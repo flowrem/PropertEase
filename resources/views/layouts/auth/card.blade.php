@@ -3,21 +3,16 @@
     <head>
         @include('partials.head')
     </head>
-    <body class="min-h-screen bg-neutral-100 antialiased dark:bg-linear-to-b dark:from-neutral-950 dark:to-neutral-900">
-        <div class="bg-muted flex min-h-svh flex-col items-center justify-center gap-6 p-6 md:p-10">
-            <div class="flex w-full max-w-md flex-col gap-6">
-                <a href="{{ route('home') }}" class="flex flex-col items-center gap-2 font-medium" wire:navigate>
-                    <span class="flex h-9 w-9 items-center justify-center rounded-md">
-                        <x-app-logo-icon class="size-9 fill-current text-black dark:text-white" />
-                    </span>
-
-                    <span class="sr-only">{{ config('app.name', 'Laravel') }}</span>
+    <body class="min-h-screen antialiased bg-coastal-50 text-coastal-900 dark:bg-coastal-950 dark:text-coastal-100">
+        <div class="flex min-h-svh flex-col items-center justify-center gap-6 p-6 md:p-10">
+            <div class="flex w-full max-w-md flex-col gap-8">
+                <a href="{{ route('home') }}" class="flex items-center justify-center gap-3" wire:navigate>
+                    <x-app-logo-icon class="size-7 text-coastal-600 dark:text-coastal-300" />
+                    <span class="text-base font-semibold tracking-tight text-coastal-900 dark:text-white">{{ config('app.name') }}</span>
                 </a>
 
-                <div class="flex flex-col gap-6">
-                    <div class="rounded-xl border bg-white dark:bg-stone-950 dark:border-stone-800 text-stone-800 shadow-xs">
-                        <div class="px-10 py-8">{{ $slot }}</div>
-                    </div>
+                <div class="rounded-xl border border-coastal-200 bg-white shadow-sm dark:border-coastal-700 dark:bg-coastal-900 dark:shadow-lg dark:shadow-coastal-950/50">
+                    <div class="px-10 py-8">{{ $slot }}</div>
                 </div>
             </div>
         </div>
