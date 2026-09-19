@@ -3,6 +3,9 @@
     <head>
         @include('partials.head')
     </head>
+    @php
+        $sidebarIsLandlord = auth()->user()->isLandlordOn(auth()->user()->currentTeam);
+    @endphp
     <body class="min-h-screen bg-white dark:bg-zinc-800">
         <flux:sidebar sticky collapsible="mobile" class="border-e border-zinc-200 bg-zinc-50 dark:border-zinc-700 dark:bg-zinc-900">
             <flux:sidebar.header>
@@ -15,22 +18,37 @@
             <flux:sidebar.nav>
                 <flux:sidebar.group :heading="__('Platform')" class="grid">
                     <flux:sidebar.item icon="home" :href="route('dashboard')" :current="request()->routeIs('dashboard')" wire:navigate>
-                        {{ __('Dashboard') }}
+                        {{ __('Home') }}
                     </flux:sidebar.item>
+
+                    @if ($sidebarIsLandlord)
+                        <flux:sidebar.item icon="building-office-2" :href="route('properties')" :current="request()->routeIs('properties')" wire:navigate>
+                            {{ __('Properties') }}
+                        </flux:sidebar.item>
+                        <flux:sidebar.item icon="users" :href="route('tenants')" :current="request()->routeIs('tenants')" wire:navigate>
+                            {{ __('Tenants') }}
+                        </flux:sidebar.item>
+                        <flux:sidebar.item icon="inbox" :href="route('inbox')" :current="request()->routeIs('inbox')" wire:navigate>
+                            {{ __('Inbox') }}
+                        </flux:sidebar.item>
+                    @else
+                        <flux:sidebar.item icon="banknotes" :href="route('billing')" :current="request()->routeIs('billing')" wire:navigate>
+                            {{ __('Billing') }}
+                        </flux:sidebar.item>
+                        <flux:sidebar.item icon="wrench-screwdriver" :href="route('maintenance')" :current="request()->routeIs('maintenance')" wire:navigate>
+                            {{ __('Maintenance') }}
+                        </flux:sidebar.item>
+                        <flux:sidebar.item icon="flag" :href="route('complaints')" :current="request()->routeIs('complaints')" wire:navigate>
+                            {{ __('Complaints') }}
+                        </flux:sidebar.item>
+                        <flux:sidebar.item icon="megaphone" :href="route('announcements')" :current="request()->routeIs('announcements')" wire:navigate>
+                            {{ __('Announcements') }}
+                        </flux:sidebar.item>
+                    @endif
                 </flux:sidebar.group>
             </flux:sidebar.nav>
 
             <flux:spacer />
-
-            <flux:sidebar.nav>
-                <flux:sidebar.item icon="folder-git-2" href="https://github.com/laravel/livewire-starter-kit" target="_blank">
-                    {{ __('Repository') }}
-                </flux:sidebar.item>
-
-                <flux:sidebar.item icon="book-open-text" href="https://laravel.com/docs/starter-kits#livewire" target="_blank">
-                    {{ __('Documentation') }}
-                </flux:sidebar.item>
-            </flux:sidebar.nav>
 
             <x-desktop-user-menu class="hidden lg:block" :name="auth()->user()->name" />
         </flux:sidebar>
@@ -91,8 +109,6 @@
         </flux:header>
 
         {{ $slot }}
-
-        <livewire:create-team-modal />
 
         @persist('toast')
             <flux:toast.group>

@@ -7,6 +7,7 @@ enum TeamRole: string
     case Owner = 'owner';
     case Admin = 'admin';
     case Member = 'member';
+    case Tenant = 'tenant';
 
     /**
      * Get the display label for the role.
@@ -30,7 +31,7 @@ enum TeamRole: string
                 TeamPermission::CreateInvitation,
                 TeamPermission::CancelInvitation,
             ],
-            self::Member => [],
+            self::Member, self::Tenant => [],
         };
     }
 
@@ -52,6 +53,7 @@ enum TeamRole: string
             self::Owner => 3,
             self::Admin => 2,
             self::Member => 1,
+            self::Tenant => 0,
         };
     }
 
@@ -64,7 +66,7 @@ enum TeamRole: string
     }
 
     /**
-     * Get the roles that can be assigned to team members (excludes Owner).
+     * Get the roles that can be assigned to team members via the invite flow (excludes Owner).
      *
      * @return array<array{value: string, label: string}>
      */

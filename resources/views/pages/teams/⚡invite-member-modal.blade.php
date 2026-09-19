@@ -9,7 +9,6 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Notification;
 use Illuminate\Validation\Rule;
-use Livewire\Attributes\Computed;
 use Livewire\Component;
 
 new class extends Component {
@@ -19,9 +18,17 @@ new class extends Component {
 
     public string $inviteRole = 'member';
 
-    public function mount(Team $team): void
+    /** @var array<int, array{value: string, label: string}> */
+    public array $roles = [];
+
+    public string $redirectTo = 'teams.edit';
+
+    public function mount(Team $team, string $defaultRole = 'member', ?array $roles = null, string $redirectTo = 'teams.edit'): void
     {
         $this->team = $team;
+        $this->inviteRole = $defaultRole;
+        $this->roles = $roles ?? TeamRole::assignable();
+        $this->redirectTo = $redirectTo;
     }
 
     public function createInvitation(): void
@@ -48,13 +55,9 @@ new class extends Component {
 
         Flux::toast(variant: 'success', text: __('Invitation sent.'));
 
-        $this->redirectRoute('teams.edit', ['team' => $this->team->slug], navigate: true);
-    }
+        $routeParam = $this->redirectTo === 'teams.edit' ? 'team' : 'current_team';
 
-    #[Computed]
-    public function availableRoles(): array
-    {
-        return TeamRole::assignable();
+        $this->redirectRoute($this->redirectTo, [$routeParam => $this->team->slug], navigate: true);
     }
 }; ?>
 
@@ -69,7 +72,7 @@ new class extends Component {
             <flux:input wire:model="inviteEmail" type="email" :label="__('Email address')" required data-test="invite-email" />
 
             <flux:select wire:model="inviteRole" :label="__('Role')" data-test="invite-role">
-                @foreach ($this->availableRoles as $role)
+                @foreach ($roles as $role)
                     <flux:select.option value="{{ $role['value'] }}">{{ $role['label'] }}</flux:select.option>
                 @endforeach
             </flux:select>

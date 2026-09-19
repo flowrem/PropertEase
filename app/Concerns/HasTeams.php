@@ -129,6 +129,14 @@ trait HasTeams
     }
 
     /**
+     * Determine if the user manages the given team (as opposed to being a tenant on it).
+     */
+    public function isLandlordOn(Team $team): bool
+    {
+        return $this->teamRole($team) !== TeamRole::Tenant;
+    }
+
+    /**
      * Get the user's teams as a collection of UserTeam objects.
      *
      * @return Collection<int, UserTeam>

@@ -9,6 +9,7 @@ use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Attributes\Hidden;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Illuminate\Support\Carbon;
@@ -66,5 +67,35 @@ class User extends Authenticatable implements PasskeyUser
         return Str::length($initials) > 1
             ? Str::substr($initials, 0, 1).Str::substr($initials, -1)
             : $initials;
+    }
+
+    /**
+     * Get the leases where this user is the tenant.
+     *
+     * @return HasMany<Lease, $this>
+     */
+    public function leases(): HasMany
+    {
+        return $this->hasMany(Lease::class, 'tenant_id');
+    }
+
+    /**
+     * Get the concern updates this user has authored.
+     *
+     * @return HasMany<ConcernUpdate, $this>
+     */
+    public function concernUpdates(): HasMany
+    {
+        return $this->hasMany(ConcernUpdate::class, 'author_id');
+    }
+
+    /**
+     * Get the announcements this user has authored.
+     *
+     * @return HasMany<Announcement, $this>
+     */
+    public function announcements(): HasMany
+    {
+        return $this->hasMany(Announcement::class, 'author_id');
     }
 }

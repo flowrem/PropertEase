@@ -75,6 +75,37 @@ test('team member cannot be removed by non owners', function () {
         ->assertForbidden();
 });
 
+test('tenants cannot access team settings', function () {
+    $owner = User::factory()->create();
+    $tenant = User::factory()->create();
+    $team = Team::factory()->create();
+
+    $team->members()->attach($owner, ['role' => TeamRole::Owner->value]);
+    $team->members()->attach($tenant, ['role' => TeamRole::Tenant->value]);
+    $tenant->switchTeam($team);
+
+    $response = $this->actingAs($tenant)->get(route('teams.edit', $team));
+
+    $response->assertForbidden();
+});
+
+test('the staff table excludes tenants', function () {
+    $owner = User::factory()->create();
+    $staffMember = User::factory()->create(['name' => 'Staff Person']);
+    $tenant = User::factory()->create(['name' => 'Tenant Person']);
+    $team = Team::factory()->create();
+
+    $team->members()->attach($owner, ['role' => TeamRole::Owner->value]);
+    $team->members()->attach($staffMember, ['role' => TeamRole::Member->value]);
+    $team->members()->attach($tenant, ['role' => TeamRole::Tenant->value]);
+
+    $this->actingAs($owner);
+
+    Livewire::test('pages::teams.edit', ['team' => $team])
+        ->assertSee('Staff Person')
+        ->assertDontSee('Tenant Person');
+});
+
 test('removed members current team is set to personal team', function () {
     $owner = User::factory()->create();
     $member = User::factory()->create();

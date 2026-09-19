@@ -96,6 +96,26 @@ class Team extends Model
     }
 
     /**
+     * Get all properties owned by this team.
+     *
+     * @return HasMany<Property, $this>
+     */
+    public function properties(): HasMany
+    {
+        return $this->hasMany(Property::class);
+    }
+
+    /**
+     * Get all billable services this team offers.
+     *
+     * @return HasMany<Service, $this>
+     */
+    public function services(): HasMany
+    {
+        return $this->hasMany(Service::class);
+    }
+
+    /**
      * Get the attributes that should be cast.
      *
      * @return array<string, string>

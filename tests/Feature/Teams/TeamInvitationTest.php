@@ -31,6 +31,35 @@ test('team invitations can be created', function () {
     ]);
 });
 
+test('the invite modal can be configured for tenant-only invites with a custom redirect', function () {
+    Notification::fake();
+
+    $owner = User::factory()->create();
+    $team = Team::factory()->create();
+
+    $team->members()->attach($owner, ['role' => TeamRole::Owner->value]);
+
+    $this->actingAs($owner);
+
+    Livewire::test('pages::teams.invite-member-modal', [
+        'team' => $team,
+        'defaultRole' => 'tenant',
+        'roles' => [['value' => 'tenant', 'label' => 'Tenant']],
+        'redirectTo' => 'tenants',
+    ])
+        ->assertSet('inviteRole', 'tenant')
+        ->set('inviteEmail', 'tenant@example.com')
+        ->call('createInvitation')
+        ->assertHasNoErrors()
+        ->assertRedirect(route('tenants', ['current_team' => $team->slug]));
+
+    $this->assertDatabaseHas('team_invitations', [
+        'team_id' => $team->id,
+        'email' => 'tenant@example.com',
+        'role' => TeamRole::Tenant->value,
+    ]);
+});
+
 test('team invitations cannot be created by members', function () {
     $owner = User::factory()->create();
     $member = User::factory()->create();
