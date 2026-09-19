@@ -61,15 +61,11 @@
                    class="text-sm text-center text-red-600 dark:text-red-400"></p>
             </div>
 
-            <div class="relative my-6">
-                <div class="absolute inset-0 flex items-center">
-                    <div class="w-full border-t border-zinc-200 dark:border-zinc-700"></div>
-                </div>
-                <div class="relative flex justify-center text-xs uppercase">
-                    <span class="px-2 text-zinc-500 dark:text-zinc-400 bg-white dark:bg-zinc-900">
-                        {{ $separator }}
-                    </span>
-                </div>
+            {{-- Hairlines flanking the label, so the separator needs no background of its own to sit on. --}}
+            <div class="my-6 flex items-center gap-3" aria-hidden="true">
+                <span class="h-px flex-1 bg-coastal-200 dark:bg-coastal-700"></span>
+                <span class="text-xs uppercase tracking-wide text-coastal-600 dark:text-coastal-400">{{ $separator }}</span>
+                <span class="h-px flex-1 bg-coastal-200 dark:bg-coastal-700"></span>
             </div>
         </div>
     </template>
