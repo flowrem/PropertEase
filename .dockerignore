@@ -3,7 +3,6 @@
 .env.*
 node_modules
 vendor
-public/build
 database/database.sqlite
 storage/framework/cache/*
 storage/framework/sessions/*

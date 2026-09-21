@@ -1,10 +1,8 @@
-# --- Frontend assets ---
-FROM node:22-slim AS assets
-WORKDIR /app
-COPY . .
-RUN rm -f package-lock.json && npm install && npm run build
+# Frontend assets are pre-built locally and committed to public/build,
+# so Docker doesn't need Node at all — this avoids the very new (and
+# still fragile in Linux containers) Vite/rolldown toolchain this
+# project builds with.
 
-# --- PHP application ---
 FROM php:8.4-cli
 
 RUN apt-get update && apt-get install -y \
@@ -16,7 +14,6 @@ COPY --from=composer:2 /usr/bin/composer /usr/bin/composer
 
 WORKDIR /app
 COPY . .
-COPY --from=assets /app/public/build ./public/build
 
 RUN composer install --no-dev --optimize-autoloader --no-interaction \
     && chmod -R 775 storage bootstrap/cache
