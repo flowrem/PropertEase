@@ -16,4 +16,16 @@ enum ConcernStatus: string
             self::Resolved => 'Resolved',
         };
     }
+
+    /**
+     * Get the badge color used to represent this status.
+     */
+    public function color(): string
+    {
+        return match ($this) {
+            self::Pending => 'zinc',
+            self::InProgress => 'blue',
+            self::Resolved => 'lime',
+        };
+    }
 }

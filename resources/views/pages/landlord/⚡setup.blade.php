@@ -32,7 +32,7 @@ new #[Title('Add a property')] class extends Component
 
     public string $postal_code = '';
 
-    public string $type = '';
+    public string $type = PropertyType::Apartment->value;
 
     public string $unit_number = '';
 
@@ -44,11 +44,6 @@ new #[Title('Add a property')] class extends Component
 
     public string $inviteEmail = '';
 
-    public function mount(): void
-    {
-        $this->type = PropertyType::Apartment->value;
-    }
-
     #[Computed]
     public function team(): Team
     {
@@ -58,7 +53,9 @@ new #[Title('Add a property')] class extends Component
     #[Computed]
     public function property(): ?Property
     {
-        return $this->propertyId ? Property::find($this->propertyId) : null;
+        return $this->propertyId
+            ? $this->team->properties()->find($this->propertyId)
+            : null;
     }
 
     /**
@@ -91,24 +88,24 @@ new #[Title('Add a property')] class extends Component
 
     public function addUnit(): void
     {
+        $property = $this->team->properties()->findOrFail($this->propertyId);
+
         $validated = $this->validate([
             'unit_number' => [
                 'required', 'string', 'max:255',
-                Rule::unique('units', 'unit_number')->where('property_id', $this->propertyId),
+                Rule::unique('units', 'unit_number')->where('property_id', $property->id),
             ],
             'floor_level' => ['nullable', 'string', 'max:255'],
             'bedrooms' => ['required', 'integer', 'min:0', 'max:20'],
             'bathrooms' => ['required', 'integer', 'min:0', 'max:20'],
         ]);
 
-        $this->property->units()->create([
+        $property->units()->create([
             ...$validated,
             'status' => UnitStatus::Vacant,
         ]);
 
-        $this->reset('unit_number', 'floor_level');
-        $this->bedrooms = 1;
-        $this->bathrooms = 1;
+        $this->reset('unit_number', 'floor_level', 'bedrooms', 'bathrooms');
 
         unset($this->property);
     }
@@ -197,8 +194,8 @@ new #[Title('Add a property')] class extends Component
                         <li wire:key="unit-{{ $unit->id }}" class="flex items-center justify-between rounded-lg border border-zinc-200 px-4 py-3 text-sm dark:border-zinc-700">
                             <span class="font-medium">{{ __('Unit :number', ['number' => $unit->unit_number]) }}</span>
                             <span class="text-zinc-500 dark:text-zinc-400">
-                                {{ $unit->bedrooms }} {{ $unit->bedrooms === 1 ? 'bed' : 'beds' }} &middot;
-                                {{ $unit->bathrooms }} {{ $unit->bathrooms === 1 ? 'bath' : 'baths' }}
+                                {{ $unit->bedrooms }} {{ Str::plural('bed', $unit->bedrooms) }} &middot;
+                                {{ $unit->bathrooms }} {{ Str::plural('bath', $unit->bathrooms) }}
                             </span>
                         </li>
                     @endforeach

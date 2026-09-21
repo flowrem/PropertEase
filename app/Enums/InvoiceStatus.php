@@ -18,4 +18,17 @@ enum InvoiceStatus: string
             self::Overdue => 'Overdue',
         };
     }
+
+    /**
+     * Get the badge color used to represent this status.
+     */
+    public function color(): string
+    {
+        return match ($this) {
+            self::Unpaid => 'zinc',
+            self::PartiallyPaid => 'amber',
+            self::Paid => 'lime',
+            self::Overdue => 'red',
+        };
+    }
 }

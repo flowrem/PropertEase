@@ -5,6 +5,7 @@ use App\Enums\TeamRole;
 use App\Models\Team;
 use App\Rules\TeamName;
 use Flux\Flux;
+use Illuminate\Contracts\View\View;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
@@ -19,12 +20,16 @@ new class extends Component
 
     public string $teamName = '';
 
+    /** @var array{id: int, name: string, slug: string, is_personal: bool} */
     public array $teamData = [];
 
+    /** @var array<int, array{id: int, name: string, email: string, avatar: string|null, initials: string, role: string, role_label: string}> */
     public array $members = [];
 
+    /** @var array<int, array{code: string, email: string, role: string, role_label: string, created_at: string}> */
     public array $invitations = [];
 
+    /** @var array<int, array{value: string, label: string}> */
     public array $availableRoles = [];
 
     public bool $isCurrentTeam = false;
@@ -59,7 +64,7 @@ new class extends Component
 
         Flux::toast(variant: 'success', text: __('Team updated.'));
 
-        $this->redirectRoute('teams.edit', ['team' => $this->teamModel->fresh()->slug], navigate: true);
+        $this->redirectRoute('teams.edit', ['team' => $team->slug], navigate: true);
     }
 
     public function updateMember(int $userId, string $role): void
@@ -82,8 +87,6 @@ new class extends Component
 
     private function populateTeamData(): void
     {
-        $user = Auth::user();
-
         $team = $this->teamModel->fresh();
 
         $this->teamData = [
@@ -123,10 +126,10 @@ new class extends Component
             ->values()
             ->all();
 
-        $this->isCurrentTeam = $user->isCurrentTeam($team);
+        $this->isCurrentTeam = Auth::user()->isCurrentTeam($team);
     }
 
-    public function render()
+    public function render(): View
     {
         $teamName = $this->teamData['name'] ?? $this->teamModel->name;
 

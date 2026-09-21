@@ -11,6 +11,11 @@
 
         <form method="POST" action="{{ route('register.store') }}" class="flex flex-col gap-6">
             @csrf
+
+            @if ($teamInvitation)
+                <input type="hidden" name="invitation" value="{{ $teamInvitation['code'] }}">
+            @endif
+
             <!-- Name -->
             <flux:input
                 name="name"
@@ -27,9 +32,10 @@
             <flux:input
                 name="email"
                 :label="__('Email address')"
-                :value="old('email')"
+                :value="$teamInvitation['email'] ?? old('email')"
                 type="email"
                 required
+                :readonly="(bool) $teamInvitation"
                 autocomplete="email"
                 placeholder="email@example.com"
             />

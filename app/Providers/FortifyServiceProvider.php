@@ -100,7 +100,7 @@ class FortifyServiceProvider extends ServiceProvider
     /**
      * Get the pending team invitation context for auth pages.
      *
-     * @return array{code: string, teamName: string}|null
+     * @return array{code: string, teamName: string, email: string}|null
      */
     private function teamInvitation(Request $request): ?array
     {
@@ -111,12 +111,9 @@ class FortifyServiceProvider extends ServiceProvider
         }
 
         $invitation = TeamInvitation::query()
+            ->pending()
             ->with('team')
             ->where('code', $invitationCode)
-            ->whereNull('accepted_at')
-            ->where(fn ($query) => $query
-                ->whereNull('expires_at')
-                ->orWhere('expires_at', '>=', now()))
             ->first();
 
         if (! $invitation) {
@@ -126,6 +123,7 @@ class FortifyServiceProvider extends ServiceProvider
         return [
             'code' => $invitation->code,
             'teamName' => $invitation->team->name,
+            'email' => $invitation->email,
         ];
     }
 }

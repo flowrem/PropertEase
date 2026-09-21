@@ -1,7 +1,5 @@
 <?php
 
-use App\Enums\ConcernCategory;
-use App\Enums\ConcernStatus;
 use App\Models\Concern;
 use App\Models\Team;
 use Illuminate\Support\Collection;
@@ -42,10 +40,10 @@ new #[Title('Inbox')] class extends Component
             <div class="flex items-start justify-between gap-4">
                 <div>
                     <div class="flex items-center gap-2">
-                        <flux:badge :color="$concern->category === ConcernCategory::Maintenance ? 'blue' : 'amber'" size="sm">
+                        <flux:badge :color="$concern->category->color()" size="sm">
                             {{ $concern->category->label() }}
                         </flux:badge>
-                        <flux:badge :color="$concern->status === ConcernStatus::Resolved ? 'lime' : ($concern->status === ConcernStatus::InProgress ? 'blue' : 'zinc')" size="sm">
+                        <flux:badge :color="$concern->status->color()" size="sm">
                             {{ $concern->status->label() }}
                         </flux:badge>
                     </div>

@@ -3,11 +3,7 @@
 use Livewire\Attributes\Title;
 use Livewire\Component;
 
-new #[Title('Maintenance')] class extends Component
-{
-    //
-};
-?>
+new #[Title('Maintenance')] class extends Component {}; ?>
 
 <section class="w-full">
     <x-feature-preview

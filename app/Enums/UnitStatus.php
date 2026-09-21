@@ -16,4 +16,16 @@ enum UnitStatus: string
             self::UnderMaintenance => 'Under Maintenance',
         };
     }
+
+    /**
+     * Get the badge color used to represent this status.
+     */
+    public function color(): string
+    {
+        return match ($this) {
+            self::Vacant => 'lime',
+            self::Occupied => 'blue',
+            self::UnderMaintenance => 'amber',
+        };
+    }
 }

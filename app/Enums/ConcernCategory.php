@@ -14,4 +14,15 @@ enum ConcernCategory: string
             self::Complaint => 'Complaint',
         };
     }
+
+    /**
+     * Get the badge color used to represent this category.
+     */
+    public function color(): string
+    {
+        return match ($this) {
+            self::Maintenance => 'blue',
+            self::Complaint => 'amber',
+        };
+    }
 }

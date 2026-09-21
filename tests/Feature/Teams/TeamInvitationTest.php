@@ -4,6 +4,7 @@ use App\Enums\TeamRole;
 use App\Models\Team;
 use App\Models\TeamInvitation;
 use App\Models\User;
+use App\Notifications\Teams\TeamInvitation as TeamInvitationNotification;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Support\Facades\Notification;
 use Livewire\Livewire;
@@ -204,6 +205,44 @@ test('team invitations cannot be accepted by user that wasnt invited', function 
     $response->assertHasErrors(['invitation']);
 
     expect($uninvitedUser->fresh()->belongsToTeam($team))->toBeFalse();
+});
+
+test('a tenant invitation email says the invitee will become a tenant, not join a team', function () {
+    $owner = User::factory()->create();
+    $team = Team::factory()->create(['name' => 'Sunrise Apartments']);
+
+    $team->members()->attach($owner, ['role' => TeamRole::Owner->value]);
+
+    $invitation = TeamInvitation::factory()->create([
+        'team_id' => $team->id,
+        'role' => TeamRole::Tenant,
+        'invited_by' => $owner->id,
+    ]);
+
+    $mail = (new TeamInvitationNotification($invitation))->toMail($invitation);
+
+    expect($mail->subject)->toBe("You've been invited to become a tenant under Sunrise Apartments")
+        ->and($mail->introLines)->toContain($owner->name.' has invited you to become a tenant under Sunrise Apartments.')
+        ->and(implode(' ', $mail->introLines))->not->toContain('join Sunrise Apartments');
+});
+
+test('a staff invitation email says the invitee will join the team', function () {
+    $owner = User::factory()->create();
+    $team = Team::factory()->create(['name' => 'Sunrise Apartments']);
+
+    $team->members()->attach($owner, ['role' => TeamRole::Owner->value]);
+
+    $invitation = TeamInvitation::factory()->create([
+        'team_id' => $team->id,
+        'role' => TeamRole::Member,
+        'invited_by' => $owner->id,
+    ]);
+
+    $mail = (new TeamInvitationNotification($invitation))->toMail($invitation);
+
+    expect($mail->subject)->toBe("You've been invited to join Sunrise Apartments")
+        ->and($mail->introLines)->toContain($owner->name.' has invited you to join Sunrise Apartments.')
+        ->and(implode(' ', $mail->introLines))->not->toContain('become a tenant');
 });
 
 test('expired invitations cannot be accepted', function () {

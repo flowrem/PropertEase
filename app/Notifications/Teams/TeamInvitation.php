@@ -2,6 +2,7 @@
 
 namespace App\Notifications\Teams;
 
+use App\Enums\TeamRole;
 use App\Models\TeamInvitation as TeamInvitationModel;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -35,15 +36,24 @@ class TeamInvitation extends Notification implements ShouldQueue
      */
     public function toMail(object $notifiable): MailMessage
     {
-        $team = $this->invitation->team;
-        $inviter = $this->invitation->inviter;
+        $isTenant = $this->invitation->role === TeamRole::Tenant;
+
+        $replacements = [
+            'inviterName' => $this->invitation->inviter->name,
+            'teamName' => $this->invitation->team->name,
+        ];
+
+        $subject = $isTenant
+            ? __("You've been invited to become a tenant under :teamName", $replacements)
+            : __("You've been invited to join :teamName", $replacements);
+
+        $invitedBy = $isTenant
+            ? __(':inviterName has invited you to become a tenant under :teamName.', $replacements)
+            : __(':inviterName has invited you to join :teamName.', $replacements);
 
         return (new MailMessage)
-            ->subject(__("You've been invited to join :teamName", ['teamName' => $team->name]))
-            ->line(__(':inviterName has invited you to join the :teamName team.', [
-                'inviterName' => $inviter->name,
-                'teamName' => $team->name,
-            ]))
+            ->subject($subject)
+            ->line($invitedBy)
             ->line(__('Log in and visit your dashboard to accept or decline this invitation.'))
             ->action(
                 __('Log in'),
