@@ -1,0 +1,15 @@
+.git
+.env
+.env.*
+node_modules
+vendor
+public/build
+database/database.sqlite
+storage/framework/cache/*
+storage/framework/sessions/*
+storage/framework/testing/*
+storage/framework/views/*
+storage/logs/*
+tests
+.phpunit.cache
+.claude
