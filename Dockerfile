@@ -1,5 +1,5 @@
 # --- Frontend assets ---
-FROM node:22-alpine AS assets
+FROM node:22-slim AS assets
 WORKDIR /app
 COPY . .
 RUN npm ci && npm run build
