@@ -2,7 +2,7 @@
 FROM node:22-slim AS assets
 WORKDIR /app
 COPY . .
-RUN npm ci && npm run build
+RUN rm -f package-lock.json && npm install && npm run build
 
 # --- PHP application ---
 FROM php:8.4-cli
