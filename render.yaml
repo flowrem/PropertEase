@@ -33,7 +33,7 @@ services:
       - key: CACHE_STORE
         value: database
       - key: QUEUE_CONNECTION
-        value: sync
+        value: database
       - key: MAIL_MAILER
         sync: false
       - key: MAIL_SCHEME

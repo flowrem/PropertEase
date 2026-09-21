@@ -20,4 +20,4 @@ RUN composer install --no-dev --optimize-autoloader --no-interaction \
 
 EXPOSE 10000
 
-CMD ["/bin/sh", "-c", "php artisan migrate --force && php artisan config:cache && php artisan route:cache && php artisan view:cache && php artisan serve --host=0.0.0.0 --port=${PORT:-10000}"]
+CMD ["/bin/sh", "-c", "php artisan migrate --force && php artisan config:cache && php artisan route:cache && php artisan view:cache && (php artisan queue:work --tries=1 --timeout=90 &) && PHP_CLI_SERVER_WORKERS=4 php artisan serve --host=0.0.0.0 --port=${PORT:-10000}"]
