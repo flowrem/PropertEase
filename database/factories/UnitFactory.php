@@ -26,6 +26,8 @@ class UnitFactory extends Factory
             'bedrooms' => fake()->numberBetween(0, 4),
             'bathrooms' => fake()->numberBetween(1, 3),
             'status' => fake()->randomElement(UnitStatus::cases()),
+            'allows_multiple_tenants' => false,
+            'price' => fake()->numberBetween(2000, 15000),
         ];
     }
 }

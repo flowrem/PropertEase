@@ -3,9 +3,6 @@
     <head>
         @include('partials.head')
     </head>
-    @php
-        $sidebarIsLandlord = auth()->user()->isLandlordOn(auth()->user()->currentTeam);
-    @endphp
     <body class="min-h-screen bg-white dark:bg-zinc-800">
         <flux:sidebar sticky collapsible="mobile" class="border-e border-zinc-200 bg-zinc-50 dark:border-zinc-700 dark:bg-zinc-900">
             <flux:sidebar.header>
@@ -15,21 +12,29 @@
 
             <livewire:team-switcher />
 
+            @php($isLandlord = auth()->user()->isLandlordOn(auth()->user()->currentTeam))
+
             <flux:sidebar.nav>
                 <flux:sidebar.group :heading="__('Platform')" class="grid">
                     <flux:sidebar.item icon="home" :href="route('dashboard')" :current="request()->routeIs('dashboard')" wire:navigate>
                         {{ __('Home') }}
                     </flux:sidebar.item>
 
-                    @if ($sidebarIsLandlord)
+                    @if ($isLandlord)
                         <flux:sidebar.item icon="building-office-2" :href="route('properties')" :current="request()->routeIs('properties')" wire:navigate>
                             {{ __('Properties') }}
                         </flux:sidebar.item>
                         <flux:sidebar.item icon="users" :href="route('tenants')" :current="request()->routeIs('tenants')" wire:navigate>
                             {{ __('Tenants') }}
                         </flux:sidebar.item>
+                        <flux:sidebar.item icon="banknotes" :href="route('invoices')" :current="request()->routeIs('invoices')" wire:navigate>
+                            {{ __('Invoices') }}
+                        </flux:sidebar.item>
                         <flux:sidebar.item icon="inbox" :href="route('inbox')" :current="request()->routeIs('inbox')" wire:navigate>
                             {{ __('Inbox') }}
+                        </flux:sidebar.item>
+                        <flux:sidebar.item icon="megaphone" :href="route('announcements')" :current="request()->routeIs('announcements')" wire:navigate>
+                            {{ __('Announcements') }}
                         </flux:sidebar.item>
                     @else
                         <flux:sidebar.item icon="banknotes" :href="route('billing')" :current="request()->routeIs('billing')" wire:navigate>
