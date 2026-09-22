@@ -13,7 +13,7 @@ services:
     healthCheckPath: /up
     envVars:
       - key: APP_NAME
-        value: PropertEase
+        value: Occuplace
       - key: APP_ENV
         value: production
       - key: APP_DEBUG
@@ -43,4 +43,4 @@ services:
       - key: MAIL_FROM_ADDRESS
         sync: false
       - key: MAIL_FROM_NAME
-        value: PropertEase
+        value: Occuplace

@@ -1,8 +1,10 @@
-# PropertEase — Session Context
+# Occuplace — Session Context
 
 Paste this whole file into a new Claude Code conversation (in this repo) to restore context if a session forgets what happened.
 
-## What PropertEase Is
+Formerly named PropertEase — the product was renamed to Occuplace as part of the professor-revisions branch. Infrastructure identifiers created under the old name (the Herd site, the GitHub repo, the Render service and its URL) were deliberately left unchanged; see the note wherever they're referenced below.
+
+## What Occuplace Is
 
 A Laravel webapp automating landlord-tenant management for apartments/dormitories: rent billing, maintenance/complaint tracking, and announcements. Built from real research: a 48-respondent tenant survey (`Tenant Research Questionnaire`, collected 2026-09-09 to 2026-09-19) drives feature priority. Key findings that shaped decisions:
 

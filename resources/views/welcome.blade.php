@@ -51,7 +51,7 @@
                     {{ __('Stop running your property over group chat.') }}
                 </h1>
                 <p class="mx-auto mt-5 max-w-xl text-lg text-zinc-400">
-                    {{ __('PropertEase gives landlords and tenants one shared place for rent, maintenance requests, and complaints, so nothing gets lost in a text thread.') }}
+                    {{ __('Occuplace gives landlords and tenants one shared place for rent, maintenance requests, and complaints, so nothing gets lost in a text thread.') }}
                 </p>
 
                 @if (Route::has('register'))
