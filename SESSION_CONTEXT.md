@@ -37,7 +37,7 @@ Source docs (outside the repo, on the user's machine): `Tenant_Survey_Analysis_a
 
 - PHP is managed by **Laravel Herd**, not on the Bash tool's PATH. From Bash, use the `.bat` wrappers directly (`composer.bat`, `php.bat`) — plain `composer`/`php` resolve to nothing. **PowerShell resolves them natively and is strongly preferred** for `artisan`/`pint`/`pest`/`composer` one-offs.
 - **Docker is not installed locally** — you cannot test-build the Dockerfile on this machine. Render's build is the first real test of any Dockerfile change.
-- The project is `herd link`ed and served continuously at `http://PropertEase.test`.
+- The project is `herd link`ed and served continuously at `http://Occuplace.test`.
 - **Real device (phone) testing no longer needs a tunnel** — the app is deployed publicly now. The old Expose tunnel workflow (1-hour cap, 60-minute cooldown, `expose token <token>` to bypass the hanging device-code login) is obsolete but documented in git history if ever needed again.
 - **`bootstrap/app.php` trusts all proxies** (`$middleware->trustProxies(at: '*')`). Without this, Laravel doesn't know a request arriving through a reverse proxy was originally HTTPS, so `asset()`/`url()` emit `http://` on an `https://` page — browsers silently block those as mixed content, so the page loads with zero CSS/JS. **This matters in production on Render too, not just tunnels.**
 - Killing the dev server with a broad `taskkill /IM php.exe` also kills the Laravel Boost MCP connection. Prefer killing by specific PID.
@@ -261,7 +261,7 @@ New this session:
 
 ## How To Resume
 
-Locally: the app is served by Herd at `http://PropertEase.test`. Run `php artisan queue:listen --tries=1 --timeout=0` if you need queued mail to send. Confirm `php artisan test --compact` is green (**175/175**) and `vendor/bin/phpstan.bat analyse` is clean (0 errors). Use **PowerShell** for artisan/pint/pest/composer.
+Locally: the app is served by Herd at `http://Occuplace.test`. Run `php artisan queue:listen --tries=1 --timeout=0` if you need queued mail to send. Confirm `php artisan test --compact` is green (**175/175**) and `vendor/bin/phpstan.bat analyse` is clean (0 errors). Use **PowerShell** for artisan/pint/pest/composer.
 
 In production: pushing to `main` auto-deploys to Render. **If the change touches CSS/JS/assets, run `npm run build` and commit `public/build/` too** or production will serve stale assets.
 
