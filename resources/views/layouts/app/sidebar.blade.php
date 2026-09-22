@@ -6,51 +6,64 @@
     <body class="min-h-screen bg-white dark:bg-zinc-800">
         <flux:sidebar sticky collapsible="mobile" class="border-e border-zinc-200 bg-zinc-50 dark:border-zinc-700 dark:bg-zinc-900">
             <flux:sidebar.header>
-                <x-app-logo :sidebar="true" href="{{ route('dashboard') }}" wire:navigate />
+                <x-app-logo :sidebar="true" href="{{ auth()->user()->is_super_admin ? route('admin.dashboard') : route('dashboard') }}" wire:navigate />
                 <flux:sidebar.collapse class="lg:hidden" />
             </flux:sidebar.header>
 
-            <livewire:team-switcher />
-
-            @php($isLandlord = auth()->user()->isLandlordOn(auth()->user()->currentTeam))
+            @unless (auth()->user()->is_super_admin)
+                <livewire:team-switcher />
+            @endunless
 
             <flux:sidebar.nav>
-                <flux:sidebar.group :heading="__('Platform')" class="grid">
-                    <flux:sidebar.item icon="home" :href="route('dashboard')" :current="request()->routeIs('dashboard')" wire:navigate>
-                        {{ __('Home') }}
-                    </flux:sidebar.item>
+                @if (auth()->user()->is_super_admin)
+                    <flux:sidebar.group :heading="__('Admin')" class="grid">
+                        <flux:sidebar.item icon="squares-2x2" :href="route('admin.dashboard')" :current="request()->routeIs('admin.dashboard')" wire:navigate>
+                            {{ __('Overview') }}
+                        </flux:sidebar.item>
+                        <flux:sidebar.item icon="building-office-2" :href="route('admin.landlords')" :current="request()->routeIs('admin.landlords')" wire:navigate>
+                            {{ __('Landlords') }}
+                        </flux:sidebar.item>
+                    </flux:sidebar.group>
+                @else
+                    @php($isLandlord = auth()->user()->isLandlordOn(auth()->user()->currentTeam))
 
-                    @if ($isLandlord)
-                        <flux:sidebar.item icon="building-office-2" :href="route('properties')" :current="request()->routeIs('properties')" wire:navigate>
-                            {{ __('Properties') }}
+                    <flux:sidebar.group :heading="__('Platform')" class="grid">
+                        <flux:sidebar.item icon="home" :href="route('dashboard')" :current="request()->routeIs('dashboard')" wire:navigate>
+                            {{ __('Home') }}
                         </flux:sidebar.item>
-                        <flux:sidebar.item icon="users" :href="route('tenants')" :current="request()->routeIs('tenants')" wire:navigate>
-                            {{ __('Tenants') }}
-                        </flux:sidebar.item>
-                        <flux:sidebar.item icon="banknotes" :href="route('invoices')" :current="request()->routeIs('invoices')" wire:navigate>
-                            {{ __('Invoices') }}
-                        </flux:sidebar.item>
-                        <flux:sidebar.item icon="inbox" :href="route('inbox')" :current="request()->routeIs('inbox')" wire:navigate>
-                            {{ __('Inbox') }}
-                        </flux:sidebar.item>
-                        <flux:sidebar.item icon="megaphone" :href="route('announcements')" :current="request()->routeIs('announcements')" wire:navigate>
-                            {{ __('Announcements') }}
-                        </flux:sidebar.item>
-                    @else
-                        <flux:sidebar.item icon="banknotes" :href="route('billing')" :current="request()->routeIs('billing')" wire:navigate>
-                            {{ __('Billing') }}
-                        </flux:sidebar.item>
-                        <flux:sidebar.item icon="wrench-screwdriver" :href="route('maintenance')" :current="request()->routeIs('maintenance')" wire:navigate>
-                            {{ __('Maintenance') }}
-                        </flux:sidebar.item>
-                        <flux:sidebar.item icon="flag" :href="route('complaints')" :current="request()->routeIs('complaints')" wire:navigate>
-                            {{ __('Complaints') }}
-                        </flux:sidebar.item>
-                        <flux:sidebar.item icon="megaphone" :href="route('announcements')" :current="request()->routeIs('announcements')" wire:navigate>
-                            {{ __('Announcements') }}
-                        </flux:sidebar.item>
-                    @endif
-                </flux:sidebar.group>
+
+                        @if ($isLandlord)
+                            <flux:sidebar.item icon="building-office-2" :href="route('properties')" :current="request()->routeIs('properties')" wire:navigate>
+                                {{ __('Properties') }}
+                            </flux:sidebar.item>
+                            <flux:sidebar.item icon="users" :href="route('tenants')" :current="request()->routeIs('tenants')" wire:navigate>
+                                {{ __('Tenants') }}
+                            </flux:sidebar.item>
+                            <flux:sidebar.item icon="banknotes" :href="route('invoices')" :current="request()->routeIs('invoices')" wire:navigate>
+                                {{ __('Invoices') }}
+                            </flux:sidebar.item>
+                            <flux:sidebar.item icon="inbox" :href="route('inbox')" :current="request()->routeIs('inbox')" wire:navigate>
+                                {{ __('Inbox') }}
+                            </flux:sidebar.item>
+                            <flux:sidebar.item icon="megaphone" :href="route('announcements')" :current="request()->routeIs('announcements')" wire:navigate>
+                                {{ __('Announcements') }}
+                            </flux:sidebar.item>
+                        @else
+                            <flux:sidebar.item icon="banknotes" :href="route('billing')" :current="request()->routeIs('billing')" wire:navigate>
+                                {{ __('Billing') }}
+                            </flux:sidebar.item>
+                            <flux:sidebar.item icon="wrench-screwdriver" :href="route('maintenance')" :current="request()->routeIs('maintenance')" wire:navigate>
+                                {{ __('Maintenance') }}
+                            </flux:sidebar.item>
+                            <flux:sidebar.item icon="flag" :href="route('complaints')" :current="request()->routeIs('complaints')" wire:navigate>
+                                {{ __('Complaints') }}
+                            </flux:sidebar.item>
+                            <flux:sidebar.item icon="megaphone" :href="route('announcements')" :current="request()->routeIs('announcements')" wire:navigate>
+                                {{ __('Announcements') }}
+                            </flux:sidebar.item>
+                        @endif
+                    </flux:sidebar.group>
+                @endif
             </flux:sidebar.nav>
 
             <flux:spacer />
