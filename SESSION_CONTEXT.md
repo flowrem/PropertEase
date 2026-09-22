@@ -19,6 +19,28 @@ Source docs (outside the repo, on the user's machine): `Tenant_Survey_Analysis_a
 
 **The app is deployed and publicly live** at `https://propertease-wv4j.onrender.com` (Render free tier). See the Deployment section — it has its own set of hard-won gotchas.
 
+## Professor Revisions — Multi-Phase Work In Progress
+
+Implementing `c:\Users\Rem\Downloads\REVISIONS_PROMPT.md` (**not in the repo** — read it in full before resuming this work), an 8-phase brief responding to a professor's feedback. Working on branch **`feature/professor-revisions`**, never `main` (`main` auto-deploys to the live Render app). Do not merge or rebase onto PR #1 (it branches from the first commit and would revert later auth-page work).
+
+**Locked-in decisions** (the user's own choices, overriding the brief's `{{NEW_NAME}}` placeholder and a couple of open questions):
+- Product name: **Occuplace** (Phase 1 done — renamed everywhere except the Render service name, database name, `APP_URL`, and the GitHub repo `flowrem/PropertEase`, which stay per the brief's rule 8).
+- S3 dependency approved (`league/flysystem-aws-s3-v3`). User doesn't have a bucket yet, so production uploads stay ephemeral until one's configured (Cloudflare R2 / Supabase Storage were floated as candidates, unconfirmed).
+- PHP upload limits will be raised for Phase 3 — both local Herd `php.ini` and a new `docker/php.ini` copied into the Dockerfile, since production currently ships PHP's stock 2MB/8MB with no `php.ini` in the image at all.
+- Minimum applicant age: 18 (the brief's own default, lands in Phase 5).
+- Super Admin promotion is **artisan-only** (`app:create-super-admin`), reachable by anyone with shell access to the server or a local machine — no extra permission layer beyond that. Confirmed with the user this is the intended trust boundary: teammates self-register as landlords, then whoever has shell access promotes them.
+- Every other Open Decision in the brief uses its own stated default (tenant invite-by-email kept, no landlord approval gate, reservation-based slot holding, manual downpayment verification, reject-if-email-already-exists, Owner+Manager can approve/submit and Staff view-only, payment QR set once per team not per listing).
+
+**Progress:**
+- ✅ **Phase 1 (rename to Occuplace)** — done, committed.
+- ✅ **Phase 2 (Super Admin + role hierarchy)** — done, committed. Added `users.is_super_admin` (kept out of `#[Fillable]`, artisan-only), `EnsureSuperAdmin` middleware, `/admin` route group (`admin.dashboard`, `admin.landlords`), fixed a sidebar-layout crash for teamless users (it called `route('dashboard')` and `isLandlordOn(null)`, both of which assumed a team), landlord-only registration with a business-name field, relabeled `TeamRole` (Owner→Landlord, Admin→Manager, Member→Staff; stored values unchanged).
+- 🔲 **Phase 3 (Unit Listings + payment channels)** — **plan presented to the user, not yet approved or started.** Covers: `media`/`sensitive` storage disks, the S3 adapter, raised upload limits, a `ListingStatus` enum, `unit_listings`/`listing_photos`/`payment_channels` tables, landlord `listings` + `payment-settings` pages, `/admin/listings` review queue, cross-team policies (Owner/Manager write, Staff view-only). One open question flagged to the user and still unanswered: whether Staff should see disabled Submit/Unlist buttons or have them hidden entirely.
+- 🔲 Phases 4-8 not started: public landing/browse pages, public reservation submission, landlord review + tenant account provisioning, forced first-login password change, final wrap-up (asset build, `SESSION_CONTEXT.md`/`README.md` updates, manual-steps checklist).
+
+**Non-negotiable rules from the brief, apply to every remaining phase:** migrations are additive-only, never edit an existing migration; never `migrate:fresh`/`db:wipe` outside the test suite; keep `php artisan test --compact`, PHPStan, and Pint green after every phase; one commit per logical step, no catch-alls; never rename the Render service/database/`APP_URL`; present a short plan and wait for approval at the start of each phase, stop and summarize at the end; if an ambiguity isn't covered by the brief or its Open Decisions, stop and ask. Temporary tenant passwords (Phase 6) need the same discipline already applied to `is_super_admin`: never logged, never flashed, never stored in plaintext, and the notification carrying one must be both `ShouldQueue` and `ShouldBeEncrypted`.
+
+**Test count as of Phase 2**: 188/188 passing, PHPStan 0 errors, Pint clean.
+
 ## Tech Stack
 
 - Laravel 13, PHP 8.4, **Livewire 4** using **Single-File Components** with a `⚡` filename prefix (`resources/views/pages/⚡name.blade.php` for full pages, registered via `Route::livewire()`).
@@ -223,6 +245,7 @@ Live at `https://propertease-wv4j.onrender.com`. GitHub repo `flowrem/PropertEas
 26. **Replaced the tenant Billing stub** with a real page: current balance, next due date, outstanding invoices, paid history — scoped across all of that tenant's leases, including units they've moved out of.
 27. **Committed and pushed the entire backlog** (everything since "focused on landlord functions") as two scoped commits, then deployed.
 28. **Deployed to Render** after abandoning Laravel Cloud (card required). Wrote the Dockerfile + `render.yaml`, then worked through: three consecutive Docker build failures ending in vendoring pre-built assets; a queue worker that didn't exist; a single-threaded server causing health-check timeouts; Render blocking SMTP (→ Resend); Resend's sandbox recipient restriction; and a missing `APP_URL` producing localhost links in emails.
+29. **Started the professor-revisions rewrite** (see that section above for full status): reviewed an 8-phase brief for feasibility before touching anything, then Phase 1 (renamed PropertEase → Occuplace, including relinking the local Herd site) and Phase 2 (Super Admin role: guarded `is_super_admin` column, artisan-only promotion command, `/admin` routes, a sidebar-layout crash fix for teamless users, landlord-only registration, role relabeling). Phase 3's plan (unit listings + payment channels + first file uploads) is written and presented, awaiting approval.
 
 ## Bugs Found & Fixed Mid-Session (worth knowing if debugging similar issues)
 
@@ -256,13 +279,15 @@ New this session:
 - **Truncating the final invoice when a lease ends mid-cycle** — an already-generated invoice keeps covering its full period even if the tenant leaves early. Arguably correct as a business policy, but it was never an explicit decision.
 - **Tenant-side Concern submission form** — Maintenance/Complaints are still "Coming soon" stubs (Billing is real now).
 - **Per-tenant custom rent amounts** — the equal split is currently forced; the user has signalled interest in unequal amounts (common in PH dorms), which would need a nullable per-lease override that the splitter skips.
-- A platform-admin account type above landlord Teams — deferred.
 - SMS/low-bandwidth fallback mode.
+- Unit listings, public browse/reservation flow, and tenant self-service account provisioning — see "Professor Revisions" above for current phase status.
 
 ## How To Resume
 
-Locally: the app is served by Herd at `http://Occuplace.test`. Run `php artisan queue:listen --tries=1 --timeout=0` if you need queued mail to send. Confirm `php artisan test --compact` is green (**175/175**) and `vendor/bin/phpstan.bat analyse` is clean (0 errors). Use **PowerShell** for artisan/pint/pest/composer.
+Locally: the app is served by Herd at `http://Occuplace.test`. Run `php artisan queue:listen --tries=1 --timeout=0` if you need queued mail to send. Confirm `php artisan test --compact` is green (**188/188** as of Phase 2 of the professor revisions) and `vendor/bin/phpstan.bat analyse` is clean (0 errors). Use **PowerShell** for artisan/pint/pest/composer.
 
-In production: pushing to `main` auto-deploys to Render. **If the change touches CSS/JS/assets, run `npm run build` and commit `public/build/` too** or production will serve stale assets.
+In production: pushing to `main` auto-deploys to Render. **If the change touches CSS/JS/assets, run `npm run build` and commit `public/build/` too** or production will serve stale assets. Nothing from the professor-revisions branch has been pushed to `main` yet — it all lives on `feature/professor-revisions`.
 
-Natural next steps, roughly in order of value: the outstanding-balance warning on tenant removal/move (the designed-but-unbuilt piece that closes the "debt disappears from view" gap), per-tenant custom rent amounts, service charges on invoices, then the tenant-side Concern submission form so Inbox has real data.
+**Immediate next step:** resume the professor revisions (see that section above) on branch `feature/professor-revisions`. Phase 3's plan was presented to the user but not yet approved — re-present it (or pick up mid-implementation if it was approved after this was written) rather than assuming it's done. Read `c:\Users\Rem\Downloads\REVISIONS_PROMPT.md` first if it's not still in context.
+
+Once the professor revisions wrap up (or if picking other work instead), natural next steps on the original feature set: the outstanding-balance warning on tenant removal/move (the designed-but-unbuilt piece that closes the "debt disappears from view" gap), per-tenant custom rent amounts, service charges on invoices, then the tenant-side Concern submission form so Inbox has real data.
