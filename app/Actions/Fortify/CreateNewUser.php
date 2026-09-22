@@ -8,6 +8,7 @@ use App\Concerns\PasswordValidationRules;
 use App\Concerns\ProfileValidationRules;
 use App\Models\TeamInvitation;
 use App\Models\User;
+use App\Rules\TeamName;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Str;
@@ -38,6 +39,7 @@ class CreateNewUser implements CreatesNewUsers
             ...$this->profileRules(),
             'password' => $this->passwordRules(),
             'invitation' => ['nullable', 'string'],
+            'business_name' => ['nullable', 'string', 'max:255', new TeamName],
         ])->validate();
 
         return DB::transaction(function () use ($input) {
@@ -52,7 +54,7 @@ class CreateNewUser implements CreatesNewUsers
             if ($invitation) {
                 $this->acceptTeamInvitation->handle($user, $invitation);
             } else {
-                $this->createTeam->handle($user, $user->name."'s Team", isPersonal: true);
+                $this->createTeam->handle($user, $input['business_name'] ?? $user->name."'s Team", isPersonal: true);
             }
 
             return $user;

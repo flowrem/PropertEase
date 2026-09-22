@@ -1,6 +1,9 @@
 <x-layouts::auth :title="__('Register')">
     <div class="flex flex-col gap-6">
-        <x-auth-header :title="__('Create an account')" :description="__('Enter your details below to create your account')" />
+        <x-auth-header
+            :title="$teamInvitation ? __('Create an account') : __('Create your landlord account')"
+            :description="$teamInvitation ? __('Enter your details below to create your account') : __('Enter your details below to start listing units on '.config('app.name'))"
+        />
 
         <!-- Session Status -->
         <x-auth-session-status class="text-center" :status="session('status')" />
@@ -39,6 +42,19 @@
                 autocomplete="email"
                 placeholder="email@example.com"
             />
+
+            @unless ($teamInvitation)
+                <!-- Business or property name -->
+                <flux:input
+                    name="business_name"
+                    :label="__('Business or property name')"
+                    :value="old('business_name')"
+                    type="text"
+                    required
+                    autocomplete="organization"
+                    :placeholder="__('e.g. Dela Cruz Apartments')"
+                />
+            @endunless
 
             <!-- Password -->
             <flux:input
