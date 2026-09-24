@@ -45,6 +45,15 @@
                             <flux:sidebar.item icon="home-modern" :href="route('listings')" :current="request()->routeIs('listings')" wire:navigate>
                                 {{ __('Listings') }}
                             </flux:sidebar.item>
+                            <flux:sidebar.item
+                                icon="clipboard-document-check"
+                                :href="route('reservations')"
+                                :current="request()->routeIs('reservations')"
+                                :badge="\App\Models\Reservation::where('team_id', auth()->user()->current_team_id)->pending()->count() ?: null"
+                                wire:navigate
+                            >
+                                {{ __('Reservations') }}
+                            </flux:sidebar.item>
                             <flux:sidebar.item icon="banknotes" :href="route('invoices')" :current="request()->routeIs('invoices')" wire:navigate>
                                 {{ __('Invoices') }}
                             </flux:sidebar.item>

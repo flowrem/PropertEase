@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\PublicListingController;
+use App\Http\Controllers\ReservationFileController;
 use App\Http\Middleware\EnsureTeamMembership;
 use Illuminate\Support\Facades\Route;
 
@@ -34,6 +35,11 @@ Route::prefix('{current_team}')
             Route::get('inbox', fn () => redirect()->route('landlord.maintenance'))->name('inbox');
             Route::livewire('listings', 'pages::landlord.listings')->name('listings');
             Route::livewire('payment-settings', 'pages::landlord.payment-settings')->name('payment-settings');
+            Route::livewire('reservations', 'pages::landlord.reservations')->name('reservations');
+            Route::get('reservations/{reservation}/files/{kind}', ReservationFileController::class)
+                ->whereNumber('reservation')
+                ->whereIn('kind', ['id', 'proof'])
+                ->name('reservations.files');
         });
     });
 
