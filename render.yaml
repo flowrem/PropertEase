@@ -1,12 +1,13 @@
-databases:
-  - name: propertease-db
-    plan: free
-    databaseName: propertease
-    user: propertease
+# Documentation of the production setup. Render's Blueprint for this repo was
+# DISCONNECTED on 2026-09-24, so pushing changes here does not change Render.
+# The live service (occuplace) was created by hand and its environment
+# variables are managed in the Render dashboard. Keep this file in step with
+# the dashboard so the setup can be recreated. The database and file storage
+# live in Supabase, not on Render.
 
 services:
   - type: web
-    name: propertease
+    name: occuplace
     runtime: docker
     plan: free
     dockerfilePath: ./Dockerfile
@@ -19,15 +20,14 @@ services:
       - key: APP_DEBUG
         value: false
       - key: APP_URL
-        value: https://propertease-wv4j.onrender.com
+        value: https://occuplace.onrender.com
       - key: APP_KEY
         sync: false
       - key: LOG_CHANNEL
         value: stderr
       - key: DB_CONNECTION
         value: pgsql
-      # The app uses a Supabase Postgres, not the Render database declared above
-      # (which is now unused and can be deleted in the dashboard). Set DB_URL by
+      # The app uses a Supabase Postgres, not a Render database. Set DB_URL by
       # hand to the Supabase *Session pooler* string (port 5432, user
       # postgres.<project-ref>). Never the direct or transaction pooler string.
       - key: DB_URL

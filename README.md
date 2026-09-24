@@ -74,7 +74,10 @@ php artisan migrate
 
 ## Production
 
-Deployed to Render as one Docker service (`render.yaml`), auto-deploying from `main`.
+Live at https://occuplace.onrender.com, deployed to Render as one Docker service that
+auto-deploys from `main`. The service was created by hand and its environment variables
+are managed in the Render dashboard. `render.yaml` documents that setup but is not linked
+to Render (the Blueprint was disconnected), so editing it does not change the deployment.
 
 - **Database:** Supabase Postgres, through the **Session pooler** (port 5432). Set `DB_URL`
   by hand in Render and set `DB_SSLMODE=require`.
