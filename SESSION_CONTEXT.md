@@ -36,11 +36,12 @@ Implementing `c:\Users\Rem\Downloads\REVISIONS_PROMPT.md` (**not in the repo** �
 - ✅ **Phase 2 (Super Admin + role hierarchy)** — done, committed. Added `users.is_super_admin` (kept out of `#[Fillable]`, artisan-only), `EnsureSuperAdmin` middleware, `/admin` route group (`admin.dashboard`, `admin.landlords`), fixed a sidebar-layout crash for teamless users (it called `route('dashboard')` and `isLandlordOn(null)`, both of which assumed a team), landlord-only registration with a business-name field, relabeled `TeamRole` (Owner→Landlord, Admin→Manager, Member→Staff; stored values unchanged).
 - ✅ **Phase 3 (Unit Listings + payment channels)** — done, committed. `media` (public) and `sensitive` (private) disks chosen by `MEDIA_DISK`/`SENSITIVE_DISK` (`media_s3`/`sensitive_s3` for a bucket), S3 adapter, raised upload limits (`docker/php.ini` + local Herd). New tables `unit_listings`, `listing_photos`, `payment_channels` (+ nullable `properties.map_url`), `ListingStatus` enum, `UnitListingPolicy`/`PaymentChannelPolicy` (Owner+Manager write via `User::canManageListingsOn()`, Staff view-only with controls hidden). Pages: `{team}/listings`, `{team}/payment-settings`, `/admin/listings` review queue (approve, or reject with reason; each action re-checks `is_super_admin` because Livewire update requests do not reliably re-run route middleware). Submit needs an active payment channel and at least one photo; editing an Approved listing returns it to PendingReview. `ListingReviewed` is a database notification to the team Owner and Managers, but **no screen reads notifications yet**; landlords see the outcome via the listing status badge and rejection reason. `status`/`submitted_at` are deliberately not fillable, so tests use `forceFill`.
 - ✅ **Phase 4 (public landing + browse pages)** — done, committed. Shared `<x-public-layout>`, landing page with "Find an apartment or dorm" / "I'm a landlord", `PublicListingController` (`/find-a-place` = `listings.index`, `/find-a-place/{listing}` = `listings.show`, plain GET filters, no JS). One visibility rule: `UnitListing::publiclyVisible()` = Approved + `Unit::scopeHasRoom()` (SQL twin of `hasRoomForAnotherTenant()`; **Phase 6 must update both** to count held reservations). `Unit::slotsAvailable()` drives the "N slots" display. The "Reserve this unit" button only renders once a `listings.reserve` route exists (Phase 5).
-- 🔲 Phases 5-8 not started
+- ✅ **Phase 5 (public reservation form)** — done, committed. `Reservation` model + `ReservationStatus`, `users.username` (nullable, unique, lowercase, not fillable), `pages::reserve` at `find-a-place/{listing}/reserve` (`listings.reserve`). Pay-then-upload layout; ID and proof stored on the `sensitive` disk; `team_id` from the unit, `listingId` `#[Locked]`, channel must be active and belong to the listing team; honeypot; 5 submissions and 30 attempts per hour per IP; min age 18. `ReservationSubmitted` database notification goes to team Owner and Managers. **The brief also asks for a pending-count badge in the landlord nav; that is deferred to Phase 6 because it needs the `{team}/reservations` page to link to.** Gotcha: a `use Closure;` line at the top of a Livewire SFC breaks compilation (500), so write `Closure` inline instead.
+- 🔲 Phases 6-8 not started (landlord review + tenant provisioning, forced password change, wrap-up)
 
 **Non-negotiable rules from the brief, apply to every remaining phase:** migrations are additive-only, never edit an existing migration; never `migrate:fresh`/`db:wipe` outside the test suite; keep `php artisan test --compact`, PHPStan, and Pint green after every phase; one commit per logical step, no catch-alls; never rename the Render service/database/`APP_URL`; present a short plan and wait for approval at the start of each phase, stop and summarize at the end; if an ambiguity isn't covered by the brief or its Open Decisions, stop and ask. Temporary tenant passwords (Phase 6) need the same discipline already applied to `is_super_admin`: never logged, never flashed, never stored in plaintext, and the notification carrying one must be both `ShouldQueue` and `ShouldBeEncrypted`.
 
-**Test count as of Phase 4**: 250/250 passing, PHPStan 0 errors, Pint clean.
+**Test count as of Phase 5 plus the Home redesign**: 299/299 passing, PHPStan 0 errors, Pint clean.
 
 ## Tech Stack
 
@@ -120,11 +121,11 @@ resources/
         ⚡invoices.blade.php    NEW: landlord ledger. Tenants sorted by who owes most;
                                 click one → their full invoice collection split into
                                 Outstanding and History, with a Record payment flow
-        ⚡inbox.blade.php       Read-only Concerns feed
+        ⚡maintenance.blade.php ⚡complaints.blade.php   Landlord concern lists split by category (replaced the old inbox)
       teams/…                   Team/staff management (unchanged)
 
 routes/
-  web.php            {current_team}/{setup,properties,tenants,invoices,inbox} gated ':member'
+  web.php            {current_team}/{setup,properties,tenants,invoices,requests/maintenance,requests/complaints}; `inbox` redirects to maintenance gated ':member'
   console.php        Schedule::command('invoices:generate')->daily()
 
 Dockerfile          PHP 8.4-cli image; NO Node stage (assets are pre-built + committed)
@@ -247,6 +248,7 @@ Live at `https://propertease-wv4j.onrender.com`. GitHub repo `flowrem/PropertEas
 27. **Committed and pushed the entire backlog** (everything since "focused on landlord functions") as two scoped commits, then deployed.
 28. **Deployed to Render** after abandoning Laravel Cloud (card required). Wrote the Dockerfile + `render.yaml`, then worked through: three consecutive Docker build failures ending in vendoring pre-built assets; a queue worker that didn't exist; a single-threaded server causing health-check timeouts; Render blocking SMTP (→ Resend); Resend's sandbox recipient restriction; and a missing `APP_URL` producing localhost links in emails.
 29. **Started the professor-revisions rewrite** (see that section above for full status): reviewed an 8-phase brief for feasibility before touching anything, then Phase 1 (renamed PropertEase → Occuplace, including relinking the local Herd site) and Phase 2 (Super Admin role: guarded `is_super_admin` column, artisan-only promotion command, `/admin` routes, a sidebar-layout crash fix for teamless users, landlord-only registration, role relabeling). Phase 3's plan (unit listings + payment channels + first file uploads) is written and presented, awaiting approval.
+30. **Landlord Home redesign and Inbox split** (not in the brief, requested mid-project): Home is now ordered by importance (money owed and past due, then urgent maintenance and unanswered complaints, then occupancy, then links). The combined Inbox became separate Maintenance and Complaints pages (`landlord.maintenance`, `landlord.complaints`); `inbox` redirects. Added `ConcernPriority::color()`/`rank()` and an `<x-concern-list>` component. Then finished Phase 5 (reservation form), where writing the tests caught a 500 from a `use Closure;` line in the SFC.
 
 ## Bugs Found & Fixed Mid-Session (worth knowing if debugging similar issues)
 
@@ -289,6 +291,6 @@ Locally: the app is served by Herd at `http://Occuplace.test`. Run `php artisan 
 
 In production: pushing to `main` auto-deploys to Render. **If the change touches CSS/JS/assets, run `npm run build` and commit `public/build/` too** or production will serve stale assets. Nothing from the professor-revisions branch has been pushed to `main` yet — it all lives on `feature/professor-revisions`.
 
-**Immediate next step:** resume the professor revisions (see that section above) on branch `feature/professor-revisions`. Phases 1-4 are done; Phase 5 (public reservation submission) is next, and its plan must be presented and approved before starting. Read `c:\Users\Rem\Downloads\REVISIONS_PROMPT.md` first if it's not still in context.
+**Immediate next step:** resume the professor revisions (see that section above) on branch `feature/professor-revisions`. Phases 1-5 are done; **Phase 6 (landlord review and tenant account provisioning) is next**, and its plan must be presented and approved first. It must also add the pending-reservations nav badge deferred from Phase 5 and update both `UnitListing::publiclyVisible()` capacity checks (`Unit::hasRoomForAnotherTenant()` and `scopeHasRoom()`) to count held reservations. Read `c:SERSREMDOWNLOADSREVISIONS_PROMPT.MD` FIRST IF IT IS NOT STILL IN CONTEXT.
 
 Once the professor revisions wrap up (or if picking other work instead), natural next steps on the original feature set: the outstanding-balance warning on tenant removal/move (the designed-but-unbuilt piece that closes the "debt disappears from view" gap), per-tenant custom rent amounts, service charges on invoices, then the tenant-side Concern submission form so Inbox has real data.
