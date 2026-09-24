@@ -51,8 +51,11 @@
                             <flux:sidebar.item icon="qr-code" :href="route('payment-settings')" :current="request()->routeIs('payment-settings')" wire:navigate>
                                 {{ __('Payment settings') }}
                             </flux:sidebar.item>
-                            <flux:sidebar.item icon="inbox" :href="route('inbox')" :current="request()->routeIs('inbox')" wire:navigate>
-                                {{ __('Inbox') }}
+                            <flux:sidebar.item icon="wrench-screwdriver" :href="route('landlord.maintenance')" :current="request()->routeIs('landlord.maintenance')" wire:navigate>
+                                {{ __('Maintenance') }}
+                            </flux:sidebar.item>
+                            <flux:sidebar.item icon="flag" :href="route('landlord.complaints')" :current="request()->routeIs('landlord.complaints')" wire:navigate>
+                                {{ __('Complaints') }}
                             </flux:sidebar.item>
                             <flux:sidebar.item icon="megaphone" :href="route('announcements')" :current="request()->routeIs('announcements')" wire:navigate>
                                 {{ __('Announcements') }}
