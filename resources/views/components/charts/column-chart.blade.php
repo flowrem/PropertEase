@@ -9,7 +9,17 @@
     $last = count($points) - 1;
     $valueLabel ??= ucfirst($unit ?: __('Amount'));
     $isEmpty = (float) collect($points)->sum('value') === 0.0;
-    $tick = fn ($value) => $prefix.\Illuminate\Support\Number::abbreviate($value);
+    // Plain PHP on purpose: the framework's number-formatting helper needs the intl
+    // extension, which the production image does not install.
+    $tick = function ($value) use ($prefix) {
+        foreach ([1_000_000_000 => 'B', 1_000_000 => 'M', 1_000 => 'K'] as $size => $suffix) {
+            if ($value >= $size) {
+                return $prefix.rtrim(rtrim(number_format($value / $size, 1), '0'), '.').$suffix;
+            }
+        }
+
+        return $prefix.number_format($value);
+    };
 @endphp
 
 <div {{ $attributes->class('rounded-lg border border-zinc-200 p-5 dark:border-zinc-700') }}>
