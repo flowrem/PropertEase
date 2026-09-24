@@ -1,5 +1,6 @@
 <?php
 
+use App\Actions\Reservations\ApproveReservation;
 use App\Enums\ReservationStatus;
 use App\Enums\TeamRole;
 use App\Enums\UnitStatus;
@@ -159,4 +160,27 @@ test('reservation files are refused for other teams, tenants and guests', functi
 
     auth()->logout();
     $this->get($url)->assertRedirect(route('login'));
+});
+
+test('a landlord can cancel an approved reservation from the page but staff cannot', function () {
+    Notification::fake();
+    [$landlord, $reservation] = landlordWithReservation();
+    app(ApproveReservation::class)->handle($reservation, $landlord, true);
+    $staff = reservationTeamMember($landlord, TeamRole::Member);
+
+    $this->actingAs($staff);
+    Livewire::test('pages::landlord.reservations')
+        ->call('open', $reservation->id)
+        ->set('cancelReason', 'No show.')
+        ->call('cancel')
+        ->assertForbidden();
+
+    $this->actingAs($landlord);
+    Livewire::test('pages::landlord.reservations')
+        ->call('open', $reservation->id)
+        ->set('cancelReason', 'No show.')
+        ->call('cancel')
+        ->assertHasNoErrors();
+
+    expect($reservation->fresh()->status)->toBe(ReservationStatus::Cancelled);
 });

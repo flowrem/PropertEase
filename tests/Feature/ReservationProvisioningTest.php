@@ -1,6 +1,7 @@
 <?php
 
 use App\Actions\Reservations\ApproveReservation;
+use App\Actions\Reservations\CancelReservation;
 use App\Actions\Reservations\RejectReservation;
 use App\Actions\Reservations\ResendLoginDetails;
 use App\Enums\ReservationStatus;
@@ -207,4 +208,33 @@ test('pruning deletes files of old rejected reservations only', function () {
     $disk->assertExists($pending->valid_id_path);
     expect($old->fresh()->hasFiles())->toBeFalse()
         ->and($recent->fresh()->hasFiles())->toBeTrue();
+});
+
+test('cancelling releases the slot, disables the account and removes the membership', function () {
+    Notification::fake();
+    [$landlord, $reservation] = pendingReservation();
+    $tenant = app(ApproveReservation::class)->handle($reservation, $landlord, true);
+
+    app(CancelReservation::class)->handle($reservation->fresh(), 'Applicant never showed up.');
+
+    $fresh = $reservation->fresh();
+    expect($fresh->status)->toBe(ReservationStatus::Cancelled)
+        ->and($fresh->cancelled_at)->not->toBeNull()
+        ->and($fresh->cancellation_reason)->toBe('Applicant never showed up.')
+        ->and($tenant->fresh()->isDisabled())->toBeTrue()
+        ->and($tenant->fresh()->belongsToTeam($landlord->currentTeam))->toBeFalse()
+        ->and($reservation->unit->fresh()->hasRoomForAnotherTenant())->toBeTrue();
+});
+
+test('only an approved reservation can be cancelled, and a reason is required', function () {
+    Notification::fake();
+    [$landlord, $reservation] = pendingReservation();
+
+    expect(fn () => app(CancelReservation::class)->handle($reservation, 'Because'))
+        ->toThrow(ValidationException::class);
+
+    app(ApproveReservation::class)->handle($reservation, $landlord, true);
+
+    expect(fn () => app(CancelReservation::class)->handle($reservation->fresh(), ' '))
+        ->toThrow(ValidationException::class);
 });

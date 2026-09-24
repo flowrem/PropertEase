@@ -1,6 +1,7 @@
 <?php
 
 use App\Actions\Reservations\ApproveReservation;
+use App\Actions\Reservations\CancelReservation;
 use App\Actions\Reservations\RejectReservation;
 use App\Actions\Reservations\ResendLoginDetails;
 use App\Enums\ReservationStatus;
@@ -25,6 +26,10 @@ new #[Title('Reservations')] class extends Component
     public bool $rejecting = false;
 
     public string $rejectReason = '';
+
+    public bool $cancelling = false;
+
+    public string $cancelReason = '';
 
     #[Computed]
     public function team(): Team
@@ -118,6 +123,19 @@ new #[Title('Reservations')] class extends Component
         $this->afterReview(__('Reservation rejected. The applicant was emailed.'));
     }
 
+    public function startCancelling(): void
+    {
+        $this->cancelling = true;
+        $this->resetErrorBag();
+    }
+
+    public function cancel(CancelReservation $cancel): void
+    {
+        $cancel->handle($this->reviewable(), $this->cancelReason);
+
+        $this->afterReview(__('Reservation cancelled and the slot released.'));
+    }
+
     public function resendLoginDetails(ResendLoginDetails $resend): void
     {
         $resend->handle($this->reviewable());
@@ -135,7 +153,7 @@ new #[Title('Reservations')] class extends Component
 
     protected function resetForm(): void
     {
-        $this->reset('downpaymentConfirmed', 'rejecting', 'rejectReason');
+        $this->reset('downpaymentConfirmed', 'rejecting', 'rejectReason', 'cancelling', 'cancelReason');
         $this->resetErrorBag();
     }
 
@@ -348,6 +366,37 @@ new #[Title('Reservations')] class extends Component
                             </div>
                         </div>
                     @endif
+                @endif
+
+                @if ($this->canReview && $reservation->status === ReservationStatus::Approved)
+                    @if ($cancelling)
+                        <div class="space-y-3">
+                            <flux:callout variant="warning" icon="exclamation-triangle">
+                                <flux:callout.text>
+                                    {{ __('Cancelling releases the slot and disables the applicant\'s account. If they already sent a downpayment, the refund is handled outside Occuplace.') }}
+                                </flux:callout.text>
+                            </flux:callout>
+
+                            <flux:textarea wire:model="cancelReason" :label="__('Reason for cancelling')" rows="3" required />
+                            <flux:error name="cancelReason" />
+
+                            <div class="flex justify-end gap-2">
+                                <flux:button wire:click="$set('cancelling', false)">{{ __('Back') }}</flux:button>
+                                <flux:button variant="danger" wire:click="cancel">{{ __('Cancel reservation') }}</flux:button>
+                            </div>
+                        </div>
+                    @else
+                        <div class="flex justify-end">
+                            <flux:button variant="danger" wire:click="startCancelling">{{ __('Cancel reservation') }}</flux:button>
+                        </div>
+                    @endif
+                @endif
+
+                @if ($reservation->cancellation_reason)
+                    <flux:callout icon="x-circle">
+                        <flux:callout.heading>{{ __('Cancelled') }}</flux:callout.heading>
+                        <flux:callout.text>{{ $reservation->cancellation_reason }}</flux:callout.text>
+                    </flux:callout>
                 @endif
 
                 @if ($this->canReview && $reservation->status === ReservationStatus::Approved && $reservation->tenant?->must_change_password)
