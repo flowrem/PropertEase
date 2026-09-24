@@ -2,9 +2,11 @@
 
 use App\Enums\BillingTiming;
 use App\Enums\LeaseStatus;
+use App\Enums\ReservationStatus;
 use App\Enums\TeamRole;
 use App\Enums\UnitStatus;
 use App\Models\Lease;
+use App\Models\Reservation;
 use App\Models\Team;
 use App\Models\TeamInvitation;
 use App\Models\Unit;
@@ -129,7 +131,7 @@ new #[Title('Tenants')] class extends Component
             ->where(fn ($query) => $query
                 ->where('status', UnitStatus::Vacant)
                 ->orWhere('allows_multiple_tenants', true))
-            ->withCount('activeLeases')
+            ->withCount(['activeLeases', 'heldReservations'])
             ->with('property')
             ->get()
             ->filter(fn (Unit $unit) => $unit->hasRoomForAnotherTenant())
@@ -142,11 +144,33 @@ new #[Title('Tenants')] class extends Component
      *
      * @return Collection<int, Unit>
      */
-    public function assignableUnits(?Lease $currentLease): Collection
+    public function assignableUnits(?Lease $currentLease, ?User $tenant = null): Collection
     {
-        return $this->vacantUnits
+        $units = $this->vacantUnits;
+
+        $heldReservation = $tenant ? $this->approvedReservationFor($tenant) : null;
+
+        if ($heldReservation && $units->doesntContain('id', $heldReservation->unit_id)) {
+            $units = $units->push(
+                Unit::withCount(['activeLeases', 'heldReservations'])->with('property')->findOrFail($heldReservation->unit_id),
+            );
+        }
+
+        return $units
             ->reject(fn (Unit $unit) => $currentLease && $unit->id === $currentLease->unit_id)
             ->values();
+    }
+
+    /**
+     * The approved reservation on this team that is holding a slot for the tenant, if any.
+     */
+    protected function approvedReservationFor(User $tenant): ?Reservation
+    {
+        return Reservation::query()
+            ->where('team_id', $this->team->id)
+            ->where('tenant_user_id', $tenant->id)
+            ->where('status', ReservationStatus::Approved->value)
+            ->first();
     }
 
     public function manageTenant(int $tenantId): void
@@ -188,12 +212,20 @@ new #[Title('Tenants')] class extends Component
         $unit = Unit::withCount('activeLeases')->findOrFail($validated['unit_id']);
 
         abort_unless($unit->property->team_id === $this->team->id, 403);
-        abort_unless($unit->hasRoomForAnotherTenant(), 403);
+
+        $heldReservation = $this->approvedReservationFor($tenant);
+        $holdsThisUnit = $heldReservation?->unit_id === $unit->id;
+
+        abort_unless($unit->hasRoomForAnotherTenant(excludingOwnHold: $holdsThisUnit), 403);
 
         $currentLease = $tenant->leases->first();
 
         if ($currentLease) {
             $currentLease->end(LeaseStatus::Ended);
+        }
+
+        if ($holdsThisUnit) {
+            $heldReservation->forceFill(['status' => ReservationStatus::Fulfilled])->save();
         }
 
         $unit->leases()->create([
@@ -351,7 +383,7 @@ new #[Title('Tenants')] class extends Component
                 <form wire:submit="saveUnitAssignment" class="flex flex-col gap-4">
                     <flux:select wire:model.live="unit_id" :label="$currentLease ? __('Move to unit') : __('Assign unit')" required>
                         <flux:select.option value="">{{ __('Select a unit') }}</flux:select.option>
-                        @foreach ($this->assignableUnits($currentLease) as $unit)
+                        @foreach ($this->assignableUnits($currentLease, $this->managingTenant) as $unit)
                             <flux:select.option value="{{ $unit->id }}">
                                 {{ $unit->property->name }} &mdash; {{ __('Unit :number', ['number' => $unit->unit_number]) }}
                                 &mdash; &#8369;{{ number_format((float) $unit->price, 2) }}/mo
@@ -362,7 +394,7 @@ new #[Title('Tenants')] class extends Component
                         @endforeach
                     </flux:select>
 
-                    @php($selectedUnit = $this->assignableUnits($currentLease)->firstWhere('id', $unit_id))
+                    @php($selectedUnit = $this->assignableUnits($currentLease, $this->managingTenant)->firstWhere('id', $unit_id))
 
                     @if ($selectedUnit)
                         <flux:text class="text-zinc-500 dark:text-zinc-400">

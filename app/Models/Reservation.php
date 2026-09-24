@@ -37,6 +37,11 @@ use Illuminate\Support\Str;
  * @property string|null $rejection_reason
  * @property int|null $tenant_user_id
  * @property Carbon $consented_at
+ * @property Carbon|null $downpayment_confirmed_at
+ * @property int|null $downpayment_confirmed_by
+ * @property Carbon|null $cancelled_at
+ * @property string|null $cancellation_reason
+ * @property Carbon|null $files_pruned_at
  * @property Carbon|null $created_at
  * @property Carbon|null $updated_at
  * @property-read UnitListing|null $listing
@@ -76,6 +81,9 @@ class Reservation extends Model
             'downpayment_method' => PaymentMethod::class,
             'reviewed_at' => 'datetime',
             'consented_at' => 'datetime',
+            'downpayment_confirmed_at' => 'datetime',
+            'cancelled_at' => 'datetime',
+            'files_pruned_at' => 'datetime',
         ];
     }
 
@@ -123,6 +131,33 @@ class Reservation extends Model
     public function paymentChannel(): BelongsTo
     {
         return $this->belongsTo(PaymentChannel::class);
+    }
+
+    /**
+     * The tenant account created when this reservation was approved.
+     *
+     * @return BelongsTo<User, $this>
+     */
+    public function tenant(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'tenant_user_id');
+    }
+
+    /**
+     * @return BelongsTo<User, $this>
+     */
+    public function reviewer(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'reviewed_by');
+    }
+
+    /**
+     * Whether the ID and payment proof are still stored (they are deleted
+     * some time after a rejected or cancelled reservation).
+     */
+    public function hasFiles(): bool
+    {
+        return $this->files_pruned_at === null;
     }
 
     /**

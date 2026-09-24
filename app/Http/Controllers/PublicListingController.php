@@ -22,7 +22,7 @@ class PublicListingController extends Controller
             ->publiclyVisible()
             ->with([
                 'photos',
-                'unit' => fn ($unit) => $unit->withCount('activeLeases')->with('property'),
+                'unit' => fn ($unit) => $unit->withCount(['activeLeases', 'heldReservations'])->with('property'),
             ])
             ->when($search !== '', function (Builder $query) use ($search) {
                 $term = '%'.addcslashes($search, '\\%_').'%';
@@ -55,7 +55,7 @@ class PublicListingController extends Controller
             ->publiclyVisible()
             ->with([
                 'photos',
-                'unit' => fn ($unit) => $unit->withCount('activeLeases')->with('property.team'),
+                'unit' => fn ($unit) => $unit->withCount(['activeLeases', 'heldReservations'])->with('property.team'),
             ])
             ->findOrFail($listing);
 
