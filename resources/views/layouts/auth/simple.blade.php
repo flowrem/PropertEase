@@ -5,12 +5,15 @@
     </head>
     <body class="min-h-screen bg-brand-900 antialiased">
         <div class="flex min-h-svh flex-col items-center justify-center gap-6 p-6 md:p-10">
-            <a href="{{ route('home') }}" class="flex flex-col items-center gap-2 font-medium" wire:navigate>
-                <span class="flex h-11 w-11 items-center justify-center rounded-lg bg-brand-600">
-                    <x-app-logo-icon class="size-6 fill-current text-white" />
-                </span>
-
-                <span class="text-sm font-semibold tracking-tight text-white">{{ config('app.name') }}</span>
+            <a href="{{ route('home') }}" class="flex flex-col items-center" wire:navigate>
+                <img
+                    src="{{ asset('images/logo.png') }}"
+                    alt="{{ config('app.name') }}"
+                    width="520"
+                    height="407"
+                    class="h-28 w-auto"
+                    decoding="async"
+                >
             </a>
 
             <div class="flex w-full max-w-md flex-col gap-6">

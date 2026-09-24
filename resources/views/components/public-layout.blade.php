@@ -10,9 +10,7 @@
     <body class="min-h-screen bg-brand-900 font-sans antialiased">
         <header class="mx-auto flex w-full max-w-5xl items-center justify-between gap-4 px-6 py-6 sm:px-8">
             <a href="{{ route('home') }}" class="flex items-center gap-2" wire:navigate>
-                <span class="flex size-8 items-center justify-center rounded-lg bg-brand-600">
-                    <x-app-logo-icon class="size-4 fill-current text-white" />
-                </span>
+                <x-app-logo-icon class="size-9 object-contain" />
                 <span class="text-sm font-semibold tracking-tight text-white">{{ config('app.name') }}</span>
             </a>
 
