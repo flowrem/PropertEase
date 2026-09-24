@@ -1,10 +1,13 @@
 <?php
 
 use App\Enums\ListingStatus;
+use App\Enums\ReservationStatus;
 use App\Enums\TeamRole;
 use App\Models\ListingPhoto;
 use App\Models\PaymentChannel;
 use App\Models\Property;
+use App\Models\Reservation;
+use App\Models\Team;
 use App\Models\Unit;
 use App\Models\UnitListing;
 use App\Models\User;
@@ -148,16 +151,32 @@ test('a listing that is no longer pending cannot be reviewed again', function ()
     Notification::assertNothingSent();
 });
 
-test('the overview shows listing counts by status', function () {
+test('the dashboard shows listing counts by status', function () {
     UnitListing::factory()->count(2)->pendingReview()->create();
     UnitListing::factory()->approved()->create();
 
     $this->actingAs(superAdmin());
 
-    Livewire::test('pages::admin.overview')
-        ->assertSee('0 draft')
-        ->assertSee('2 pending review')
-        ->assertSee('1 approved');
+    $component = Livewire::test('pages::admin.dashboard');
+
+    expect($component->instance()->listingCounts)->toMatchArray([
+        ListingStatus::PendingReview->value => 2,
+        ListingStatus::Approved->value => 1,
+    ]);
+});
+
+test('the dashboard shows landlord review counts and platform totals', function () {
+    Team::factory()->awaitingApproval()->count(2)->create();
+    Team::factory()->rejectedByAdmin()->create();
+    Team::factory()->create();
+    Reservation::factory()->status(ReservationStatus::Approved)->create();
+
+    $this->actingAs(superAdmin());
+
+    $component = Livewire::test('pages::admin.dashboard')->assertSee('Dashboard');
+
+    expect($component->instance()->landlords)->toMatchArray(['awaiting' => 2, 'rejected' => 1])
+        ->and($component->instance()->platform['heldReservations'])->toBe(1);
 });
 
 test('a Super Admin can open every admin page over HTTP', function (string $routeName) {

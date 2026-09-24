@@ -18,7 +18,7 @@
                 @if (auth()->user()->is_super_admin)
                     <flux:sidebar.group :heading="__('Admin')" class="grid">
                         <flux:sidebar.item icon="squares-2x2" :href="route('admin.dashboard')" :current="request()->routeIs('admin.dashboard')" wire:navigate>
-                            {{ __('Overview') }}
+                            {{ __('Dashboard') }}
                         </flux:sidebar.item>
                         <flux:sidebar.item
                             icon="building-office-2"
@@ -29,7 +29,13 @@
                         >
                             {{ __('Landlords') }}
                         </flux:sidebar.item>
-                        <flux:sidebar.item icon="home-modern" :href="route('admin.listings')" :current="request()->routeIs('admin.listings')" wire:navigate>
+                        <flux:sidebar.item
+                            icon="home-modern"
+                            :href="route('admin.listings')"
+                            :current="request()->routeIs('admin.listings')"
+                            :badge="\App\Models\UnitListing::where('status', \App\Enums\ListingStatus::PendingReview->value)->count() ?: null"
+                            wire:navigate
+                        >
                             {{ __('Listings') }}
                         </flux:sidebar.item>
                     </flux:sidebar.group>

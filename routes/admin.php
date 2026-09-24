@@ -8,7 +8,7 @@ Route::prefix('admin')
     ->middleware(['auth', 'verified', EnsureSuperAdmin::class])
     ->name('admin.')
     ->group(function () {
-        Route::livewire('/', 'pages::admin.overview')->name('dashboard');
+        Route::livewire('/', 'pages::admin.dashboard')->name('dashboard');
         Route::livewire('landlords', 'pages::admin.landlords')->name('landlords');
         Route::get('landlords/{team}/id', LandlordIdController::class)->whereNumber('team')->name('landlords.id');
         Route::livewire('listings', 'pages::admin.listings')->name('listings');
