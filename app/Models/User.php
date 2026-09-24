@@ -7,6 +7,7 @@ use App\Concerns\HasTeams;
 use Database\Factories\UserFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Attributes\Hidden;
+use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -21,6 +22,7 @@ use Laravel\Fortify\TwoFactorAuthenticatable;
 /**
  * @property int $id
  * @property string $name
+ * @property string|null $username
  * @property string $email
  * @property Carbon|null $email_verified_at
  * @property string $password
@@ -57,6 +59,16 @@ class User extends Authenticatable implements PasskeyUser
             'two_factor_confirmed_at' => 'datetime',
             'is_super_admin' => 'boolean',
         ];
+    }
+
+    /**
+     * Usernames are always stored lowercase so lookups and uniqueness are case-insensitive.
+     *
+     * @return Attribute<string|null, string|null>
+     */
+    protected function username(): Attribute
+    {
+        return Attribute::set(fn (?string $value) => $value === null ? null : Str::lower(trim($value)));
     }
 
     /**
