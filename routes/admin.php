@@ -9,4 +9,5 @@ Route::prefix('admin')
     ->group(function () {
         Route::livewire('/', 'pages::admin.overview')->name('dashboard');
         Route::livewire('landlords', 'pages::admin.landlords')->name('landlords');
+        Route::livewire('listings', 'pages::admin.listings')->name('listings');
     });

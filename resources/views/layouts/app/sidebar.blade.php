@@ -23,6 +23,9 @@
                         <flux:sidebar.item icon="building-office-2" :href="route('admin.landlords')" :current="request()->routeIs('admin.landlords')" wire:navigate>
                             {{ __('Landlords') }}
                         </flux:sidebar.item>
+                        <flux:sidebar.item icon="home-modern" :href="route('admin.listings')" :current="request()->routeIs('admin.listings')" wire:navigate>
+                            {{ __('Listings') }}
+                        </flux:sidebar.item>
                     </flux:sidebar.group>
                 @else
                     @php($isLandlord = auth()->user()->isLandlordOn(auth()->user()->currentTeam))
