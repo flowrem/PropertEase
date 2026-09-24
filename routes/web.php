@@ -21,6 +21,8 @@ Route::prefix('{current_team}')
             Route::livewire('tenants', 'pages::landlord.tenants')->name('tenants');
             Route::livewire('invoices', 'pages::landlord.invoices')->name('invoices');
             Route::livewire('inbox', 'pages::landlord.inbox')->name('inbox');
+            Route::livewire('listings', 'pages::landlord.listings')->name('listings');
+            Route::livewire('payment-settings', 'pages::landlord.payment-settings')->name('payment-settings');
         });
     });
 

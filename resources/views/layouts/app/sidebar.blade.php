@@ -39,8 +39,14 @@
                             <flux:sidebar.item icon="users" :href="route('tenants')" :current="request()->routeIs('tenants')" wire:navigate>
                                 {{ __('Tenants') }}
                             </flux:sidebar.item>
+                            <flux:sidebar.item icon="home-modern" :href="route('listings')" :current="request()->routeIs('listings')" wire:navigate>
+                                {{ __('Listings') }}
+                            </flux:sidebar.item>
                             <flux:sidebar.item icon="banknotes" :href="route('invoices')" :current="request()->routeIs('invoices')" wire:navigate>
                                 {{ __('Invoices') }}
+                            </flux:sidebar.item>
+                            <flux:sidebar.item icon="qr-code" :href="route('payment-settings')" :current="request()->routeIs('payment-settings')" wire:navigate>
+                                {{ __('Payment settings') }}
                             </flux:sidebar.item>
                             <flux:sidebar.item icon="inbox" :href="route('inbox')" :current="request()->routeIs('inbox')" wire:navigate>
                                 {{ __('Inbox') }}
