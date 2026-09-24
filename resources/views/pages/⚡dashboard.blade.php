@@ -3,11 +3,13 @@
 use App\Enums\ConcernCategory;
 use App\Enums\ConcernPriority;
 use App\Enums\ConcernStatus;
+use App\Enums\InvoiceStatus;
 use App\Enums\LeaseStatus;
 use App\Enums\UnitStatus;
 use App\Models\Concern;
 use App\Models\Invoice;
 use App\Models\Lease;
+use App\Models\Payment;
 use App\Models\Team;
 use App\Models\Unit;
 use Carbon\CarbonImmutable;
@@ -22,6 +24,8 @@ use Livewire\Component;
 
 new #[Title('Home')] class extends Component
 {
+    private const MONTHS = 6;
+
     public bool $showLeaveModal = false;
 
     public function mount(): void
@@ -164,6 +168,84 @@ new #[Title('Home')] class extends Component
     }
 
     /**
+     * Rent collected in each of the last months, oldest first, empty months included.
+     *
+     * @return array<int, array{label: string, hint: string, value: float}>
+     */
+    #[Computed]
+    public function rentCollectedPerMonth(): array
+    {
+        $start = CarbonImmutable::now()->startOfMonth()->subMonths(self::MONTHS - 1);
+
+        $totals = Payment::query()
+            ->whereHas('invoice.lease.unit.property', fn ($properties) => $properties->where('team_id', $this->team->id))
+            ->where('paid_at', '>=', $start)
+            ->get(['amount_paid', 'paid_at'])
+            ->groupBy(fn (Payment $payment) => $payment->paid_at->format('Y-m'))
+            ->map(fn (Collection $payments) => round((float) $payments->sum('amount_paid'), 2));
+
+        return collect(range(0, self::MONTHS - 1))
+            ->map(function (int $offset) use ($start, $totals) {
+                $month = $start->addMonths($offset);
+
+                return [
+                    'label' => $month->format('M'),
+                    'hint' => $month->format('F Y'),
+                    'value' => (float) ($totals[$month->format('Y-m')] ?? 0),
+                ];
+            })
+            ->all();
+    }
+
+    /**
+     * Invoices due in the last months, each counted once by where it stands now.
+     *
+     * @return array{paid: int, partial: int, unpaid: int, pastDue: int, total: int}
+     */
+    #[Computed]
+    public function invoiceStates(): array
+    {
+        $invoices = Invoice::query()
+            ->whereHas('lease.unit.property', fn ($properties) => $properties->where('team_id', $this->team->id))
+            ->where('due_date', '>=', CarbonImmutable::now()->startOfMonth()->subMonths(self::MONTHS - 1))
+            ->get(['id', 'status', 'due_date']);
+
+        $pastDue = $invoices->filter(fn (Invoice $invoice) => $invoice->isPastDue());
+        $rest = $invoices->diff($pastDue);
+
+        return [
+            'paid' => $rest->where('status', InvoiceStatus::Paid)->count(),
+            'partial' => $rest->where('status', InvoiceStatus::PartiallyPaid)->count(),
+            'unpaid' => $rest->whereNotIn('status', [InvoiceStatus::Paid, InvoiceStatus::PartiallyPaid])->count(),
+            'pastDue' => $pastDue->count(),
+            'total' => $invoices->count(),
+        ];
+    }
+
+    /**
+     * Open maintenance requests counted by priority, most urgent first.
+     *
+     * @return array<int, array{label: string, value: int, emphasis: bool}>
+     */
+    #[Computed]
+    public function openMaintenanceByPriority(): array
+    {
+        $counts = $this->teamConcerns(ConcernCategory::Maintenance)
+            ->get()
+            ->countBy(fn (Concern $concern) => $concern->priority->value);
+
+        return collect(ConcernPriority::cases())
+            ->sortByDesc(fn (ConcernPriority $priority) => $priority->rank())
+            ->map(fn (ConcernPriority $priority) => [
+                'label' => $priority->label(),
+                'value' => (int) ($counts[$priority->value] ?? 0),
+                'emphasis' => $priority === ConcernPriority::Urgent,
+            ])
+            ->values()
+            ->all();
+    }
+
+    /**
      * Unresolved concerns of one category on this team, with their tenant and unit.
      *
      * @return Builder<Concern>
@@ -239,6 +321,29 @@ new #[Title('Home')] class extends Component
                 </div>
             </div>
 
+            <div class="grid gap-4 lg:grid-cols-2">
+                <x-charts.column-chart
+                    :title="__('Rent collected per month')"
+                    :description="__('Payments you recorded, last 6 months')"
+                    prefix="₱"
+                    period="Month"
+                    :value-label="__('Collected')"
+                    :empty-text="__('No payments recorded in the last 6 months.')"
+                    :points="$this->rentCollectedPerMonth"
+                />
+
+                <x-charts.stacked-bar
+                    :title="__('Invoices by state')"
+                    :description="__('Invoices due in the last 6 months')"
+                    :segments="[
+                        ['label' => __('Paid'), 'value' => $this->invoiceStates['paid'], 'color' => 'bg-[#0ca30c]', 'icon' => 'check-circle'],
+                        ['label' => __('Partially paid'), 'value' => $this->invoiceStates['partial'], 'color' => 'bg-[#fab219]', 'icon' => 'minus-circle'],
+                        ['label' => __('Not due yet'), 'value' => $this->invoiceStates['unpaid'], 'color' => 'bg-zinc-400 dark:bg-zinc-500', 'icon' => 'clock'],
+                        ['label' => __('Past due'), 'value' => $this->invoiceStates['pastDue'], 'color' => 'bg-[#d03b3b]', 'icon' => 'exclamation-triangle'],
+                    ]"
+                />
+            </div>
+
             @if ($this->money['behind']->isNotEmpty())
                 <ul class="grid gap-2" data-test="tenants-behind">
                     @foreach ($this->money['behind'] as $row)
@@ -305,6 +410,14 @@ new #[Title('Home')] class extends Component
                     @endforelse
                 </div>
             </div>
+
+            <div class="grid gap-4 lg:grid-cols-2">
+                <x-charts.bar-list
+                    :title="__('Open maintenance by priority')"
+                    :description="__('Unresolved requests, urgent highlighted')"
+                    :rows="$this->openMaintenanceByPriority"
+                />
+            </div>
         </section>
 
         <section class="flex flex-col gap-4" aria-labelledby="occupancy-heading">
@@ -326,6 +439,17 @@ new #[Title('Home')] class extends Component
                     </div>
                 @endforeach
             </div>
+
+            @php($unitTotal = $this->occupancy['occupied'] + $this->occupancy['vacant'] + $this->occupancy['maintenance'])
+
+            <x-charts.meter
+                :title="__('Units occupied')"
+                :description="__('Share of your units with a tenant')"
+                :value="$this->occupancy['occupied']"
+                :total="$unitTotal"
+                :caption="__(':occupied of :total units occupied', ['occupied' => $this->occupancy['occupied'], 'total' => $unitTotal])"
+                :empty-text="__('Add a unit to see occupancy.')"
+            />
         </section>
 
         <section class="flex flex-col gap-4" aria-labelledby="more-heading">

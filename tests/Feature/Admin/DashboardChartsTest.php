@@ -76,7 +76,8 @@ test('an empty platform shows honest empty states instead of broken charts', fun
     Livewire::actingAs(dashboardAdmin())
         ->test('pages::admin.dashboard')
         ->assertSee('Nothing is waiting on you.')
-        ->assertSee('No units yet.');
+        ->assertSee('No units yet.')
+        ->assertSee('Nothing recorded in this period.');
 });
 
 test('the review hero counts landlords and listings that need a decision', function () {
