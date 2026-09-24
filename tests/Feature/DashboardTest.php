@@ -34,7 +34,7 @@ test('a landlord with a property sees the landlord dashboard', function () {
         ->assertOk()
         ->assertSee(route('properties'), false)
         ->assertSee(route('tenants'), false)
-        ->assertSee(route('inbox'), false);
+        ->assertSee(route('landlord.maintenance'), false);
 });
 
 test('a tenant sees the tenant dashboard', function () {
