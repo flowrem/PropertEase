@@ -33,7 +33,16 @@ php artisan app:create-super-admin
 - **New email:** it asks for a name and a password, and creates an account with no team.
 - **Existing email:** it asks to confirm promoting that account. It does not change the password.
 
-On Render, run it from the service's **Shell** tab.
+Render's Shell is not available on the free plan, so in production use one of these:
+
+- **Register normally, then promote in Supabase:** register the account on the site, then
+  open Supabase's **Table Editor**, the `users` table, and set that row's `is_super_admin`
+  to `true`. Log out and back in.
+- **Run the command from your own machine against the production database:** set
+  `DB_CONNECTION=pgsql`, `DB_URL` (the Supabase *Session pooler* string) and
+  `DB_SSLMODE=require` in your shell only, run the command, then clear them. Environment
+  variables in the shell override `.env`. Turn shell history off first so the password is
+  not saved.
 
 ## How the main flows work
 
