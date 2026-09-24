@@ -10,6 +10,9 @@ Route::get('find-a-place', [PublicListingController::class, 'index'])->name('lis
 Route::get('find-a-place/{listing}', [PublicListingController::class, 'show'])
     ->whereNumber('listing')
     ->name('listings.show');
+Route::livewire('find-a-place/{listing}/reserve', 'pages::reserve')
+    ->whereNumber('listing')
+    ->name('listings.reserve');
 
 Route::prefix('{current_team}')
     ->middleware(['auth', 'verified', EnsureTeamMembership::class])
