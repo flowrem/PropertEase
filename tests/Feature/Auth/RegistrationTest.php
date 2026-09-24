@@ -3,6 +3,25 @@
 use App\Enums\TeamRole;
 use App\Models\TeamInvitation;
 use App\Models\User;
+use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Storage;
+
+beforeEach(function () {
+    Storage::fake(config('filesystems.sensitive_disk'));
+});
+
+/**
+ * The valid ID and consent every self-registering landlord must send.
+ *
+ * @return array{verification_id: UploadedFile, consent: string}
+ */
+function landlordIdPayload(): array
+{
+    return [
+        'verification_id' => UploadedFile::fake()->image('id.jpg'),
+        'consent' => '1',
+    ];
+}
 
 test('registration screen can be rendered', function () {
     $response = $this->get(route('register'));
@@ -17,6 +36,7 @@ test('new users can register as a landlord with a business name', function () {
         'password' => 'password',
         'password_confirmation' => 'password',
         'business_name' => "John's Apartments",
+        ...landlordIdPayload(),
     ]);
 
     $user = User::where('email', 'test@example.com')->first();
@@ -36,6 +56,7 @@ test('registering without a business name falls back to a default team name', fu
         'email' => 'test@example.com',
         'password' => 'password',
         'password_confirmation' => 'password',
+        ...landlordIdPayload(),
     ]);
 
     $user = User::where('email', 'test@example.com')->first();
@@ -94,6 +115,7 @@ test('registering with an email that does not match the invitation gets a person
         'password' => 'password',
         'password_confirmation' => 'password',
         'invitation' => $invitation->code,
+        ...landlordIdPayload(),
     ]);
 
     $response->assertSessionHasNoErrors();

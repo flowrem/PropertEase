@@ -1,6 +1,8 @@
 <?php
 
 use App\Models\User;
+use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Storage;
 
 function createSuperAdmin(): User
 {
@@ -59,12 +61,16 @@ test('is_super_admin cannot be mass assigned when creating a user', function () 
 });
 
 test('is_super_admin cannot be set through the registration form', function () {
+    Storage::fake(config('filesystems.sensitive_disk'));
+
     $this->post(route('register.store'), [
         'name' => 'Someone',
         'email' => 'someone@example.com',
         'password' => 'password',
         'password_confirmation' => 'password',
         'business_name' => "Someone's Apartments",
+        'verification_id' => UploadedFile::fake()->image('id.jpg'),
+        'consent' => '1',
         'is_super_admin' => true,
     ]);
 
