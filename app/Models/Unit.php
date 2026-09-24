@@ -3,15 +3,18 @@
 namespace App\Models;
 
 use App\Enums\LeaseStatus;
+use App\Enums\ReservationStatus;
 use App\Enums\UnitStatus;
 use Database\Factories\UnitFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasManyThrough;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Support\Carbon;
 
 /**
@@ -28,9 +31,12 @@ use Illuminate\Support\Carbon;
  * @property Carbon|null $created_at
  * @property Carbon|null $updated_at
  * @property-read Property $property
+ * @property-read UnitListing|null $listing
  * @property-read Collection<int, Lease> $leases
  * @property-read Collection<int, Lease> $activeLeases
  * @property-read int|null $active_leases_count
+ * @property-read Collection<int, Reservation> $heldReservations
+ * @property-read int|null $held_reservations_count
  * @property-read Collection<int, Concern> $concerns
  */
 #[Fillable(['property_id', 'unit_number', 'floor_level', 'bedrooms', 'bathrooms', 'status', 'allows_multiple_tenants', 'tenant_limit', 'price'])]
@@ -45,6 +51,14 @@ class Unit extends Model
     public function property(): BelongsTo
     {
         return $this->belongsTo(Property::class);
+    }
+
+    /**
+     * @return HasOne<UnitListing, $this>
+     */
+    public function listing(): HasOne
+    {
+        return $this->hasOne(UnitListing::class);
     }
 
     /**
@@ -92,19 +106,79 @@ class Unit extends Model
     }
 
     /**
-     * Determine whether this unit currently has room for another tenant.
+     * Approved reservations that are holding a slot until they are fulfilled,
+     * cancelled or rejected.
+     *
+     * @return HasMany<Reservation, $this>
      */
-    public function hasRoomForAnotherTenant(): bool
+    public function heldReservations(): HasMany
     {
-        if ($this->status === UnitStatus::Vacant) {
-            return true;
-        }
+        return $this->hasMany(Reservation::class)->where('status', ReservationStatus::Approved->value);
+    }
 
-        if (! $this->allows_multiple_tenants || $this->tenant_limit === null) {
+    /**
+     * Count the slots held by approved reservations, reusing an eager-loaded
+     * count before falling back to a query.
+     */
+    public function heldReservationCount(): int
+    {
+        return $this->held_reservations_count ?? $this->heldReservations()->count();
+    }
+
+    /**
+     * How many tenants this unit can hold in total.
+     */
+    public function capacity(): int
+    {
+        return $this->allows_multiple_tenants && $this->tenant_limit !== null
+            ? $this->tenant_limit
+            : 1;
+    }
+
+    /**
+     * Determine whether this unit currently has room for another tenant.
+     * Slots held by approved reservations count as taken; pass true when the
+     * person being assigned is the one holding one of them.
+     */
+    public function hasRoomForAnotherTenant(bool $excludingOwnHold = false): bool
+    {
+        if ($this->status !== UnitStatus::Vacant && ! ($this->allows_multiple_tenants && $this->tenant_limit !== null)) {
             return false;
         }
 
-        return $this->activeLeaseCount() < $this->tenant_limit;
+        $held = max(0, $this->heldReservationCount() - ($excludingOwnHold ? 1 : 0));
+
+        return $this->capacity() - $this->activeLeaseCount() - $held > 0;
+    }
+
+    /**
+     * Limit the query to units that currently have room for another tenant.
+     * Mirrors hasRoomForAnotherTenant() so both stay the single rule for capacity.
+     *
+     * @param  Builder<Unit>  $query
+     */
+    public function scopeHasRoom(Builder $query): void
+    {
+        $query
+            ->where(fn (Builder $room) => $room
+                ->where('units.status', UnitStatus::Vacant->value)
+                ->orWhere(fn (Builder $shared) => $shared
+                    ->where('units.allows_multiple_tenants', true)
+                    ->whereNotNull('units.tenant_limit')))
+            ->whereRaw(
+                '(case when units.allows_multiple_tenants and units.tenant_limit is not null then units.tenant_limit else 1 end)'
+                .' > (select count(*) from leases where leases.unit_id = units.id and leases.status = ?)'
+                .' + (select count(*) from reservations where reservations.unit_id = units.id and reservations.status = ?)',
+                [LeaseStatus::Active->value, ReservationStatus::Approved->value],
+            );
+    }
+
+    /**
+     * How many more tenants this unit can take right now.
+     */
+    public function slotsAvailable(): int
+    {
+        return max(0, $this->capacity() - $this->activeLeaseCount() - $this->heldReservationCount());
     }
 
     /**

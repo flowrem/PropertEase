@@ -22,8 +22,17 @@ use Illuminate\Support\Carbon;
  * @property Carbon|null $created_at
  * @property Carbon|null $updated_at
  * @property Carbon|null $deleted_at
+ * @property Carbon|null $approved_at
+ * @property int|null $approved_by
+ * @property Carbon|null $rejected_at
+ * @property string|null $rejection_reason
+ * @property string|null $verification_id_path
+ * @property Carbon|null $verification_submitted_at
+ * @property Carbon|null $verification_id_pruned_at
  * @property-read Collection<int, TeamInvitation> $invitations
  * @property-read Collection<int, Membership> $memberships
+ * @property-read Collection<int, PaymentChannel> $paymentChannels
+ * @property-read Collection<int, Reservation> $reservations
  * @property-read Collection<int, User> $members
  */
 #[Fillable(['name', 'slug', 'is_personal'])]
@@ -53,9 +62,33 @@ class Team extends Model
     }
 
     /**
+     * Whether a Super Admin has approved this landlord team.
+     */
+    public function isApproved(): bool
+    {
+        return $this->approved_at !== null;
+    }
+
+    /**
+     * Whether this team was turned down and is waiting for a new ID.
+     */
+    public function isRejected(): bool
+    {
+        return $this->approved_at === null && $this->rejected_at !== null;
+    }
+
+    /**
+     * Whether this team's ID is waiting for a Super Admin to review it.
+     */
+    public function isAwaitingReview(): bool
+    {
+        return $this->approved_at === null && $this->rejected_at === null;
+    }
+
+    /**
      * Get the team owner.
      */
-    public function owner(): ?Model
+    public function owner(): ?User
     {
         return $this->members()
             ->wherePivot('role', TeamRole::Owner->value)
@@ -106,6 +139,29 @@ class Team extends Model
     }
 
     /**
+     * @return HasMany<Reservation, $this>
+     */
+    public function reservations(): HasMany
+    {
+        return $this->hasMany(Reservation::class);
+    }
+
+    public function pendingReservationsCount(): int
+    {
+        return $this->reservations()->pending()->count();
+    }
+
+    /**
+     * Get the ways this team accepts online downpayments.
+     *
+     * @return HasMany<PaymentChannel, $this>
+     */
+    public function paymentChannels(): HasMany
+    {
+        return $this->hasMany(PaymentChannel::class);
+    }
+
+    /**
      * Get all billable services this team offers.
      *
      * @return HasMany<Service, $this>
@@ -124,6 +180,10 @@ class Team extends Model
     {
         return [
             'is_personal' => 'boolean',
+            'approved_at' => 'datetime',
+            'rejected_at' => 'datetime',
+            'verification_submitted_at' => 'datetime',
+            'verification_id_pruned_at' => 'datetime',
         ];
     }
 

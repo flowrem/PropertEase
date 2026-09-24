@@ -1,9 +1,33 @@
 <?php
 
+use App\Http\Controllers\ForcedPasswordChangeController;
+use App\Http\Controllers\LandlordVerificationController;
+use App\Http\Controllers\PublicListingController;
+use App\Http\Controllers\ReservationFileController;
 use App\Http\Middleware\EnsureTeamMembership;
 use Illuminate\Support\Facades\Route;
 
 Route::view('/', 'welcome')->name('home');
+
+// Must be registered before the {current_team} group below: /admin/listings would
+// otherwise match {current_team}/listings and fail team membership with a 403.
+require __DIR__.'/admin.php';
+
+Route::get('find-a-place', [PublicListingController::class, 'index'])->name('listings.index');
+Route::get('find-a-place/{listing}', [PublicListingController::class, 'show'])
+    ->whereNumber('listing')
+    ->name('listings.show');
+Route::livewire('find-a-place/{listing}/reserve', 'pages::reserve')
+    ->whereNumber('listing')
+    ->name('listings.reserve');
+
+Route::middleware('auth')->group(function () {
+    Route::get('change-password', [ForcedPasswordChangeController::class, 'show'])->name('password.change');
+    Route::post('change-password', [ForcedPasswordChangeController::class, 'store'])->name('password.change.store');
+
+    Route::get('account-review', [LandlordVerificationController::class, 'show'])->name('landlord.verification');
+    Route::post('account-review', [LandlordVerificationController::class, 'resubmit'])->name('landlord.verification.resubmit');
+});
 
 Route::prefix('{current_team}')
     ->middleware(['auth', 'verified', EnsureTeamMembership::class])
@@ -20,7 +44,16 @@ Route::prefix('{current_team}')
             Route::livewire('properties', 'pages::landlord.properties')->name('properties');
             Route::livewire('tenants', 'pages::landlord.tenants')->name('tenants');
             Route::livewire('invoices', 'pages::landlord.invoices')->name('invoices');
-            Route::livewire('inbox', 'pages::landlord.inbox')->name('inbox');
+            Route::livewire('requests/maintenance', 'pages::landlord.maintenance')->name('landlord.maintenance');
+            Route::livewire('requests/complaints', 'pages::landlord.complaints')->name('landlord.complaints');
+            Route::get('inbox', fn () => redirect()->route('landlord.maintenance'))->name('inbox');
+            Route::livewire('listings', 'pages::landlord.listings')->name('listings');
+            Route::livewire('payment-settings', 'pages::landlord.payment-settings')->name('payment-settings');
+            Route::livewire('reservations', 'pages::landlord.reservations')->name('reservations');
+            Route::get('reservations/{reservation}/files/{kind}', ReservationFileController::class)
+                ->whereNumber('reservation')
+                ->whereIn('kind', ['id', 'proof'])
+                ->name('reservations.files');
         });
     });
 

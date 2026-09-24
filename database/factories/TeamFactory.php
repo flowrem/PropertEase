@@ -24,7 +24,31 @@ class TeamFactory extends Factory
             'name' => $name,
             'slug' => Str::slug($name),
             'is_personal' => false,
+            'approved_at' => now(),
         ];
+    }
+
+    /**
+     * Indicate that the landlord team has submitted an ID and is waiting for review.
+     */
+    public function awaitingApproval(): static
+    {
+        return $this->state(fn (array $attributes) => [
+            'approved_at' => null,
+            'verification_id_path' => 'landlord-ids/'.fake()->uuid().'.jpg',
+            'verification_submitted_at' => now(),
+        ]);
+    }
+
+    /**
+     * Indicate that a Super Admin turned the landlord team down.
+     */
+    public function rejectedByAdmin(string $reason = 'The ID is not readable.'): static
+    {
+        return $this->awaitingApproval()->state(fn (array $attributes) => [
+            'rejected_at' => now(),
+            'rejection_reason' => $reason,
+        ]);
     }
 
     /**

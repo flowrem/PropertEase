@@ -20,6 +20,10 @@ class CreateTeam
                 'is_personal' => $isPersonal,
             ]);
 
+            if ($user->ownsApprovedTeam()) {
+                $team->forceFill(['approved_at' => now()])->save();
+            }
+
             $membership = $team->memberships()->create([
                 'user_id' => $user->id,
                 'role' => TeamRole::Owner,

@@ -67,6 +67,33 @@ trait HasTeams
     }
 
     /**
+     * The landlord team this user is blocked on because a Super Admin has not
+     * approved it yet. Null for everyone else: approved landlords, invited
+     * staff and tenants (who belong to an approved team), and Super Admins.
+     */
+    public function teamAwaitingApproval(): ?Team
+    {
+        if ($this->is_super_admin) {
+            return null;
+        }
+
+        if ($this->teams()->whereNotNull('teams.approved_at')->exists()) {
+            return null;
+        }
+
+        return $this->ownedTeams()->first();
+    }
+
+    /**
+     * Whether the user already owns a landlord team that was approved, so any
+     * further team they create does not need a new review.
+     */
+    public function ownsApprovedTeam(): bool
+    {
+        return $this->ownedTeams()->whereNotNull('teams.approved_at')->exists();
+    }
+
+    /**
      * Get the user's personal team.
      */
     public function personalTeam(): ?Team
@@ -134,6 +161,15 @@ trait HasTeams
     public function isLandlordOn(Team $team): bool
     {
         return $this->teamRole($team) !== TeamRole::Tenant;
+    }
+
+    /**
+     * Determine if the user can make changes on a landlord's behalf (Landlord or Manager).
+     * Staff can view but not change listings and payment settings.
+     */
+    public function canManageListingsOn(Team $team): bool
+    {
+        return $this->teamRole($team)?->isAtLeast(TeamRole::Admin) ?? false;
     }
 
     /**

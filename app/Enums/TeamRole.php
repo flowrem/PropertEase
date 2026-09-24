@@ -14,7 +14,12 @@ enum TeamRole: string
      */
     public function label(): string
     {
-        return ucfirst($this->value);
+        return match ($this) {
+            self::Owner => 'Landlord',
+            self::Admin => 'Manager',
+            self::Member => 'Staff',
+            self::Tenant => 'Tenant',
+        };
     }
 
     /**

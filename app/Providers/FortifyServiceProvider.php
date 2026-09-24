@@ -10,11 +10,14 @@ use App\Http\Responses\RegisterResponse;
 use App\Http\Responses\TwoFactorLoginResponse;
 use App\Http\Responses\VerifyEmailResponse;
 use App\Models\TeamInvitation;
+use App\Models\User;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\ServiceProvider;
 use Illuminate\Support\Str;
+use Illuminate\Validation\ValidationException;
 use Laravel\Fortify\Contracts\LoginResponse as LoginResponseContract;
 use Laravel\Fortify\Contracts\RegisterResponse as RegisterResponseContract;
 use Laravel\Fortify\Contracts\TwoFactorLoginResponse as TwoFactorLoginResponseContract;
@@ -53,6 +56,41 @@ class FortifyServiceProvider extends ServiceProvider
     {
         Fortify::resetUserPasswordsUsing(ResetUserPassword::class);
         Fortify::createUsersUsing(CreateNewUser::class);
+        Fortify::authenticateUsing($this->authenticateByEmailOrUsername(...));
+    }
+
+    /**
+     * Find the user by email or username and check the password. Accounts
+     * that may not log in are refused only after the password is right, so
+     * the message cannot be used to discover which accounts exist.
+     *
+     * @throws ValidationException
+     */
+    private function authenticateByEmailOrUsername(Request $request): ?User
+    {
+        $identifier = Str::lower(trim((string) $request->input(Fortify::username())));
+
+        $user = User::query()
+            ->where(fn ($query) => $query->whereRaw('lower(email) = ?', [$identifier])->orWhere('username', $identifier))
+            ->first();
+
+        if (! $user || ! Hash::check((string) $request->input('password'), $user->password)) {
+            return null;
+        }
+
+        if ($user->isDisabled()) {
+            throw ValidationException::withMessages([
+                Fortify::username() => __('This account has been disabled. Contact your landlord.'),
+            ]);
+        }
+
+        if ($user->must_change_password && $user->temporary_password_expires_at?->isPast()) {
+            throw ValidationException::withMessages([
+                Fortify::username() => __('Your temporary password expired. Ask your landlord for new login details.'),
+            ]);
+        }
+
+        return $user;
     }
 
     /**

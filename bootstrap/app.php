@@ -1,5 +1,8 @@
 <?php
 
+use App\Http\Middleware\EnsureAccountIsActive;
+use App\Http\Middleware\EnsureLandlordIsApproved;
+use App\Http\Middleware\EnsurePasswordIsChanged;
 use App\Http\Middleware\SetTeamUrlDefaults;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
@@ -16,6 +19,9 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->trustProxies(at: '*');
 
         $middleware->web(append: [
+            EnsureAccountIsActive::class,
+            EnsurePasswordIsChanged::class,
+            EnsureLandlordIsApproved::class,
             SetTeamUrlDefaults::class,
         ]);
     })

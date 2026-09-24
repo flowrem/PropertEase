@@ -11,3 +11,7 @@ Schedule::call(function () {
 })->daily()->description('Delete expired team invitations');
 
 Schedule::command('invoices:generate')->daily();
+
+Schedule::command('reservations:prune-files')->daily();
+
+Schedule::command('landlord-ids:prune')->daily();

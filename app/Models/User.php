@@ -7,6 +7,7 @@ use App\Concerns\HasTeams;
 use Database\Factories\UserFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Attributes\Hidden;
+use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -21,6 +22,7 @@ use Laravel\Fortify\TwoFactorAuthenticatable;
 /**
  * @property int $id
  * @property string $name
+ * @property string|null $username
  * @property string $email
  * @property Carbon|null $email_verified_at
  * @property string $password
@@ -29,6 +31,10 @@ use Laravel\Fortify\TwoFactorAuthenticatable;
  * @property Carbon|null $two_factor_confirmed_at
  * @property string|null $remember_token
  * @property int|null $current_team_id
+ * @property bool $is_super_admin
+ * @property bool $must_change_password
+ * @property Carbon|null $temporary_password_expires_at
+ * @property Carbon|null $disabled_at
  * @property Carbon|null $created_at
  * @property Carbon|null $updated_at
  * @property-read Team|null $currentTeam
@@ -54,7 +60,30 @@ class User extends Authenticatable implements PasskeyUser
             'email_verified_at' => 'datetime',
             'password' => 'hashed',
             'two_factor_confirmed_at' => 'datetime',
+            'is_super_admin' => 'boolean',
+            'must_change_password' => 'boolean',
+            'temporary_password_expires_at' => 'datetime',
+            'disabled_at' => 'datetime',
         ];
+    }
+
+    /**
+     * Usernames are always stored lowercase so lookups and uniqueness are case-insensitive.
+     *
+     * @return Attribute<string|null, string|null>
+     */
+    protected function username(): Attribute
+    {
+        return Attribute::set(fn (?string $value) => $value === null ? null : Str::lower(trim($value)));
+    }
+
+    /**
+     * Whether this account has been switched off, for example after the
+     * reservation it was created for was cancelled.
+     */
+    public function isDisabled(): bool
+    {
+        return $this->disabled_at !== null;
     }
 
     /**

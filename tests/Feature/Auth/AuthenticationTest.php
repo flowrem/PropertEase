@@ -26,6 +26,25 @@ test('users can authenticate using the login screen', function () {
     $this->assertAuthenticated();
 });
 
+test('a super admin is redirected to the admin dashboard on login, not a team url', function () {
+    $admin = User::create([
+        'name' => 'Site Admin',
+        'email' => 'admin@example.com',
+        'password' => 'password',
+    ]);
+    $admin->is_super_admin = true;
+    $admin->save();
+
+    $response = $this->post(route('login.store'), [
+        'email' => $admin->email,
+        'password' => 'password',
+    ]);
+
+    $response->assertSessionHasNoErrors()->assertRedirect('/admin');
+
+    $this->assertAuthenticated();
+});
+
 test('passkey login response redirects to the current team dashboard', function () {
     $user = User::factory()->create();
 

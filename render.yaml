@@ -13,7 +13,7 @@ services:
     healthCheckPath: /up
     envVars:
       - key: APP_NAME
-        value: PropertEase
+        value: Occuplace
       - key: APP_ENV
         value: production
       - key: APP_DEBUG
@@ -26,10 +26,14 @@ services:
         value: stderr
       - key: DB_CONNECTION
         value: pgsql
+      # The app uses a Supabase Postgres, not the Render database declared above
+      # (which is now unused and can be deleted in the dashboard). Set DB_URL by
+      # hand to the Supabase *Session pooler* string (port 5432, user
+      # postgres.<project-ref>). Never the direct or transaction pooler string.
       - key: DB_URL
-        fromDatabase:
-          name: propertease-db
-          property: connectionString
+        sync: false
+      - key: DB_SSLMODE
+        value: require
       - key: SESSION_DRIVER
         value: database
       - key: CACHE_STORE
@@ -43,4 +47,28 @@ services:
       - key: MAIL_FROM_ADDRESS
         sync: false
       - key: MAIL_FROM_NAME
-        value: PropertEase
+        value: Occuplace
+      # Render's filesystem is ephemeral, so uploads live in Supabase Storage
+      # (S3 API). occuplace-media is a public bucket for listing photos and
+      # payment QR codes; occuplace-sensitive is private, for IDs and payment
+      # proofs. The keys, endpoint and MEDIA_URL are set by hand in the dashboard.
+      - key: MEDIA_DISK
+        value: media_s3
+      - key: SENSITIVE_DISK
+        value: sensitive_s3
+      - key: AWS_DEFAULT_REGION
+        value: us-west-2
+      - key: AWS_USE_PATH_STYLE_ENDPOINT
+        value: true
+      - key: AWS_ACCESS_KEY_ID
+        sync: false
+      - key: AWS_SECRET_ACCESS_KEY
+        sync: false
+      - key: AWS_ENDPOINT
+        sync: false
+      - key: MEDIA_BUCKET
+        sync: false
+      - key: SENSITIVE_BUCKET
+        sync: false
+      - key: MEDIA_URL
+        sync: false
