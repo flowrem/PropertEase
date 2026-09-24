@@ -12,6 +12,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasManyThrough;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Support\Carbon;
 
 /**
@@ -28,6 +29,7 @@ use Illuminate\Support\Carbon;
  * @property Carbon|null $created_at
  * @property Carbon|null $updated_at
  * @property-read Property $property
+ * @property-read UnitListing|null $listing
  * @property-read Collection<int, Lease> $leases
  * @property-read Collection<int, Lease> $activeLeases
  * @property-read int|null $active_leases_count
@@ -45,6 +47,14 @@ class Unit extends Model
     public function property(): BelongsTo
     {
         return $this->belongsTo(Property::class);
+    }
+
+    /**
+     * @return HasOne<UnitListing, $this>
+     */
+    public function listing(): HasOne
+    {
+        return $this->hasOne(UnitListing::class);
     }
 
     /**

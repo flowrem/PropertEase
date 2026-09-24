@@ -24,6 +24,7 @@ use Illuminate\Support\Carbon;
  * @property Carbon|null $deleted_at
  * @property-read Collection<int, TeamInvitation> $invitations
  * @property-read Collection<int, Membership> $memberships
+ * @property-read Collection<int, PaymentChannel> $paymentChannels
  * @property-read Collection<int, User> $members
  */
 #[Fillable(['name', 'slug', 'is_personal'])]
@@ -103,6 +104,16 @@ class Team extends Model
     public function properties(): HasMany
     {
         return $this->hasMany(Property::class);
+    }
+
+    /**
+     * Get the ways this team accepts online downpayments.
+     *
+     * @return HasMany<PaymentChannel, $this>
+     */
+    public function paymentChannels(): HasMany
+    {
+        return $this->hasMany(PaymentChannel::class);
     }
 
     /**

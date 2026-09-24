@@ -20,6 +20,7 @@ use Illuminate\Support\Carbon;
  * @property string $city
  * @property string $province
  * @property string $postal_code
+ * @property string|null $map_url
  * @property PropertyType $type
  * @property Carbon|null $created_at
  * @property Carbon|null $updated_at
@@ -27,7 +28,7 @@ use Illuminate\Support\Carbon;
  * @property-read Collection<int, Unit> $units
  * @property-read Collection<int, Announcement> $announcements
  */
-#[Fillable(['team_id', 'name', 'address_line', 'city', 'province', 'postal_code', 'type'])]
+#[Fillable(['team_id', 'name', 'address_line', 'city', 'province', 'postal_code', 'map_url', 'type'])]
 class Property extends Model
 {
     /** @use HasFactory<PropertyFactory> */

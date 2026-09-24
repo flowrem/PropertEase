@@ -137,6 +137,15 @@ trait HasTeams
     }
 
     /**
+     * Determine if the user can make changes on a landlord's behalf (Landlord or Manager).
+     * Staff can view but not change listings and payment settings.
+     */
+    public function canManageListingsOn(Team $team): bool
+    {
+        return $this->teamRole($team)?->isAtLeast(TeamRole::Admin) ?? false;
+    }
+
+    /**
      * Get the user's teams as a collection of UserTeam objects.
      *
      * @return Collection<int, UserTeam>
