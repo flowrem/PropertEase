@@ -20,7 +20,13 @@
                         <flux:sidebar.item icon="squares-2x2" :href="route('admin.dashboard')" :current="request()->routeIs('admin.dashboard')" wire:navigate>
                             {{ __('Overview') }}
                         </flux:sidebar.item>
-                        <flux:sidebar.item icon="building-office-2" :href="route('admin.landlords')" :current="request()->routeIs('admin.landlords')" wire:navigate>
+                        <flux:sidebar.item
+                            icon="building-office-2"
+                            :href="route('admin.landlords')"
+                            :current="request()->routeIs('admin.landlords')"
+                            :badge="\App\Models\Team::whereNull('approved_at')->whereNull('rejected_at')->count() ?: null"
+                            wire:navigate
+                        >
                             {{ __('Landlords') }}
                         </flux:sidebar.item>
                         <flux:sidebar.item icon="home-modern" :href="route('admin.listings')" :current="request()->routeIs('admin.listings')" wire:navigate>

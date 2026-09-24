@@ -13,3 +13,5 @@ Schedule::call(function () {
 Schedule::command('invoices:generate')->daily();
 
 Schedule::command('reservations:prune-files')->daily();
+
+Schedule::command('landlord-ids:prune')->daily();
