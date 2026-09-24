@@ -13,6 +13,7 @@ test('creating a super admin with a new email makes a teamless super admin accou
     $user = User::where('email', 'admin@example.com')->firstOrFail();
 
     expect($user->is_super_admin)->toBeTrue()
+        ->and($user->hasVerifiedEmail())->toBeTrue()
         ->and($user->current_team_id)->toBeNull()
         ->and($user->personalTeam())->toBeNull();
 });

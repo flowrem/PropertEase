@@ -87,6 +87,7 @@ class CreateSuperAdmin extends Command
         ]);
 
         $user->is_super_admin = true;
+        $user->email_verified_at = now();
         $user->save();
 
         $this->info("Created Super Admin {$user->email}.");
