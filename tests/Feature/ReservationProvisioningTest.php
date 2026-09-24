@@ -11,10 +11,12 @@ use App\Models\Property;
 use App\Models\Reservation;
 use App\Models\Unit;
 use App\Models\User;
+use App\Notifications\ReservationCancelled;
 use App\Notifications\ReservationRejected;
 use App\Notifications\TenantAccountCreated;
 use Illuminate\Contracts\Queue\ShouldBeEncrypted;
 use Illuminate\Contracts\Queue\ShouldQueue;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Facades\Storage;
@@ -237,4 +239,30 @@ test('only an approved reservation can be cancelled, and a reason is required', 
 
     expect(fn () => app(CancelReservation::class)->handle($reservation->fresh(), ' '))
         ->toThrow(ValidationException::class);
+});
+
+test('cancelling emails the applicant and ends their sessions', function () {
+    Notification::fake();
+    [$landlord, $reservation] = pendingReservation();
+    $tenant = app(ApproveReservation::class)->handle($reservation, $landlord, true);
+    DB::table('sessions')->insert([
+        'id' => 'abc', 'user_id' => $tenant->id, 'payload' => '', 'last_activity' => time(),
+    ]);
+
+    app(CancelReservation::class)->handle($reservation->fresh(), 'No show.');
+
+    Notification::assertSentOnDemand(ReservationCancelled::class, fn ($notification, $channels, $notifiable) => $notifiable->routes['mail'] === $reservation->email);
+    expect(DB::table('sessions')->where('user_id', $tenant->id)->exists())->toBeFalse();
+});
+
+test('a disabled user is logged out on their next request', function () {
+    $user = User::factory()->create();
+    $user->forceFill(['disabled_at' => now()])->save();
+    $user->switchTeam($user->currentTeam);
+
+    $this->actingAs($user)
+        ->get(route('dashboard'))
+        ->assertRedirect(route('login'));
+
+    $this->assertGuest();
 });

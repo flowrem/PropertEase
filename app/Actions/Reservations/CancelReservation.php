@@ -5,7 +5,9 @@ namespace App\Actions\Reservations;
 use App\Enums\ReservationStatus;
 use App\Models\Reservation;
 use App\Models\User;
+use App\Notifications\ReservationCancelled;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Notification;
 use Illuminate\Validation\ValidationException;
 
 class CancelReservation
@@ -43,7 +45,13 @@ class CancelReservation
             if ($tenant) {
                 $tenant->forceFill(['disabled_at' => now(), 'remember_token' => null])->save();
                 $locked->team->memberships()->where('user_id', $tenant->id)->delete();
+
+                DB::table('sessions')->where('user_id', $tenant->id)->delete();
             }
+
+            $reservation->setRawAttributes($locked->getAttributes(), true);
         });
+
+        Notification::route('mail', $reservation->email)->notify(new ReservationCancelled($reservation));
     }
 }
