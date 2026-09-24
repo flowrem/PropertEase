@@ -9,6 +9,10 @@ use Illuminate\Support\Facades\Route;
 
 Route::view('/', 'welcome')->name('home');
 
+// Must be registered before the {current_team} group below: /admin/listings would
+// otherwise match {current_team}/listings and fail team membership with a 403.
+require __DIR__.'/admin.php';
+
 Route::get('find-a-place', [PublicListingController::class, 'index'])->name('listings.index');
 Route::get('find-a-place/{listing}', [PublicListingController::class, 'show'])
     ->whereNumber('listing')
@@ -54,4 +58,3 @@ Route::prefix('{current_team}')
     });
 
 require __DIR__.'/settings.php';
-require __DIR__.'/admin.php';

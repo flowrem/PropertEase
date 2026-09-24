@@ -159,3 +159,10 @@ test('the overview shows listing counts by status', function () {
         ->assertSee('2 pending review')
         ->assertSee('1 approved');
 });
+
+test('a Super Admin can open every admin page over HTTP', function (string $routeName) {
+    $admin = User::factory()->create();
+    $admin->forceFill(['is_super_admin' => true])->save();
+
+    $this->actingAs($admin)->get(route($routeName))->assertOk();
+})->with(['admin.dashboard', 'admin.landlords', 'admin.listings']);
