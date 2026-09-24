@@ -12,6 +12,10 @@ RUN apt-get update && apt-get install -y \
 
 COPY --from=composer:2 /usr/bin/composer /usr/bin/composer
 
+# The stock image ships no php.ini, so PHP's 2MB upload / 8MB post defaults
+# would reject listing photos and ID scans.
+COPY docker/php.ini /usr/local/etc/php/conf.d/occuplace.ini
+
 WORKDIR /app
 COPY . .
 
