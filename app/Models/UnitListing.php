@@ -84,6 +84,17 @@ class UnitListing extends Model
     }
 
     /**
+     * Listings guests may see: approved, and the unit still has room.
+     *
+     * @param  Builder<UnitListing>  $query
+     */
+    public function scopePubliclyVisible(Builder $query): void
+    {
+        $query->where('status', ListingStatus::Approved->value)
+            ->whereHas('unit', fn (Builder $unit) => $unit->hasRoom());
+    }
+
+    /**
      * @param  Builder<UnitListing>  $query
      */
     public function scopeForTeam(Builder $query, Team $team): void

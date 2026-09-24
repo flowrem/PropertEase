@@ -6,6 +6,7 @@ use App\Enums\LeaseStatus;
 use App\Enums\UnitStatus;
 use Database\Factories\UnitFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -115,6 +116,37 @@ class Unit extends Model
         }
 
         return $this->activeLeaseCount() < $this->tenant_limit;
+    }
+
+    /**
+     * Limit the query to units that currently have room for another tenant.
+     * Mirrors hasRoomForAnotherTenant() so both stay the single rule for capacity.
+     *
+     * @param  Builder<Unit>  $query
+     */
+    public function scopeHasRoom(Builder $query): void
+    {
+        $query->where(fn (Builder $room) => $room
+            ->where('units.status', UnitStatus::Vacant->value)
+            ->orWhere(fn (Builder $shared) => $shared
+                ->where('units.allows_multiple_tenants', true)
+                ->whereNotNull('units.tenant_limit')
+                ->whereRaw(
+                    '(select count(*) from leases where leases.unit_id = units.id and leases.status = ?) < units.tenant_limit',
+                    [LeaseStatus::Active->value],
+                )));
+    }
+
+    /**
+     * How many more tenants this unit can take right now.
+     */
+    public function slotsAvailable(): int
+    {
+        $capacity = $this->allows_multiple_tenants && $this->tenant_limit !== null
+            ? $this->tenant_limit
+            : 1;
+
+        return max(0, $capacity - $this->activeLeaseCount());
     }
 
     /**
