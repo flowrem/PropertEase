@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\ForcedPasswordChangeController;
 use App\Http\Controllers\PublicListingController;
 use App\Http\Controllers\ReservationFileController;
 use App\Http\Middleware\EnsureTeamMembership;
@@ -14,6 +15,11 @@ Route::get('find-a-place/{listing}', [PublicListingController::class, 'show'])
 Route::livewire('find-a-place/{listing}/reserve', 'pages::reserve')
     ->whereNumber('listing')
     ->name('listings.reserve');
+
+Route::middleware('auth')->group(function () {
+    Route::get('change-password', [ForcedPasswordChangeController::class, 'show'])->name('password.change');
+    Route::post('change-password', [ForcedPasswordChangeController::class, 'store'])->name('password.change.store');
+});
 
 Route::prefix('{current_team}')
     ->middleware(['auth', 'verified', EnsureTeamMembership::class])
