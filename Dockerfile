@@ -24,4 +24,8 @@ RUN composer install --no-dev --optimize-autoloader --no-interaction \
 
 EXPOSE 10000
 
-CMD ["/bin/sh", "-c", "php artisan migrate --force && php artisan config:cache && php artisan route:cache && php artisan view:cache && (php artisan queue:work --tries=1 --timeout=90 &) && PHP_CLI_SERVER_WORKERS=4 php artisan serve --host=0.0.0.0 --port=${PORT:-10000}"]
+# Render's free plan has no cron and no separate worker service, so the queue
+# worker and the scheduler both run in the background of this one container.
+# --no-reload is required for PHP_CLI_SERVER_WORKERS to take effect; without it
+# artisan serve falls back to a single, blockable worker.
+CMD ["/bin/sh", "-c", "php artisan migrate --force && php artisan config:cache && php artisan route:cache && php artisan view:cache && (php artisan queue:work --tries=1 --timeout=90 &) && (php artisan schedule:work &) && PHP_CLI_SERVER_WORKERS=4 php artisan serve --no-reload --host=0.0.0.0 --port=${PORT:-10000}"]
