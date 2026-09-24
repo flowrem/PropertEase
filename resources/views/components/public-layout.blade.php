@@ -33,10 +33,10 @@
                     </a>
                 @else
                     <a
-                        href="{{ route('login') }}"
-                        class="rounded-lg px-3 py-2 text-sm font-medium text-zinc-300 transition-colors hover:text-white sm:px-4"
+                        href="{{ route('register') }}"
+                        class="rounded-lg bg-brand-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-brand-500"
                     >
-                        {{ __('Log in') }}
+                        {{ __("I'm a landlord") }}
                     </a>
                 @endauth
             </nav>
@@ -48,6 +48,10 @@
 
         <footer class="mx-auto w-full max-w-5xl px-6 py-10 text-center text-sm text-zinc-400 sm:px-8">
             &copy; {{ date('Y') }} {{ config('app.name') }}
+            @guest
+                &middot;
+                <a href="{{ route('login') }}" class="underline transition-colors hover:text-white">{{ __('Landlord or tenant log in') }}</a>
+            @endguest
         </footer>
 
         @fluxAppearance

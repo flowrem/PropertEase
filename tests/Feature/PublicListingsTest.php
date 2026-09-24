@@ -188,12 +188,19 @@ test('the landing page has both entry points', function () {
         ->assertSee(route('register'));
 });
 
-test('the public pages link to log in for guests and the dashboard for landlords', function () {
-    $this->get(route('listings.index'))->assertSee(route('login'));
+test('guests see a landlord sign-up in the header and log in in the footer', function () {
+    $this->get(route('listings.index'))
+        ->assertSee(route('register'))
+        ->assertSee('Landlord or tenant log in')
+        ->assertSee(route('login'));
+});
 
+test('signed-in users see the dashboard instead of sign-up or log in', function () {
     $landlord = User::factory()->create();
 
-    $this->actingAs($landlord)->get(route('listings.index'))->assertSee('Dashboard');
+    $this->actingAs($landlord)->get(route('listings.index'))
+        ->assertSee('Dashboard')
+        ->assertDontSee('Landlord or tenant log in');
 });
 
 test('a super admin without a team can view the public pages', function () {
