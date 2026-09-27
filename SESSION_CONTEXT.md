@@ -19,9 +19,35 @@ Source docs (outside the repo, on the user's machine): `Tenant_Survey_Analysis_a
 
 **The app is deployed and publicly live** at `https://occuplace.onrender.com` (Render free tier, Supabase for database and storage). The old service `propertease` (`propertease-wv4j.onrender.com`) was replaced by a hand-created `occuplace` service on 2026-09-24. See the Deployment section — it has its own set of hard-won gotchas.
 
-## Professor Revisions — Multi-Phase Work In Progress
+## Professor Revisions Round 2 — IN PROGRESS (resume here)
 
-Implementing `c:\Users\Rem\Downloads\REVISIONS_PROMPT.md` (**not in the repo** — read it in full before resuming this work), an 8-phase brief responding to a professor's feedback. Working on branch **`feature/professor-revisions`**, never `main` (`main` auto-deploys to the live Render app). Do not merge or rebase onto PR #1 (it branches from the first commit and would revert later auth-page work).
+Implementing `c:\Users\Rem\Downloads\PROPERTY_REVISIONS_PROMPT.md` (**not in the repo** — read it in full before resuming), a 10-phase brief ("Professor Revisions, Round 2") built from `Additional-system-functions.pdf` plus the professor's note about input limits. Branch **`feature/property-revisions`**, never `main`. Same ground rules as Round 1 (below): plan first and wait for approval at the start of each phase, stop and summarize at the end, additive migrations only, one commit per logical step, suite + PHPStan + Pint green, server-side enforcement with a test for every locked field or limit, no new dependencies without asking.
+
+**Progress:**
+- ✅ **Phase 1 (property and unit structure, locked fields, floor area, capacity)** — done, committed. Property type locked after creation; an address edit sends the property's Approved listings back to `PendingReview`. Units got `floor_area_sqm` (nullable decimal); floor level (picked from `Unit::floorLevelOptions()`), bedrooms, bathrooms and floor area lock once saved (`Unit::hasLockedDetails()` = floor area is set), with a confirm modal before saving (`<x-confirm-unit-modal>`) and read-only display afterwards. Legacy units without a floor area are completed once, and their listings can't be submitted until then. Limits live in `config/occuplace.php`. **The user lowered the floor area maximum from the brief's 300 to 70 m²** (commit `c1966d0`).
+- **Capacity rules, as they stand now** (`Unit::maxCapacityFor(floorArea, type, bedrooms, bedSpaces)`, always capped by `floor(area ÷ area_per_tenant)` and `max_capacity` 20, never below 1):
+  1. **Beds listed** → capacity = what the beds sleep (`Σ quantity × amenities.sleeps`). Chosen by the user on 2026-09-27 ("beds decide capacity") to answer "where does each tenant sleep?".
+  2. **No beds listed** (unfurnished, tenants bring their own) → bedroom estimate: `bedrooms × tenants_per_bedroom` (2 for apartment/condo/rental home, 4 for dorm/boarding house; the user's numbers).
+  3. **Studio/bedspace (0 bedrooms) with no beds** → floor area alone.
+  - Room checks set aside a **6 m² common area** (kitchen/living, `common_area` config) whenever bedrooms ≥ 1, plus at least one bathroom's 1.2 m² even when bathrooms = 0. So a 24 m² unit fits at most 2 bedrooms. Bathrooms are capped at bedrooms + 1.
+  - `capacity()`, `hasRoomForAnotherTenant()`, `scopeHasRoom()` (SQL twin, uses the `BED_SPACES_SQL` subquery constant) and `slotsAvailable()` are still the single rule; change them together. List queries eager-load the bed total with `Unit::withBedSpaces()` (same pattern as `withCount`), otherwise `bedSpaces()` queries per unit.
+- ✅ **Phase 2 (amenities module)** — done, committed.
+  - Tables `amenities` (`team_id` nullable = platform default, `name`, `category` string + `AmenityCategory` enum, `sleeps`, `is_active`) and `amenity_unit` (`quantity` 1–20). 37 platform defaults are seeded **by a migration** (`2026_09_27_085939_seed_default_amenities`) so production gets them on deploy; beds: Single bed sleeps 1, Double deck 2, Double bed 2; everything else 0 (includes TV, gas/electric stove, induction cooker, washing machine, Wi-Fi, CCTV...).
+  - **`sleeps` is deliberately NOT fillable**: custom amenities always sleep 0, so a landlord can't invent a "bed that sleeps 10". New bed types go into the platform list.
+  - Unit form (Properties page + setup wizard, shared `UnitForm` + `<x-unit-form-fields>`): checkboxes grouped by category (`Amenity::groupByCategory()`), quantity per ticked item. Only platform + the team's own active amenities are accepted (`Amenity::availableTo($team)`); an inactive one already on the unit stays selectable. Removing beds is refused when fewer would no longer sleep the tenants + reservations already holding the unit (only when the edit shrinks capacity, so already-over-capacity legacy units can still be edited).
+  - Once any bed is ticked the form says "Counting only the ticked beds: 2 double decks and 1 single bed sleep 5 people. Tick every bed in the unit..." (ticking the first bed switches from the bedroom estimate and can LOWER capacity; the note explains it). A shared unit's tenant limit **follows the maximum** when beds change while it is empty or sits at the old maximum; a limit set lower on purpose stays unless the new maximum forbids it (`UnitForm::followMaxCapacity()`, driven by the pages' `updating()`/`updated()` hooks).
+  - `{team}/amenities` page (`amenities` route, sidebar item after Properties): landlords add their own (name unique within the team's list incl. platform defaults, case-insensitive) and deactivate/reactivate; Staff view-only; `AmenityPolicy`.
+  - Public: listing page shows "What's included" with quantities; browse has an Amenities filter (plain `<details>`, no JS) matching units that have ALL ticked amenities, platform amenities only.
+- ⏭️ **Phase 3 (unit inventory + move-in condition checklist)** — NEXT, not started, **no plan presented yet**. Brief: `unit_items`, `condition_checks`, `condition_check_items`, move-in rule (no assignment while an item is Not working/Missing unless "Proceed anyway" + reason), tenant acknowledgment. The user wants amenities monitored so they know items are in good condition before handing the unit over. Idea already floated to the user: generate a unit's checklist items from its amenities and quantities (`unit_items.amenity_id`), plus landlord-added non-amenity items (ceiling lights, faucets).
+- Phases 4–10 not started (tenant reports + repair history + notifications screen, contact number + stay type, reservation hold/expiry vs downpayment, contract terms + generated contract, unit transfer, light theme + PSGC region/city dropdowns, wrap-up).
+
+**Not yet seen in a browser** (only covered by tests): the amenity checkboxes and quantity boxes on the unit form, the "counting only the ticked beds" note, the tenant limit following beds, the Amenities page, the public "What's included" section and Amenities filter.
+
+**Nothing on this branch is pushed or merged.** Merging to `main` deploys, and would run the three new migrations (amenities, the seed, amenity_unit) plus `add_floor_area_sqm_to_units_table` on Supabase. Existing production units have no beds and no floor area, so their capacity is unchanged until landlords complete them.
+
+## Professor Revisions (Round 1) — COMPLETE
+
+Implemented `c:\Users\Rem\Downloads\REVISIONS_PROMPT.md` (**not in the repo**), an 8-phase brief responding to a professor's feedback. All 8 phases are done and merged; the notes below are kept for context. Working on branch **`feature/professor-revisions`**, never `main` (`main` auto-deploys to the live Render app). Do not merge or rebase onto PR #1 (it branches from the first commit and would revert later auth-page work).
 
 **Locked-in decisions** (the user's own choices, overriding the brief's `{{NEW_NAME}}` placeholder and a couple of open questions):
 - Product name: **Occuplace** (Phase 1 done — renamed everywhere except the GitHub repo `flowrem/PropertEase`. The brief's rule 8 also kept the Render service, database and `APP_URL` under the old name, but the user overrode that on 2026-09-24 and moved to a new `occuplace` service).
@@ -44,7 +70,7 @@ Implementing `c:\Users\Rem\Downloads\REVISIONS_PROMPT.md` (**not in the repo** �
 
 **Non-negotiable rules from the brief, apply to every remaining phase:** migrations are additive-only, never edit an existing migration; never `migrate:fresh`/`db:wipe` outside the test suite; keep `php artisan test --compact`, PHPStan, and Pint green after every phase; one commit per logical step, no catch-alls; never rename the Render service/database/`APP_URL`; present a short plan and wait for approval at the start of each phase, stop and summarize at the end; if an ambiguity isn't covered by the brief or its Open Decisions, stop and ask. Temporary tenant passwords (Phase 6) need the same discipline already applied to `is_super_admin`: never logged, never flashed, never stored in plaintext, and the notification carrying one must be both `ShouldQueue` and `ShouldBeEncrypted`.
 
-**Test count as of 2026-09-25**: 419/419 passing, PHPStan 0 errors, Pint clean.
+**Test count as of 2026-09-27** (branch `feature/property-revisions`, commit `a936e1a`): 522/522 passing, PHPStan 0 errors, Pint clean.
 
 ## Tech Stack
 
@@ -98,6 +124,12 @@ app/
     Landlords/{Approve,Reject}Landlord                                    Super Admin ID review
   Models (added by the professor revisions): UnitListing, ListingPhoto, PaymentChannel,
                      Reservation. Enums: ListingStatus, ReservationStatus.
+  Round 2:           Amenity (+ AmenityCategory enum, AmenityPolicy); Unit::amenities(),
+                     bedSpaces(), withBedSpaces(); Team::amenities()
+  Livewire/Forms/UnitForm.php   Shared add/edit unit form: limits, locked details, amenities,
+                     bed-based capacity preview, tenant-limit clamping/following
+config/occuplace.php  All unit limits: floor area 6–70, rooms, common_area 6, area_per_tenant,
+                     tenants_per_bedroom, amenity_quantity max 20, max_capacity 20
   Console/Commands/  GenerateInvoices (`invoices:generate`), PruneReservationFiles
                      (`reservations:prune-files`), PruneLandlordIds (`landlord-ids:prune`),
                      CreateSuperAdmin (`app:create-super-admin`). All scheduled daily except the last.
@@ -292,6 +324,7 @@ Live at `https://occuplace.onrender.com`. GitHub repo `flowrem/PropertEase` (kep
 33. **Phase 8 wrap-up:** scheduler and `--no-reload` in the Dockerfile, `render.yaml` aligned with the Supabase setup, README rewritten, this file brought up to date, `public/build/` committed.
 34. **Merged to `main` and moved to a new Render service** (2026-09-24). Merged `feature/professor-revisions` (merge commit `2635e1a`, 44 commits) and pushed, which redeployed the old service with the new code. The user then wanted a service URL matching the product name; Render cannot change an existing `onrender.com` address, so a new `occuplace` service was created by hand (environment variables pasted in), verified live at `https://occuplace.onrender.com` serving the new code, and the Render Blueprint was disconnected so `render.yaml` stops syncing (otherwise a rename would have created a duplicate service, and deleting the old one would have been undone on the next sync). Both services share the one Supabase database and buckets, so the old `propertease` service and the empty `propertease-db` are to be suspended and then deleted.
 35. **First production run and fixes** (2026-09-24 to 25). After the merge, `/admin` returned 500: the column chart used `Number::abbreviate`, which needs the `intl` extension the image lacks (gotcha #16, fixed with plain PHP and a guard test). Render's Shell turned out to be paid-only, so the first Super Admin was made by registering on the site and setting `is_super_admin` to true in Supabase's Table Editor. Registration then returned 500 because `SENSITIVE_BUCKET` was missing on the new service (gotcha #18); the cause was found by temporarily setting `APP_DEBUG=true` (gotcha #17). The supplied logo was applied everywhere (gotcha #19): full logo on login and register, the mark beside the name on public pages, the mark in the sidebar, new favicons, and the sidebar's navy square made transparent in dark mode.
+36. **Round 2, Phases 1–2** (2026-09-27, branch `feature/property-revisions`). Phase 1: locked unit details, floor area, config-driven limits. Then the user questioned the capacity math ("3 bedrooms but 4 tenants, where does the 4th sleep?"): capacity first became bedroom-based (2 or 4 per bedroom) with a 6 m² common area, then, in Phase 2, bed-based (a double deck sleeps 2). Phase 2 built the amenity catalog, unit-form amenities with quantities, the Amenities page and the public amenity display/filter. A follow-up added the "counting only the ticked beds" note and made the tenant limit follow the maximum as beds change. Gotchas hit: `sed` edits silently miss on this repo's CRLF files (use Edit or `perl -0pi`); the spread operator renumbers integer-keyed arrays (use `+`); PHPStan can't see `$amenity->pivot`, so read pivot values with `pluck('amenity_unit.quantity', 'amenities.id')` in PHP code (Blade is fine).
 
 ## Bugs Found & Fixed Mid-Session (worth knowing if debugging similar issues)
 
@@ -335,7 +368,9 @@ Locally: the app is served by Herd at `http://Occuplace.test`. Run `php artisan 
 
 In production: pushing to `main` auto-deploys to Render. **If the change touches CSS/JS/assets, run `npm run build` and commit `public/build/` too** or production will serve stale assets. Nothing from the professor-revisions branch has been pushed to `main` yet — it all lives on `feature/professor-revisions`. Production already runs against Supabase (database and, once the branch is deployed, storage) using the OLD `main` code.
 
-**Immediate next step (state at the end of the 2026-09-25 session):** everything is merged and pushed. `origin/main` is at the logo commit `01647aa` or later, and `occuplace` auto-deploys from it. Open items, in this order:
+**Immediate next step (2026-09-27):** continue Round 2 on `feature/property-revisions` (see "Professor Revisions Round 2" at the top). Phases 1–2 are committed, nothing pushed. Next is **Phase 3 (inventory + move-in checklist)**: read the brief's Phase 3, present a short plan (files, migrations, tests) and wait for approval. Before that, the user may want to check the Phase 2 screens in a browser (listed at the top as not yet seen).
+
+**Production open items (state at the end of the 2026-09-25 session, may already be done):** everything is merged and pushed. `origin/main` is at the logo commit `01647aa` or later, and `occuplace` auto-deploys from it. Open items, in this order:
 1. **Set `APP_DEBUG` back to `false`** in Render's Environment tab if it is still `true`. It was turned on temporarily to debug the registration 500.
 2. **Confirm the registration 500 is fixed.** The `occuplace` service must have all of these, with exactly these names: `SENSITIVE_BUCKET`, `MEDIA_BUCKET`, `MEDIA_URL`, `AWS_ENDPOINT`, `AWS_DEFAULT_REGION`, `AWS_USE_PATH_STYLE_ENDPOINT`, `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `MEDIA_DISK=media_s3`, `SENSITIVE_DISK=sensitive_s3`.
 3. **Run the full flow once on production:** register a landlord with an ID, approve it from `/admin/landlords` (View ID must load), confirm the file is in the `occuplace-sensitive` bucket in Supabase and survives a redeploy, then finish the setup wizard and check the landlord Home. One landlord (team `INF-241`) was approved and reached the setup wizard.
