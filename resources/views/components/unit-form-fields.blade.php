@@ -4,6 +4,7 @@
     'amenityGroups' => collect(),
     'selectedAmenities' => [],
     'bedSpaces' => 0,
+    'bedSummary' => null,
     'maxCapacity' => null,
     'maxBedrooms' => null,
     'maxBathrooms' => null,
@@ -153,6 +154,14 @@
                 </div>
             @endforeach
         </flux:checkbox.group>
+
+        @if ($bedSummary)
+            <flux:callout icon="information-circle" class="mt-4">
+                <flux:callout.text>
+                    {{ trans_choice('Counting only the ticked beds: :beds sleep :count person. Tick every bed in the unit, or none if tenants bring their own.|Counting only the ticked beds: :beds sleep :count people. Tick every bed in the unit, or none if tenants bring their own.', $bedSpaces, ['beds' => $bedSummary]) }}
+                </flux:callout.text>
+            </flux:callout>
+        @endif
 
         <flux:error name="form.amenityIds" />
         <flux:error name="form.amenityIds.*" />

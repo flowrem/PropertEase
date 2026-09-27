@@ -15,6 +15,7 @@ use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
 use Livewire\Attributes\Computed;
 use Livewire\Attributes\Title;
 use Livewire\Component;
@@ -138,6 +139,37 @@ new #[Title('Properties')] class extends Component
     public function updatedFormTenantLimit(): void
     {
         $this->form->clampTenantLimit($this->formMaxCapacityPreview, $this->editingUnit?->takenSlotCount() ?? 0);
+    }
+
+    /**
+     * The unit's maximum capacity just before its beds changed on the form,
+     * so updated() can tell whether the tenant limit was sitting at it.
+     */
+    protected ?int $maxCapacityBeforeBedsChanged = null;
+
+    public function updating(string $property): void
+    {
+        if (Str::startsWith($property, ['form.amenityIds', 'form.amenityQuantities'])) {
+            $this->maxCapacityBeforeBedsChanged = $this->formMaxCapacityPreview;
+            unset($this->formMaxCapacityPreview);
+        }
+    }
+
+    /**
+     * Let a shared unit's tenant limit follow its maximum when beds are
+     * ticked, unticked or recounted.
+     */
+    public function updated(string $property): void
+    {
+        if (Str::startsWith($property, ['form.amenityIds', 'form.amenityQuantities'])) {
+            unset($this->formMaxCapacityPreview, $this->formBedSpacesPreview);
+
+            $this->form->followMaxCapacity(
+                $this->maxCapacityBeforeBedsChanged,
+                $this->formMaxCapacityPreview,
+                $this->editingUnit?->takenSlotCount() ?? 0,
+            );
+        }
     }
 
     public function toggleProperty(int $propertyId): void
@@ -430,6 +462,7 @@ new #[Title('Properties')] class extends Component
                                         :amenity-groups="$this->formAmenityGroups"
                                         :selected-amenities="$form->amenityIds"
                                         :bed-spaces="$this->formBedSpacesPreview"
+                                        :bed-summary="$form->bedSummary()"
                                         :max-capacity="$this->formMaxCapacityPreview"
                                         :max-bedrooms="$this->formMaxBedroomsPreview"
                                         :max-bathrooms="$this->formMaxBathroomsPreview"
@@ -529,6 +562,7 @@ new #[Title('Properties')] class extends Component
                                 :amenity-groups="$this->formAmenityGroups"
                                 :selected-amenities="$form->amenityIds"
                                 :bed-spaces="$this->formBedSpacesPreview"
+                                :bed-summary="$form->bedSummary()"
                                 :max-capacity="$this->formMaxCapacityPreview"
                                 :max-bedrooms="$this->formMaxBedroomsPreview"
                                 :max-bathrooms="$this->formMaxBathroomsPreview"

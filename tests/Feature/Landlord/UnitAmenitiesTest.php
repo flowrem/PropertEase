@@ -141,6 +141,65 @@ test('the beds ticked on the form decide how many tenants a shared unit fits', f
         ->assertSet('form.tenant_limit', '5');
 });
 
+test('the form says only the ticked beds are counted, and which ones', function () {
+    $user = User::factory()->create();
+    $property = Property::factory()->for($user->currentTeam)->create(['type' => PropertyType::Apartment]);
+    $doubleDeck = defaultAmenity('Double deck');
+
+    Livewire::actingAs($user)
+        ->test('pages::landlord.properties')
+        ->call('startAddingUnit', $property->id)
+        ->assertDontSee('Counting only the ticked beds')
+        ->set('form.amenityIds', [(string) $doubleDeck->id, (string) defaultAmenity('Single bed')->id, (string) defaultAmenity('Television')->id])
+        ->set("form.amenityQuantities.{$doubleDeck->id}", '2')
+        ->assertSee('Counting only the ticked beds: 2 double decks and 1 single bed sleep 5 people.');
+});
+
+/**
+ * The Properties page adding a shared 40 m² apartment (room for 6 by floor
+ * area, 4 by its 2 bedrooms) with no beds ticked yet.
+ */
+function sharedUnitBeingAdded(User $user): Testable
+{
+    $property = Property::factory()->for($user->currentTeam)->create(['type' => PropertyType::Apartment]);
+
+    return Livewire::actingAs($user)
+        ->test('pages::landlord.properties')
+        ->call('startAddingUnit', $property->id)
+        ->set([
+            'form.floor_area_sqm' => '40',
+            'form.bedrooms' => 2,
+            'form.occupancy' => 'multiple',
+        ]);
+}
+
+test('the tenant limit follows the beds up and down while it sits at the maximum', function () {
+    $user = User::factory()->create();
+    $doubleDeck = defaultAmenity('Double deck');
+
+    sharedUnitBeingAdded($user)
+        ->set('form.amenityIds', [(string) $doubleDeck->id])
+        ->assertSet('form.tenant_limit', '2')
+        ->set("form.amenityQuantities.{$doubleDeck->id}", '3')
+        ->assertSet('form.tenant_limit', '6')
+        ->set("form.amenityQuantities.{$doubleDeck->id}", '2')
+        ->assertSet('form.tenant_limit', '4');
+});
+
+test('a tenant limit set lower on purpose stays when beds are added, and only comes down when beds are removed', function () {
+    $user = User::factory()->create();
+    $doubleDeck = defaultAmenity('Double deck');
+
+    sharedUnitBeingAdded($user)
+        ->set('form.amenityIds', [(string) $doubleDeck->id])
+        ->set("form.amenityQuantities.{$doubleDeck->id}", '2')
+        ->set('form.tenant_limit', '3')
+        ->set("form.amenityQuantities.{$doubleDeck->id}", '3')
+        ->assertSet('form.tenant_limit', '3')
+        ->set("form.amenityQuantities.{$doubleDeck->id}", '1')
+        ->assertSet('form.tenant_limit', '2');
+});
+
 test('a unit whose only bed is a single bed cannot be shared', function () {
     $user = User::factory()->create();
     $property = Property::factory()->for($user->currentTeam)->create(['type' => PropertyType::Apartment]);

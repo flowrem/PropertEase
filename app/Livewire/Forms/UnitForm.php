@@ -10,7 +10,9 @@ use App\Models\Unit;
 use Closure;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection as EloquentCollection;
+use Illuminate\Support\Arr;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 use Livewire\Form;
 
@@ -95,27 +97,77 @@ class UnitForm extends Form
     }
 
     /**
-     * How many people the beds ticked on the form sleep, counting only
-     * quantities that are whole numbers within bounds (anything else fails
-     * validation anyway).
+     * How many people the beds ticked on the form sleep.
      */
     public function bedSpaces(): int
     {
+        return (int) $this->tickedBeds()->sum(fn (array $bed): int => $bed['amenity']->sleeps * $bed['quantity']);
+    }
+
+    /**
+     * The ticked beds in words, like "2 double decks and 1 single bed", or
+     * null when no bed is ticked.
+     */
+    public function bedSummary(): ?string
+    {
+        $beds = $this->tickedBeds()->map(fn (array $bed): string => $bed['quantity'].' '
+            .Str::plural(Str::lower($bed['amenity']->name), $bed['quantity']));
+
+        return $beds->isEmpty() ? null : Arr::join($beds->all(), ', ', ' and ');
+    }
+
+    /**
+     * Keep a shared unit's tenant limit in step with its maximum when the
+     * beds change: a limit that was empty or sat at the old maximum follows
+     * the new one up or down, and a limit the new maximum no longer allows
+     * comes down to it. A limit the landlord set lower on purpose stays.
+     */
+    public function followMaxCapacity(?int $previousMaxCapacity, ?int $maxCapacity, int $takenSlots): void
+    {
+        if ($this->occupancy !== 'multiple' || $maxCapacity === null) {
+            return;
+        }
+
+        $limit = is_numeric($this->tenant_limit) ? (int) $this->tenant_limit : null;
+
+        if ($limit === null || $limit === $previousMaxCapacity || $limit > $maxCapacity) {
+            $this->tenant_limit = (string) $maxCapacity;
+            $this->clampTenantLimit($maxCapacity, $takenSlots);
+        }
+    }
+
+    /**
+     * The ticked amenities that sleep someone, with how many of each. A
+     * ticked bed with no quantity yet counts as one, matching the default
+     * updatedAmenityIds() gives it; a quantity that isn't a whole number
+     * within bounds counts as none, since it fails validation anyway.
+     *
+     * @return Collection<int, array{amenity: Amenity, quantity: positive-int}>
+     */
+    private function tickedBeds(): Collection
+    {
         if ($this->amenityIds === []) {
-            return 0;
+            return collect();
         }
 
         $maxQuantity = (int) config('occuplace.units.amenity_quantity.max');
 
-        return (int) Amenity::query()
+        return Amenity::query()
             ->whereIn('id', array_filter($this->amenityIds, 'is_numeric'))
             ->where('sleeps', '>', 0)
-            ->pluck('sleeps', 'id')
-            ->sum(function (int $sleeps, int $amenityId) use ($maxQuantity): int {
-                $quantity = $this->amenityQuantities[$amenityId] ?? '';
+            ->orderByDesc('sleeps')
+            ->orderBy('name')
+            ->get()
+            ->map(function (Amenity $bed) use ($maxQuantity): array {
+                $quantity = (string) ($this->amenityQuantities[$bed->id] ?? '1');
 
-                return ctype_digit($quantity) && (int) $quantity <= $maxQuantity ? $sleeps * (int) $quantity : 0;
-            });
+                return [
+                    'amenity' => $bed,
+                    'quantity' => ctype_digit($quantity) && (int) $quantity <= $maxQuantity ? (int) $quantity : 0,
+                ];
+            })
+            ->filter(fn (array $bed): bool => $bed['quantity'] > 0)
+            ->values();
     }
 
     /**
