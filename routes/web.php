@@ -38,6 +38,7 @@ Route::prefix('{current_team}')
         Route::livewire('maintenance', 'pages::maintenance')->name('maintenance');
         Route::livewire('complaints', 'pages::complaints')->name('complaints');
         Route::livewire('announcements', 'pages::announcements')->name('announcements');
+        Route::livewire('move-in-checklist', 'pages::move-in-checklist')->name('move-in-checklist');
 
         Route::middleware(EnsureTeamMembership::class.':member')->group(function () {
             Route::livewire('setup', 'pages::landlord.setup')->name('setup');

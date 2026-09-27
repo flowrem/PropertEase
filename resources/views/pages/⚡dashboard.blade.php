@@ -66,7 +66,7 @@ new #[Title('Home')] class extends Component
         return Auth::user()->leases()
             ->where('status', LeaseStatus::Active->value)
             ->whereHas('unit.property', fn ($properties) => $properties->where('team_id', $this->team->id))
-            ->with(['unit.property', 'currentRent'])
+            ->with(['unit.property', 'currentRent', 'moveInCheck'])
             ->latest()
             ->first();
     }
@@ -518,9 +518,20 @@ new #[Title('Home')] class extends Component
                 </flux:text>
             </div>
 
-            <flux:button variant="danger" size="sm" wire:click="confirmLeaveUnit">
-                {{ __('Leave unit') }}
-            </flux:button>
+            <div class="flex flex-wrap items-center justify-end gap-2">
+                @if ($this->currentLease->moveInCheck)
+                    <flux:button size="sm" icon="clipboard-document-check" :href="route('move-in-checklist')" wire:navigate>
+                        {{ __('Move-in checklist') }}
+                    </flux:button>
+                    @unless ($this->currentLease->moveInCheck->tenant_acknowledged_at)
+                        <flux:badge size="sm" color="amber">{{ __('Please acknowledge') }}</flux:badge>
+                    @endunless
+                @endif
+
+                <flux:button variant="danger" size="sm" wire:click="confirmLeaveUnit">
+                    {{ __('Leave unit') }}
+                </flux:button>
+            </div>
         </div>
 
         <flux:modal name="leave-unit-modal" class="max-w-md md:min-w-md" @close="closeLeaveModal" wire:model="showLeaveModal">
