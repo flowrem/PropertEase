@@ -114,6 +114,19 @@ new #[Title('Properties')] class extends Component
         return $this->form->amenityGroups($this->team, $this->editingUnit);
     }
 
+    /**
+     * The most of each ticked amenity the unit on the form can have.
+     *
+     * @return array<int, int>
+     */
+    #[Computed]
+    public function formAmenityLimits(): array
+    {
+        return $this->formProperty
+            ? $this->form->amenityQuantityLimits($this->formProperty->type, $this->editingUnit)
+            : [];
+    }
+
     #[Computed]
     public function formBedSpacesPreview(): int
     {
@@ -161,6 +174,10 @@ new #[Title('Properties')] class extends Component
      */
     public function updated(string $property): void
     {
+        if (Str::startsWith($property, 'form.amenityQuantities.') && $this->formProperty) {
+            $this->form->clampAmenityQuantity(Str::after($property, 'form.amenityQuantities.'), $this->formProperty->type, $this->editingUnit);
+        }
+
         if (Str::startsWith($property, ['form.amenityIds', 'form.amenityQuantities'])) {
             unset($this->formMaxCapacityPreview, $this->formBedSpacesPreview);
 
@@ -461,6 +478,7 @@ new #[Title('Properties')] class extends Component
                                         :bedrooms="$form->bedrooms"
                                         :amenity-groups="$this->formAmenityGroups"
                                         :selected-amenities="$form->amenityIds"
+                                        :amenity-limits="$this->formAmenityLimits"
                                         :bed-spaces="$this->formBedSpacesPreview"
                                         :bed-summary="$form->bedSummary()"
                                         :max-capacity="$this->formMaxCapacityPreview"
@@ -561,6 +579,7 @@ new #[Title('Properties')] class extends Component
                                 :bedrooms="$form->bedrooms"
                                 :amenity-groups="$this->formAmenityGroups"
                                 :selected-amenities="$form->amenityIds"
+                                :amenity-limits="$this->formAmenityLimits"
                                 :bed-spaces="$this->formBedSpacesPreview"
                                 :bed-summary="$form->bedSummary()"
                                 :max-capacity="$this->formMaxCapacityPreview"

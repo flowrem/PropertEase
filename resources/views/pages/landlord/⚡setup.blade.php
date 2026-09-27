@@ -151,11 +151,26 @@ new #[Title('Add a property')] class extends Component
      */
     public function updated(string $property): void
     {
+        if (Str::startsWith($property, 'form.amenityQuantities.') && $this->property) {
+            $this->form->clampAmenityQuantity(Str::after($property, 'form.amenityQuantities.'), $this->property->type);
+        }
+
         if (Str::startsWith($property, ['form.amenityIds', 'form.amenityQuantities'])) {
             unset($this->formMaxCapacityPreview, $this->formBedSpacesPreview);
 
             $this->form->followMaxCapacity($this->maxCapacityBeforeBedsChanged, $this->formMaxCapacityPreview, takenSlots: 0);
         }
+    }
+
+    /**
+     * The most of each ticked amenity the unit on the form can have.
+     *
+     * @return array<int, int>
+     */
+    #[Computed]
+    public function formAmenityLimits(): array
+    {
+        return $this->property ? $this->form->amenityQuantityLimits($this->property->type) : [];
     }
 
     /**
@@ -296,6 +311,7 @@ new #[Title('Add a property')] class extends Component
                     :bedrooms="$form->bedrooms"
                     :amenity-groups="$this->formAmenityGroups"
                     :selected-amenities="$form->amenityIds"
+                    :amenity-limits="$this->formAmenityLimits"
                     :bed-spaces="$this->formBedSpacesPreview"
                     :bed-summary="$form->bedSummary()"
                     :max-capacity="$this->formMaxCapacityPreview"

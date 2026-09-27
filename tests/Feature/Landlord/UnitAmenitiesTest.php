@@ -299,3 +299,130 @@ test('the setup wizard saves a new unit\'s amenities', function () {
 
     expect(Unit::query()->sole()->amenities->pluck('name')->all())->toBe(['Single bed']);
 });
+
+/**
+ * Add a unit of the given size to a new property of the given type, with
+ * the given amenities and quantities (amenity name => quantity).
+ *
+ * @param  array{floor_area_sqm: string, bedrooms: int, bathrooms: int}  $size
+ * @param  array<string, string>  $quantities
+ */
+function addSizedUnitWithAmenities(User $user, PropertyType $type, array $size, array $quantities): Testable
+{
+    $property = Property::factory()->for($user->currentTeam)->create(['type' => $type]);
+    $ids = collect($quantities)->keys()->mapWithKeys(fn (string $name): array => [$name => (string) (Amenity::query()->where('name', $name)->firstOrFail()->id)]);
+
+    return Livewire::actingAs($user)
+        ->test('pages::landlord.properties')
+        ->call('startAddingUnit', $property->id)
+        ->set([
+            'form.unit_number' => '101',
+            'form.floor_level' => 'Ground floor',
+            'form.floor_area_sqm' => $size['floor_area_sqm'],
+            'form.bedrooms' => $size['bedrooms'],
+            'form.bathrooms' => $size['bathrooms'],
+            'form.price' => '5000',
+        ])
+        ->set('form.amenityIds', $ids->values()->all())
+        ->set('form.amenityQuantities', $ids->flip()->map(fn (string $name): string => $quantities[$name])->all())
+        ->call('addUnit');
+}
+
+test('beds cannot sleep more tenants than the floor area fits', function (string $doubleDecks, bool $accepted) {
+    $user = User::factory()->create();
+    $doubleDeck = defaultAmenity('Double deck');
+
+    // 24 m² dormitory at 4 m² per tenant fits 6 tenants, so 3 double decks.
+    $component = addSizedUnitWithAmenities($user, PropertyType::Dormitory, ['floor_area_sqm' => '24', 'bedrooms' => 2, 'bathrooms' => 2], ['Double deck' => $doubleDecks]);
+
+    $accepted
+        ? $component->assertHasNoErrors()
+        : $component->assertHasErrors(["form.amenityQuantities.{$doubleDeck->id}"]);
+})->with([
+    '3 double decks' => ['3', true],
+    '4 double decks' => ['4', false],
+    '13 double decks' => ['13', false],
+]);
+
+test('beds cannot cover more than half of the sleeping area', function (string $singleBeds, bool $accepted) {
+    $user = User::factory()->create();
+    $singleBed = defaultAmenity('Single bed');
+
+    // 20 m² less 6 m² common area and 2 bathrooms leaves 11.6 m²; beds may
+    // cover half, 5.8 m², which fits 3 single beds of 1.7 m² (tenants fit 5).
+    $component = addSizedUnitWithAmenities($user, PropertyType::Dormitory, ['floor_area_sqm' => '20', 'bedrooms' => 1, 'bathrooms' => 2], ['Single bed' => $singleBeds]);
+
+    $accepted
+        ? $component->assertHasNoErrors()
+        : $component->assertHasErrors(["form.amenityQuantities.{$singleBed->id}"]);
+})->with([
+    '3 single beds' => ['3', true],
+    '4 single beds' => ['4', false],
+]);
+
+test('each bed\'s limit leaves room for the other beds ticked', function () {
+    $user = User::factory()->create();
+
+    // 6 tenants fit: 2 double decks sleep 4, leaving room for 2 single beds.
+    addSizedUnitWithAmenities($user, PropertyType::Dormitory, ['floor_area_sqm' => '24', 'bedrooms' => 2, 'bathrooms' => 2], ['Double deck' => '2', 'Single bed' => '3'])
+        ->assertHasErrors([
+            'form.amenityQuantities.'.defaultAmenity('Double deck')->id,
+            'form.amenityQuantities.'.defaultAmenity('Single bed')->id,
+        ]);
+});
+
+test('other amenities are limited by the unit, its rooms, bathrooms or tenants', function (string $name, string $allowed, string $tooMany) {
+    $user = User::factory()->create();
+    $amenity = defaultAmenity($name);
+
+    // A 30 m² apartment with 2 bedrooms, 1 bathroom and 2 double decks (4 tenants).
+    $size = ['floor_area_sqm' => '30', 'bedrooms' => 2, 'bathrooms' => 1];
+
+    addSizedUnitWithAmenities($user, PropertyType::Apartment, $size, ['Double deck' => '2', $name => $tooMany])
+        ->assertHasErrors(["form.amenityQuantities.{$amenity->id}"]);
+
+    addSizedUnitWithAmenities(User::factory()->create(), PropertyType::Apartment, $size, ['Double deck' => '2', $name => $allowed])
+        ->assertHasNoErrors();
+})->with([
+    'one refrigerator per unit' => ['Refrigerator', '1', '2'],
+    'one air conditioner per room' => ['Air conditioner', '3', '4'],
+    'one water heater per bathroom' => ['Water heater', '1', '2'],
+    'one wardrobe per tenant' => ['Wardrobe', '4', '5'],
+    'two chairs per tenant' => ['Chair', '8', '9'],
+]);
+
+test('a yes-or-no amenity has no quantity box and cannot be listed twice', function () {
+    $user = User::factory()->create();
+    $wifi = defaultAmenity('Wi-Fi');
+
+    addSizedUnitWithAmenities($user, PropertyType::Apartment, ['floor_area_sqm' => '30', 'bedrooms' => 2, 'bathrooms' => 1], ['Wi-Fi' => '2'])
+        ->assertHasErrors(["form.amenityQuantities.{$wifi->id}"])
+        ->assertDontSeeHtml("form.amenityQuantities.{$wifi->id}");
+});
+
+test('a landlord\'s own amenity is limited to one per tenant the unit fits', function () {
+    $user = User::factory()->create();
+    $ownAmenity = Amenity::factory()->for($user->currentTeam)->create(['name' => 'Rooftop locker']);
+
+    addSizedUnitWithAmenities($user, PropertyType::Apartment, ['floor_area_sqm' => '30', 'bedrooms' => 2, 'bathrooms' => 1], ['Double deck' => '2', 'Rooftop locker' => '5'])
+        ->assertHasErrors(["form.amenityQuantities.{$ownAmenity->id}"]);
+});
+
+test('a quantity typed past the limit snaps back to it and the form shows the limit', function () {
+    $user = User::factory()->create();
+    $property = Property::factory()->for($user->currentTeam)->create(['type' => PropertyType::Dormitory]);
+    $doubleDeck = defaultAmenity('Double deck');
+
+    Livewire::actingAs($user)
+        ->test('pages::landlord.properties')
+        ->call('startAddingUnit', $property->id)
+        ->set([
+            'form.floor_area_sqm' => '24',
+            'form.bedrooms' => 2,
+            'form.bathrooms' => 2,
+            'form.amenityIds' => [(string) $doubleDeck->id],
+        ])
+        ->set("form.amenityQuantities.{$doubleDeck->id}", '13')
+        ->assertSet("form.amenityQuantities.{$doubleDeck->id}", '3')
+        ->assertSee('Up to 3');
+});

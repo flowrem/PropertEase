@@ -85,15 +85,120 @@ class UnitForm extends Form
      */
     public function maxCapacity(PropertyType $type, ?Unit $unit = null): ?int
     {
+        $dimensions = $this->dimensions($unit);
+
+        if ($dimensions === null) {
+            return null;
+        }
+
+        return Unit::maxCapacityFor($dimensions['floorArea'], $type, $dimensions['bedrooms'], $this->bedSpaces());
+    }
+
+    /**
+     * The floor area and rooms of the unit on the form: the saved ones once
+     * locked, otherwise the ones typed in. Null while the area is missing or
+     * out of range, since nothing can be worked out from it yet.
+     *
+     * @return array{floorArea: float, bedrooms: int, bathrooms: int}|null
+     */
+    private function dimensions(?Unit $unit): ?array
+    {
         if ($unit?->hasLockedDetails()) {
-            return Unit::maxCapacityFor((float) $unit->floor_area_sqm, $type, $unit->bedrooms, $this->bedSpaces());
+            return [
+                'floorArea' => (float) $unit->floor_area_sqm,
+                'bedrooms' => $unit->bedrooms,
+                'bathrooms' => $unit->bathrooms,
+            ];
         }
 
         if (! $this->hasUsableFloorArea()) {
             return null;
         }
 
-        return Unit::maxCapacityFor((float) $this->floor_area_sqm, $type, (int) $this->bedrooms, $this->bedSpaces());
+        return [
+            'floorArea' => (float) $this->floor_area_sqm,
+            'bedrooms' => (int) $this->bedrooms,
+            'bathrooms' => (int) $this->bathrooms,
+        ];
+    }
+
+    /**
+     * The most of each ticked amenity this unit can have, keyed by amenity
+     * ID. Beds are limited by the floor space they may cover and by the
+     * tenants the floor area fits, after the other beds ticked; everything
+     * else by its own basis (per unit, room, bathroom or tenant). Until the
+     * floor area is usable, only the absolute ceiling applies.
+     *
+     * @return array<int, int>
+     */
+    public function amenityQuantityLimits(PropertyType $type, ?Unit $unit = null): array
+    {
+        $ceiling = (int) config('occuplace.units.amenity_quantity.max');
+        $ticked = $this->tickedAmenities();
+        $dimensions = $this->dimensions($unit);
+
+        if ($dimensions === null) {
+            return $ticked->mapWithKeys(fn (Amenity $amenity): array => [
+                $amenity->id => $amenity->isSingle() ? 1 : $ceiling,
+            ])->all();
+        }
+
+        $beds = $this->tickedBeds();
+        $bedFloorSpace = Unit::bedFloorSpaceFor($dimensions['floorArea'], $dimensions['bedrooms'], $dimensions['bathrooms']);
+        $tenantsThatFit = Unit::tenantsThatFitIn($dimensions['floorArea'], $type);
+        $maxCapacity = Unit::maxCapacityFor($dimensions['floorArea'], $type, $dimensions['bedrooms'], $this->bedSpaces());
+
+        return $ticked->mapWithKeys(function (Amenity $amenity) use ($beds, $bedFloorSpace, $tenantsThatFit, $maxCapacity, $dimensions, $ceiling): array {
+            if (! $amenity->isBed()) {
+                $limit = $amenity->quantity_basis->maxQuantity($amenity->quantity_per, $dimensions['bedrooms'], $dimensions['bathrooms'], $maxCapacity);
+
+                return [$amenity->id => min($ceiling, $limit)];
+            }
+
+            $otherBeds = $beds->reject(fn (array $bed): bool => $bed['amenity']->id === $amenity->id);
+            $floorSpaceLeft = $bedFloorSpace - $otherBeds->sum(fn (array $bed): float => (float) $bed['amenity']->footprint_sqm * $bed['quantity']);
+            $tenantsLeft = $tenantsThatFit - $otherBeds->sum(fn (array $bed): int => $bed['amenity']->sleeps * $bed['quantity']);
+
+            $limit = (int) floor($tenantsLeft / $amenity->sleeps + 1e-9);
+
+            if ((float) $amenity->footprint_sqm > 0) {
+                $limit = min($limit, (int) floor($floorSpaceLeft / (float) $amenity->footprint_sqm + 1e-9));
+            }
+
+            return [$amenity->id => max(0, min($ceiling, $limit))];
+        })->all();
+    }
+
+    /**
+     * Snap an amenity's quantity back within what the unit can have the
+     * moment it's typed, the same way bedrooms and bathrooms clamp
+     * themselves. A bed with no room left at all keeps its quantity, so
+     * validation can say why instead of the number silently changing.
+     */
+    public function clampAmenityQuantity(string $amenityId, PropertyType $type, ?Unit $unit = null): void
+    {
+        $limit = $this->amenityQuantityLimits($type, $unit)[(int) $amenityId] ?? null;
+        $quantity = $this->amenityQuantities[$amenityId] ?? null;
+
+        if ($limit === null || $limit < 1 || ! is_numeric($quantity)) {
+            return;
+        }
+
+        $this->amenityQuantities[$amenityId] = (string) max(1, min($limit, (int) $quantity));
+    }
+
+    /**
+     * The amenities ticked on the form.
+     *
+     * @return EloquentCollection<int, Amenity>
+     */
+    private function tickedAmenities(): EloquentCollection
+    {
+        if ($this->amenityIds === []) {
+            return new EloquentCollection;
+        }
+
+        return Amenity::query()->whereIn('id', array_filter($this->amenityIds, 'is_numeric'))->get();
     }
 
     /**
@@ -403,7 +508,7 @@ class UnitForm extends Form
                     },
                 ],
             'price' => ['required', 'numeric', 'min:'.$limits['rent']['min'], 'max:'.$limits['rent']['max']],
-            ...$this->amenityRules($propertyId, $unit, $maxCapacity, $takenSlots),
+            ...$this->amenityRules($type, $propertyId, $unit, $maxCapacity, $takenSlots),
         ];
 
         if ($unit?->hasLockedDetails()) {
@@ -459,7 +564,7 @@ class UnitForm extends Form
      *
      * @return array<string, array<int, mixed>>
      */
-    private function amenityRules(int $propertyId, ?Unit $unit, ?int $maxCapacity, int $takenSlots): array
+    private function amenityRules(PropertyType $type, int $propertyId, ?Unit $unit, ?int $maxCapacity, int $takenSlots): array
     {
         $team = Property::query()->findOrFail($propertyId)->team;
         $selectableIds = $this->selectableAmenities($team, $unit)->pluck('id')->all();
@@ -480,8 +585,32 @@ class UnitForm extends Form
             'amenityIds.*' => ['integer', 'distinct', Rule::in($selectableIds)],
         ];
 
+        $limits = $this->amenityQuantityLimits($type, $unit);
+        $amenities = $this->tickedAmenities()->keyBy('id');
+
         foreach ($this->amenityIds as $amenityId) {
-            $rules["amenityQuantities.{$amenityId}"] = ['required', 'integer', 'min:1', 'max:'.$maxQuantity];
+            $rules["amenityQuantities.{$amenityId}"] = [
+                'required', 'integer', 'min:1', 'max:'.$maxQuantity,
+                function (string $attribute, mixed $value, Closure $fail) use ($limits, $amenities, $amenityId): void {
+                    $amenity = $amenities->get((int) $amenityId);
+                    $limit = $limits[(int) $amenityId] ?? null;
+
+                    if ($amenity === null || $limit === null || (int) $value <= $limit) {
+                        return;
+                    }
+
+                    if (! $amenity->isBed()) {
+                        $fail(__('This unit can have at most :max (:rule).', [
+                            'max' => $limit,
+                            'rule' => $amenity->quantity_basis->describe($amenity->quantity_per),
+                        ]));
+                    } elseif ($limit === 0) {
+                        $fail(__('There is no floor space or tenant room left for this bed with the other beds ticked.'));
+                    } else {
+                        $fail(__('The floor area has room for at most :max with the other beds ticked.', ['max' => $limit]));
+                    }
+                },
+            ];
         }
 
         return $rules;

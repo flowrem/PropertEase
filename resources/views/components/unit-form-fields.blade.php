@@ -3,6 +3,7 @@
     'bedrooms' => 0,
     'amenityGroups' => collect(),
     'selectedAmenities' => [],
+    'amenityLimits' => [],
     'bedSpaces' => 0,
     'bedSummary' => null,
     'maxCapacity' => null,
@@ -123,7 +124,7 @@
 @if ($amenityGroups->isNotEmpty())
     <flux:fieldset>
         <flux:legend>{{ __('Amenities') }}</flux:legend>
-        <flux:description>{{ __('Tick what comes with this unit, and how many of each. The beds decide how many tenants it fits; leave them unticked if tenants bring their own.') }}</flux:description>
+        <flux:description>{{ __('Tick what comes with this unit, and how many of each, up to what its floor area and rooms allow. The beds decide how many tenants it fits; leave them unticked if tenants bring their own.') }}</flux:description>
 
         <flux:checkbox.group wire:model.live="form.amenityIds" class="mt-4 space-y-5">
             @foreach ($amenityGroups as $category => $amenities)
@@ -135,16 +136,26 @@
                             <div class="flex min-h-9 items-center justify-between gap-3" wire:key="amenity-{{ $amenity->id }}">
                                 <flux:checkbox value="{{ $amenity->id }}" :label="$amenity->name" />
 
-                                @if (in_array((string) $amenity->id, $selectedAmenities, true))
-                                    <flux:input
-                                        wire:model.blur="form.amenityQuantities.{{ $amenity->id }}"
-                                        type="number"
-                                        min="1"
-                                        max="{{ $limits['amenity_quantity']['max'] }}"
-                                        size="sm"
-                                        class="max-w-20"
-                                        :aria-label="__('How many :amenity', ['amenity' => $amenity->name])"
-                                    />
+                                @if (! $amenity->isSingle() && in_array((string) $amenity->id, $selectedAmenities, true))
+                                    @php
+                                        $amenityLimit = $amenityLimits[$amenity->id] ?? $limits['amenity_quantity']['max'];
+                                    @endphp
+
+                                    <div class="flex items-center gap-2">
+                                        <flux:text size="sm" class="whitespace-nowrap">
+                                            {{ $amenityLimit > 0 ? __('Up to :max', ['max' => $amenityLimit]) : __('No room left') }}
+                                        </flux:text>
+
+                                        <flux:input
+                                            wire:model.blur="form.amenityQuantities.{{ $amenity->id }}"
+                                            type="number"
+                                            min="1"
+                                            max="{{ max(1, $amenityLimit) }}"
+                                            size="sm"
+                                            class="max-w-20"
+                                            :aria-label="__('How many :amenity', ['amenity' => $amenity->name])"
+                                        />
+                                    </div>
                                 @endif
                             </div>
 
