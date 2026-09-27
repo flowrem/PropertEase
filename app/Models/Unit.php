@@ -20,6 +20,7 @@ use Illuminate\Database\Eloquent\Relations\HasManyThrough;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Database\Eloquent\Relations\Pivot;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\DB;
 
 /**
  * @property int $id
@@ -44,6 +45,7 @@ use Illuminate\Support\Carbon;
  * @property-read Collection<int, Reservation> $reservations
  * @property-read Collection<int, Reservation> $heldReservations
  * @property-read int|null $held_reservations_count
+ * @property-read int|string|null $bed_spaces
  * @property-read Collection<int, Concern> $concerns
  */
 #[Fillable(['property_id', 'unit_number', 'floor_level', 'bedrooms', 'bathrooms', 'floor_area_sqm', 'status', 'allows_multiple_tenants', 'tenant_limit', 'price'])]
@@ -51,6 +53,14 @@ class Unit extends Model
 {
     /** @use HasFactory<UnitFactory> */
     use HasFactory;
+
+    /**
+     * How many people a unit's beds sleep in total, as a correlated
+     * subquery on `units`. Shared by withBedSpaces() and scopeHasRoom().
+     */
+    private const BED_SPACES_SQL = '(select coalesce(sum(amenity_unit.quantity * amenities.sleeps), 0)'
+        .' from amenity_unit inner join amenities on amenities.id = amenity_unit.amenity_id'
+        .' where amenity_unit.unit_id = units.id)';
 
     /**
      * @return BelongsTo<Property, $this>
@@ -166,8 +176,8 @@ class Unit extends Model
     }
 
     /**
-     * The most tenants this unit's floor area and bedrooms allow, or null
-     * for an older unit whose floor area has not been entered yet.
+     * The most tenants this unit's floor area, beds and bedrooms allow, or
+     * null for an older unit whose floor area has not been entered yet.
      */
     public function maxCapacity(): ?int
     {
@@ -175,25 +185,57 @@ class Unit extends Model
             return null;
         }
 
-        return self::maxCapacityFor((float) $this->floor_area_sqm, $this->property->type, $this->bedrooms);
+        return self::maxCapacityFor((float) $this->floor_area_sqm, $this->property->type, $this->bedrooms, $this->bedSpaces());
     }
 
     /**
-     * The most tenants a unit of the given floor area, property type and
-     * bedroom count can hold. A unit with bedrooms fits as many tenants as
-     * its bedrooms sleep, so a 1-bedroom unit never claims room for four
-     * just because its floor area is large. A studio or bedspace (0
-     * bedrooms) has no rooms to count, so only its floor area decides.
+     * The most tenants a unit can hold, never more than its floor area fits:
+     *
+     * - with beds listed, as many as those beds sleep (2 double decks and a
+     *   single bed sleep 5), since each tenant needs somewhere to sleep;
+     * - with no beds listed (an unfurnished unit, where tenants bring their
+     *   own), an estimate from its bedrooms;
+     * - a studio or bedspace with neither, whatever its floor area fits.
      */
-    public static function maxCapacityFor(float $floorArea, PropertyType $type, int $bedrooms): int
+    public static function maxCapacityFor(float $floorArea, PropertyType $type, int $bedrooms, int $bedSpaces = 0): int
     {
         $tenantsThatFit = (int) floor($floorArea / $type->areaPerTenant() + 1e-9);
 
-        if ($bedrooms > 0) {
+        if ($bedSpaces > 0) {
+            $tenantsThatFit = min($tenantsThatFit, $bedSpaces);
+        } elseif ($bedrooms > 0) {
             $tenantsThatFit = min($tenantsThatFit, $bedrooms * $type->tenantsPerBedroom());
         }
 
         return max(1, min((int) config('occuplace.units.max_capacity'), $tenantsThatFit));
+    }
+
+    /**
+     * How many people this unit's beds sleep in total, reusing a value
+     * loaded by withBedSpaces() before falling back to a query.
+     */
+    public function bedSpaces(): int
+    {
+        if ($this->bed_spaces !== null) {
+            return (int) $this->bed_spaces;
+        }
+
+        return (int) $this->amenities()->sum(DB::raw('amenity_unit.quantity * amenities.sleeps'));
+    }
+
+    /**
+     * Load each unit's bed total alongside it, so listing many units and
+     * their capacity doesn't run a query per unit.
+     *
+     * @param  Builder<Unit>  $query
+     */
+    public function scopeWithBedSpaces(Builder $query): void
+    {
+        if ($query->getQuery()->columns === null) {
+            $query->select('units.*');
+        }
+
+        $query->selectRaw(self::BED_SPACES_SQL.' as bed_spaces');
     }
 
     /**
@@ -354,8 +396,9 @@ class Unit extends Model
      *
      * The floor-area cap is written as "area >= (taken + 1) * area per tenant"
      * instead of floor(area / area per tenant), so it reads the same on SQLite
-     * and Postgres. The bedroom cap only applies to units with bedrooms, as
-     * in maxCapacityFor().
+     * and Postgres. Beds cap the unit when it has any; otherwise bedrooms do,
+     * and a studio with neither is capped by floor area alone, as in
+     * maxCapacityFor().
      *
      * @param  Builder<Unit>  $query
      */
@@ -388,10 +431,12 @@ class Unit extends Model
                 ->orWhereRaw("{$taken} < 1", $takenBindings)
                 ->orWhereRaw(
                     "{$taken} < ? and units.floor_area_sqm >= ({$taken} + 1) * {$areaPerTenant}"
-                    ." and (units.bedrooms = 0 or units.bedrooms * {$tenantsPerBedroom} > {$taken})",
+                    .' and (('.self::BED_SPACES_SQL.' > 0 and '.self::BED_SPACES_SQL." > {$taken})"
+                    .' or ('.self::BED_SPACES_SQL." = 0 and (units.bedrooms = 0 or units.bedrooms * {$tenantsPerBedroom} > {$taken})))",
                     [
                         ...$takenBindings, (int) config('occuplace.units.max_capacity'),
                         ...$takenBindings, ...$areaPerTenantBindings,
+                        ...$takenBindings,
                         ...$tenantsPerBedroomBindings, ...$takenBindings,
                     ],
                 ));

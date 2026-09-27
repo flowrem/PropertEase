@@ -131,7 +131,7 @@ new #[Title('Tenants')] class extends Component
             ->where(fn ($query) => $query
                 ->where('status', UnitStatus::Vacant)
                 ->orWhere('allows_multiple_tenants', true))
-            ->withCount(['activeLeases', 'heldReservations'])
+            ->withCount(['activeLeases', 'heldReservations'])->withBedSpaces()
             ->with('property')
             ->get()
             ->filter(fn (Unit $unit) => $unit->hasRoomForAnotherTenant())

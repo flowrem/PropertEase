@@ -3,6 +3,7 @@
 use App\Enums\LeaseStatus;
 use App\Enums\PropertyType;
 use App\Enums\UnitStatus;
+use App\Models\Amenity;
 use App\Models\Lease;
 use App\Models\Property;
 use App\Models\Unit;
@@ -27,6 +28,15 @@ test('a unit with bedrooms fits only as many tenants as its bedrooms sleep', fun
     'apartment, 3 bedrooms is still capped by the floor area' => [24, PropertyType::Apartment, 3, 4],
     'dormitory, 1 bedroom sleeps 4' => [24, PropertyType::Dormitory, 1, 4],
     'boarding house, 2 bedrooms sleep 8' => [70, PropertyType::BoardingHouse, 2, 8],
+]);
+
+test('a unit with beds fits as many tenants as its beds sleep, whatever its bedrooms', function (float $floorArea, PropertyType $type, int $bedrooms, int $bedSpaces, int $expected) {
+    expect(Unit::maxCapacityFor($floorArea, $type, $bedrooms, $bedSpaces))->toBe($expected);
+})->with([
+    'a single bed in a 1-bedroom apartment sleeps 1, not 2' => [24, PropertyType::Apartment, 1, 1, 1],
+    'two double decks in a 1-bedroom dormitory sleep 4' => [24, PropertyType::Dormitory, 1, 4, 4],
+    'a bedspace studio with three double decks sleeps 6' => [30, PropertyType::BoardingHouse, 0, 6, 6],
+    'beds are still capped by the floor area' => [24, PropertyType::Apartment, 2, 8, 4],
 ]);
 
 test('the most bedrooms a unit fits depends on its floor area and bathrooms', function (float $floorArea, int $bathrooms, int $expected) {
@@ -93,6 +103,23 @@ test('the bedrooms cap a shared unit\'s tenant limit', function (int $activeTena
 })->with([
     'one of two taken' => [1, true],
     'both taken' => [2, false],
+]);
+
+test('the beds cap a shared unit\'s tenant limit, in place of its bedrooms', function (int $activeTenants, bool $hasRoom) {
+    $unit = sharedApartmentUnit(floorArea: 30, tenantLimit: 5, activeTenants: $activeTenants, bedrooms: 2);
+    $unit->amenities()->attach([
+        Amenity::query()->whereNull('team_id')->where('name', 'Double deck')->value('id') => ['quantity' => 1],
+        Amenity::query()->whereNull('team_id')->where('name', 'Single bed')->value('id') => ['quantity' => 1],
+        Amenity::query()->whereNull('team_id')->where('name', 'Television')->value('id') => ['quantity' => 2],
+    ]);
+
+    expect($unit->capacity())->toBe(3)
+        ->and(Unit::withBedSpaces()->find($unit->id)->bedSpaces())->toBe(3)
+        ->and($unit->hasRoomForAnotherTenant())->toBe($hasRoom)
+        ->and(Unit::hasRoom()->whereKey($unit->id)->exists())->toBe($hasRoom);
+})->with([
+    'two of three taken' => [2, true],
+    'all three taken' => [3, false],
 ]);
 
 test('a unit without a floor area keeps the limit its landlord chose', function () {

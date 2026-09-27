@@ -77,21 +77,46 @@ class UnitForm extends Form
     }
 
     /**
-     * The most tenants the unit on the form can hold: from its saved floor
-     * area and bedrooms once locked, otherwise from the ones typed in, or
-     * null while the area is missing or out of range.
+     * The most tenants the unit on the form can hold, from the beds ticked
+     * on the form (beds stay editable) and the floor area and bedrooms:
+     * the saved ones once locked, otherwise the ones typed in. Null while
+     * the area is missing or out of range.
      */
     public function maxCapacity(PropertyType $type, ?Unit $unit = null): ?int
     {
         if ($unit?->hasLockedDetails()) {
-            return $unit->maxCapacity();
+            return Unit::maxCapacityFor((float) $unit->floor_area_sqm, $type, $unit->bedrooms, $this->bedSpaces());
         }
 
         if (! $this->hasUsableFloorArea()) {
             return null;
         }
 
-        return Unit::maxCapacityFor((float) $this->floor_area_sqm, $type, (int) $this->bedrooms);
+        return Unit::maxCapacityFor((float) $this->floor_area_sqm, $type, (int) $this->bedrooms, $this->bedSpaces());
+    }
+
+    /**
+     * How many people the beds ticked on the form sleep, counting only
+     * quantities that are whole numbers within bounds (anything else fails
+     * validation anyway).
+     */
+    public function bedSpaces(): int
+    {
+        if ($this->amenityIds === []) {
+            return 0;
+        }
+
+        $maxQuantity = (int) config('occuplace.units.amenity_quantity.max');
+
+        return (int) Amenity::query()
+            ->whereIn('id', array_filter($this->amenityIds, 'is_numeric'))
+            ->where('sleeps', '>', 0)
+            ->pluck('sleeps', 'id')
+            ->sum(function (int $sleeps, int $amenityId) use ($maxQuantity): int {
+                $quantity = $this->amenityQuantities[$amenityId] ?? '';
+
+                return ctype_digit($quantity) && (int) $quantity <= $maxQuantity ? $sleeps * (int) $quantity : 0;
+            });
     }
 
     /**
@@ -331,7 +356,7 @@ class UnitForm extends Form
                     },
                 ],
             'price' => ['required', 'numeric', 'min:'.$limits['rent']['min'], 'max:'.$limits['rent']['max']],
-            ...$this->amenityRules($propertyId, $unit),
+            ...$this->amenityRules($propertyId, $unit, $maxCapacity, $takenSlots),
         ];
 
         if ($unit?->hasLockedDetails()) {
@@ -379,16 +404,32 @@ class UnitForm extends Form
      * within bounds, so a crafted request can't attach another team's
      * custom amenity.
      *
+     * Beds decide capacity, so removing beds is refused when fewer would no
+     * longer sleep the tenants and reservations already holding the unit.
+     * A unit that was already over its capacity before this edit (say its
+     * floor area was entered after tenants moved in) can still be saved, as
+     * long as the edit doesn't shrink it further.
+     *
      * @return array<string, array<int, mixed>>
      */
-    private function amenityRules(int $propertyId, ?Unit $unit): array
+    private function amenityRules(int $propertyId, ?Unit $unit, ?int $maxCapacity, int $takenSlots): array
     {
         $team = Property::query()->findOrFail($propertyId)->team;
         $selectableIds = $this->selectableAmenities($team, $unit)->pluck('id')->all();
         $maxQuantity = (int) config('occuplace.units.amenity_quantity.max');
+        $savedMaxCapacity = $unit?->maxCapacity();
 
         $rules = [
-            'amenityIds' => ['array'],
+            'amenityIds' => [
+                'array',
+                function (string $attribute, mixed $value, Closure $fail) use ($maxCapacity, $takenSlots, $savedMaxCapacity): void {
+                    $shrinks = $maxCapacity !== null && $savedMaxCapacity !== null && $maxCapacity < $savedMaxCapacity;
+
+                    if ($shrinks && $maxCapacity < $takenSlots) {
+                        $fail(__(':count tenants or reservations already hold this unit, so its beds need to sleep at least :count.', ['count' => $takenSlots]));
+                    }
+                },
+            ],
             'amenityIds.*' => ['integer', 'distinct', Rule::in($selectableIds)],
         ];
 

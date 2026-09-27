@@ -71,6 +71,7 @@ new #[Title('Properties')] class extends Component
         return $this->team->properties()
             ->with(['units' => fn ($units) => $units
                 ->with(['activeLeases.tenant', 'activeLeases.currentInvoice'])
+                ->withBedSpaces()
                 ->withCount(['heldReservations', 'concerns as open_concerns_count' => fn ($concerns) => $concerns
                     ->where('concerns.status', '!=', ConcernStatus::Resolved->value)]),
             ])
@@ -110,6 +111,12 @@ new #[Title('Properties')] class extends Component
     public function formAmenityGroups(): Collection
     {
         return $this->form->amenityGroups($this->team, $this->editingUnit);
+    }
+
+    #[Computed]
+    public function formBedSpacesPreview(): int
+    {
+        return $this->form->bedSpaces();
     }
 
     #[Computed]
@@ -422,6 +429,7 @@ new #[Title('Properties')] class extends Component
                                         :bedrooms="$form->bedrooms"
                                         :amenity-groups="$this->formAmenityGroups"
                                         :selected-amenities="$form->amenityIds"
+                                        :bed-spaces="$this->formBedSpacesPreview"
                                         :max-capacity="$this->formMaxCapacityPreview"
                                         :max-bedrooms="$this->formMaxBedroomsPreview"
                                         :max-bathrooms="$this->formMaxBathroomsPreview"
@@ -472,7 +480,7 @@ new #[Title('Properties')] class extends Component
 
                                         @if ($unit->takenSlotCount() > $unit->capacity())
                                             <flux:text class="block text-amber-700 dark:text-amber-400">
-                                                {{ __('More tenants than its floor area allows (:max). No new tenants until it fits.', ['max' => $unit->capacity()]) }}
+                                                {{ __('More tenants than its floor area and beds allow (:max). No new tenants until it fits.', ['max' => $unit->capacity()]) }}
                                             </flux:text>
                                         @endif
                                     </div>
@@ -520,6 +528,7 @@ new #[Title('Properties')] class extends Component
                                 :bedrooms="$form->bedrooms"
                                 :amenity-groups="$this->formAmenityGroups"
                                 :selected-amenities="$form->amenityIds"
+                                :bed-spaces="$this->formBedSpacesPreview"
                                 :max-capacity="$this->formMaxCapacityPreview"
                                 :max-bedrooms="$this->formMaxBedroomsPreview"
                                 :max-bathrooms="$this->formMaxBathroomsPreview"

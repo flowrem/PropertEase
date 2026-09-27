@@ -154,7 +154,7 @@ new #[Title('Home')] class extends Component
     public function occupancy(): array
     {
         $units = Unit::whereHas('property', fn ($properties) => $properties->where('team_id', $this->team->id))
-            ->withCount(['activeLeases', 'heldReservations'])
+            ->withCount(['activeLeases', 'heldReservations'])->withBedSpaces()
             ->get();
 
         return [

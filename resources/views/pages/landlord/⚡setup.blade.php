@@ -104,6 +104,12 @@ new #[Title('Add a property')] class extends Component
     }
 
     #[Computed]
+    public function formBedSpacesPreview(): int
+    {
+        return $this->form->bedSpaces();
+    }
+
+    #[Computed]
     public function formMaxBedroomsPreview(): ?int
     {
         return $this->form->maxBedrooms();
@@ -262,6 +268,7 @@ new #[Title('Add a property')] class extends Component
                     :bedrooms="$form->bedrooms"
                     :amenity-groups="$this->formAmenityGroups"
                     :selected-amenities="$form->amenityIds"
+                    :bed-spaces="$this->formBedSpacesPreview"
                     :max-capacity="$this->formMaxCapacityPreview"
                     :max-bedrooms="$this->formMaxBedroomsPreview"
                     :max-bathrooms="$this->formMaxBathroomsPreview"

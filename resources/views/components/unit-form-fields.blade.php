@@ -3,6 +3,7 @@
     'bedrooms' => 0,
     'amenityGroups' => collect(),
     'selectedAmenities' => [],
+    'bedSpaces' => 0,
     'maxCapacity' => null,
     'maxBedrooms' => null,
     'maxBathrooms' => null,
@@ -121,7 +122,7 @@
 @if ($amenityGroups->isNotEmpty())
     <flux:fieldset>
         <flux:legend>{{ __('Amenities') }}</flux:legend>
-        <flux:description>{{ __('Tick what comes with this unit, and how many of each.') }}</flux:description>
+        <flux:description>{{ __('Tick what comes with this unit, and how many of each. The beds decide how many tenants it fits; leave them unticked if tenants bring their own.') }}</flux:description>
 
         <flux:checkbox.group wire:model.live="form.amenityIds" class="mt-4 space-y-5">
             @foreach ($amenityGroups as $category => $amenities)
@@ -153,6 +154,7 @@
             @endforeach
         </flux:checkbox.group>
 
+        <flux:error name="form.amenityIds" />
         <flux:error name="form.amenityIds.*" />
     </flux:fieldset>
 @endif
@@ -172,6 +174,10 @@
             {{ $maxCapacity > 1
                 ? __('Choose multiple tenants to let up to :max people share this unit.', ['max' => $maxCapacity])
                 : __('This unit fits 1 tenant.') }}
+        @elseif ($bedSpaces > $maxCapacity)
+            {{ __('The beds sleep :beds, but the floor area fits up to :max tenants.', ['beds' => $bedSpaces, 'max' => $maxCapacity]) }}
+        @elseif ($bedSpaces > 0)
+            {{ trans_choice('The beds sleep :count tenant.|The beds sleep up to :count tenants.', $maxCapacity) }}
         @elseif ($bedroomCount > 0)
             {{ trans_choice(':count bedroom fits up to :max tenants.|:count bedrooms fit up to :max tenants.', $bedroomCount, ['max' => $maxCapacity]) }}
         @else

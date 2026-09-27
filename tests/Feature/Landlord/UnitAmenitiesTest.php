@@ -1,6 +1,10 @@
 <?php
 
+use App\Enums\LeaseStatus;
+use App\Enums\PropertyType;
+use App\Enums\UnitStatus;
 use App\Models\Amenity;
+use App\Models\Lease;
 use App\Models\Property;
 use App\Models\Unit;
 use App\Models\User;
@@ -114,6 +118,103 @@ test('editing a unit replaces its amenities but keeps a deactivated one it alrea
         ->assertHasNoErrors();
 
     expect($unit->amenities()->pluck('name')->sort()->values()->all())->toBe(['Air conditioner', $retired->name]);
+});
+
+test('the beds ticked on the form decide how many tenants a shared unit fits', function () {
+    $user = User::factory()->create();
+    $property = Property::factory()->for($user->currentTeam)->create(['type' => PropertyType::Apartment]);
+    $doubleDeck = defaultAmenity('Double deck');
+    $singleBed = defaultAmenity('Single bed');
+
+    Livewire::actingAs($user)
+        ->test('pages::landlord.properties')
+        ->call('startAddingUnit', $property->id)
+        ->set([
+            'form.floor_area_sqm' => '30',
+            'form.bedrooms' => 2,
+            'form.occupancy' => 'multiple',
+            'form.amenityIds' => [(string) $doubleDeck->id, (string) $singleBed->id],
+        ])
+        ->set("form.amenityQuantities.{$doubleDeck->id}", '2')
+        ->assertSee('The beds sleep up to 5 tenants.')
+        ->set('form.tenant_limit', 6)
+        ->assertSet('form.tenant_limit', '5');
+});
+
+test('a unit whose only bed is a single bed cannot be shared', function () {
+    $user = User::factory()->create();
+    $property = Property::factory()->for($user->currentTeam)->create(['type' => PropertyType::Apartment]);
+    $singleBed = defaultAmenity('Single bed');
+
+    Livewire::actingAs($user)
+        ->test('pages::landlord.properties')
+        ->call('startAddingUnit', $property->id)
+        ->set([
+            'form.unit_number' => '101',
+            'form.floor_level' => 'Ground floor',
+            'form.floor_area_sqm' => '30',
+            'form.bedrooms' => 2,
+            'form.bathrooms' => 1,
+            'form.price' => '6000',
+            'form.occupancy' => 'multiple',
+            'form.tenant_limit' => 2,
+            'form.amenityIds' => [(string) $singleBed->id],
+        ])
+        ->call('addUnit')
+        ->assertHasErrors(['form.occupancy', 'form.tenant_limit']);
+});
+
+/**
+ * A shared apartment with two double decks (sleeping 4) and the given
+ * number of active tenants.
+ */
+function sharedUnitWithTwoDoubleDecks(User $user, int $activeTenants): Unit
+{
+    $unit = Unit::factory()
+        ->for(Property::factory()->for($user->currentTeam)->state(['type' => PropertyType::Apartment]))
+        ->create([
+            'status' => UnitStatus::Occupied,
+            'floor_area_sqm' => 30,
+            'bedrooms' => 2,
+            'allows_multiple_tenants' => true,
+            'tenant_limit' => 4,
+        ]);
+    $unit->amenities()->attach(defaultAmenity('Double deck')->id, ['quantity' => 2]);
+    Lease::factory()->for($unit)->count($activeTenants)->create(['status' => LeaseStatus::Active]);
+
+    return $unit;
+}
+
+test('removing beds is refused when fewer would not sleep the tenants already there', function () {
+    $user = User::factory()->create();
+    $unit = sharedUnitWithTwoDoubleDecks($user, activeTenants: 3);
+    $doubleDeck = defaultAmenity('Double deck');
+
+    Livewire::actingAs($user)
+        ->test('pages::landlord.properties')
+        ->call('startEditingUnit', $unit->id)
+        ->set("form.amenityQuantities.{$doubleDeck->id}", '1')
+        ->set('form.tenant_limit', '3')
+        ->call('updateUnit')
+        ->assertHasErrors(['form.amenityIds']);
+
+    expect($unit->amenities()->sole()->pivot->quantity)->toBe(2);
+});
+
+test('removing beds is allowed while the rest still sleep everyone there', function () {
+    $user = User::factory()->create();
+    $unit = sharedUnitWithTwoDoubleDecks($user, activeTenants: 2);
+    $doubleDeck = defaultAmenity('Double deck');
+
+    Livewire::actingAs($user)
+        ->test('pages::landlord.properties')
+        ->call('startEditingUnit', $unit->id)
+        ->set("form.amenityQuantities.{$doubleDeck->id}", '1')
+        ->set('form.tenant_limit', '2')
+        ->call('updateUnit')
+        ->assertHasNoErrors();
+
+    expect($unit->fresh()->capacity())->toBe(2);
 });
 
 test('the setup wizard saves a new unit\'s amenities', function () {
