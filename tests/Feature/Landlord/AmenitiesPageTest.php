@@ -1,6 +1,7 @@
 <?php
 
 use App\Enums\AmenityCategory;
+use App\Enums\AmenityQuantityBasis;
 use App\Enums\TeamRole;
 use App\Models\Amenity;
 use App\Models\User;
@@ -23,13 +24,14 @@ test('tenants cannot open the amenities page', function () {
     $this->actingAs($tenant)->get(route('amenities'))->assertForbidden();
 });
 
-test('a landlord sees the platform defaults with how many each bed sleeps', function () {
+test('a landlord sees the platform defaults with how many of each a unit can have', function () {
     $this->actingAs(User::factory()->create())
         ->get(route('amenities'))
         ->assertOk()
         ->assertSee('Double deck')
-        ->assertSee('sleeps 2')
-        ->assertSee('Television');
+        ->assertSee('sleeps 2, covers 1.7 m²')
+        ->assertSee('Television')
+        ->assertSee('1 per bedroom, plus 1 for the living area');
 });
 
 test('a landlord can add their own amenity', function () {
@@ -46,7 +48,8 @@ test('a landlord can add their own amenity', function () {
 
     expect($amenity->name)->toBe('Rooftop access')
         ->and($amenity->category)->toBe(AmenityCategory::Other)
-        ->and($amenity->sleeps)->toBe(0);
+        ->and($amenity->sleeps)->toBe(0)
+        ->and($amenity->fresh()->quantity_basis)->toBe(AmenityQuantityBasis::PerTenant);
 });
 
 test('an amenity cannot repeat a name already on the team\'s list, ignoring case', function (string $name) {

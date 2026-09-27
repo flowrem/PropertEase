@@ -3,6 +3,7 @@
 use App\Enums\AmenityCategory;
 use App\Models\Amenity;
 use App\Models\Team;
+use App\Models\Unit;
 use Flux\Flux;
 use Illuminate\Database\Eloquent\Collection as EloquentCollection;
 use Illuminate\Support\Collection;
@@ -109,7 +110,7 @@ new #[Title('Amenities')] class extends Component
     <div class="space-y-4">
         <div>
             <flux:heading size="lg" level="2">{{ __('Your own amenities') }}</flux:heading>
-            <flux:text>{{ __('Add anything the list below is missing. A deactivated amenity stays on the units that have it but cannot be ticked on new ones.') }}</flux:text>
+            <flux:text>{{ __('Add anything the list below is missing. A unit can have up to one of each per tenant it fits. A deactivated amenity stays on the units that have it but cannot be ticked on new ones.') }}</flux:text>
         </div>
 
         @if ($this->canManage)
@@ -154,7 +155,7 @@ new #[Title('Amenities')] class extends Component
     <div class="space-y-4">
         <div>
             <flux:heading size="lg" level="2">{{ __('Included for every landlord') }}</flux:heading>
-            <flux:text>{{ __('Beds show how many people one of them sleeps; the beds on a unit decide how many tenants it fits.') }}</flux:text>
+            <flux:text>{{ __('Each shows how many a unit can have. Beds show how many people one sleeps and the floor it covers; together they may cover at most half of a unit\'s sleeping area and sleep no more tenants than its floor area fits.') }}</flux:text>
         </div>
 
         <div class="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
@@ -164,11 +165,17 @@ new #[Title('Amenities')] class extends Component
 
                     <ul class="mt-2 space-y-1 text-sm">
                         @foreach ($amenities as $amenity)
-                            <li class="flex items-center justify-between gap-2">
+                            <li class="flex items-baseline justify-between gap-3">
                                 <span>{{ $amenity->name }}</span>
-                                @if ($amenity->sleeps > 0)
-                                    <span class="text-zinc-500 dark:text-zinc-400">{{ trans_choice('sleeps :count|sleeps :count', $amenity->sleeps) }}</span>
-                                @endif
+                                <span class="text-end text-xs text-zinc-500 dark:text-zinc-400">
+                                    @if ($amenity->isBed())
+                                        {{ trans_choice('sleeps :count, covers :area m²|sleeps :count, covers :area m²', $amenity->sleeps, ['area' => Unit::formatFloorArea((float) $amenity->footprint_sqm)]) }}
+                                    @elseif ($amenity->isSingle())
+                                        {{ __('yes or no') }}
+                                    @else
+                                        {{ $amenity->quantity_basis->describe($amenity->quantity_per) }}
+                                    @endif
+                                </span>
                             </li>
                         @endforeach
                     </ul>
