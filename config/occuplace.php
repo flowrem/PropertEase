@@ -18,7 +18,7 @@ return [
 
     'units' => [
 
-        'floor_area' => ['min' => 6, 'max' => 300],
+        'floor_area' => ['min' => 6, 'max' => 70],
 
         'bedrooms' => ['min' => 0, 'max' => 10],
 
