@@ -12,6 +12,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Support\Carbon;
 
 /**
@@ -27,9 +28,14 @@ use Illuminate\Support\Carbon;
  * @property Carbon|null $created_at
  * @property Carbon|null $updated_at
  * @property-read Lease $lease
+ * @property int|null $issue_type_id
+ * @property int|null $unit_item_id
  * @property-read Collection<int, ConcernUpdate> $updates
+ * @property-read IssueType|null $issueType
+ * @property-read UnitItem|null $unitItem
+ * @property-read ItemService|null $itemService
  */
-#[Fillable(['lease_id', 'category', 'title', 'description', 'priority', 'status', 'photo_path', 'resolved_at'])]
+#[Fillable(['lease_id', 'category', 'issue_type_id', 'unit_item_id', 'title', 'description', 'priority', 'status', 'photo_path', 'resolved_at'])]
 class Concern extends Model
 {
     /** @use HasFactory<ConcernFactory> */
@@ -49,6 +55,34 @@ class Concern extends Model
     public function updates(): HasMany
     {
         return $this->hasMany(ConcernUpdate::class);
+    }
+
+    /**
+     * @return BelongsTo<IssueType, $this>
+     */
+    public function issueType(): BelongsTo
+    {
+        return $this->belongsTo(IssueType::class);
+    }
+
+    /**
+     * The inventory item the tenant said the problem is with, if any.
+     *
+     * @return BelongsTo<UnitItem, $this>
+     */
+    public function unitItem(): BelongsTo
+    {
+        return $this->belongsTo(UnitItem::class);
+    }
+
+    /**
+     * The repair or replacement recorded when this report was resolved.
+     *
+     * @return HasOne<ItemService, $this>
+     */
+    public function itemService(): HasOne
+    {
+        return $this->hasOne(ItemService::class);
     }
 
     /**

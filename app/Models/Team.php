@@ -172,6 +172,16 @@ class Team extends Model
     }
 
     /**
+     * Get the issue types this team added on top of the platform defaults.
+     *
+     * @return HasMany<IssueType, $this>
+     */
+    public function issueTypes(): HasMany
+    {
+        return $this->hasMany(IssueType::class);
+    }
+
+    /**
      * Get all billable services this team offers.
      *
      * @return HasMany<Service, $this>

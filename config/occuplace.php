@@ -18,6 +18,22 @@ return [
     |
     */
 
+    /*
+    |--------------------------------------------------------------------------
+    | Unit Items
+    |--------------------------------------------------------------------------
+    |
+    | An item repaired or replaced at least `count` times within the last
+    | `months` months is highlighted as having repeated problems.
+    |
+    */
+
+    'items' => [
+
+        'repeated_problems' => ['count' => 3, 'months' => 6],
+
+    ],
+
     'units' => [
 
         'floor_area' => ['min' => 6, 'max' => 70],
