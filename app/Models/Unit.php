@@ -175,25 +175,31 @@ class Unit extends Model
     }
 
     /**
-     * The smallest floor area that fits the given rooms.
+     * The smallest floor area that fits the given rooms. Always accounts for
+     * at least one bathroom, even when "bathrooms" is 0 (shared), to match
+     * maxBedroomsFor(): bedrooms alone should never be allowed to claim a
+     * floor area that leaves no room for a bathroom anywhere.
      */
     public static function minimumFloorAreaFor(int $bedrooms, int $bathrooms): float
     {
         return max(
             (float) config('occuplace.units.floor_area.min'),
             $bedrooms * (float) config('occuplace.units.minimum_bedroom_area')
-                + $bathrooms * (float) config('occuplace.units.minimum_bathroom_area'),
+                + max($bathrooms, 1) * (float) config('occuplace.units.minimum_bathroom_area'),
         );
     }
 
     /**
      * The most bedrooms a unit of the given floor area can have, once the
-     * given number of bathrooms is accounted for.
+     * given number of bathrooms is accounted for. Always reserves room for
+     * at least one bathroom, even when "bathrooms" is 0 (shared), so
+     * bedrooms alone can never claim the entire floor area and leave a unit
+     * that supposedly fits several tenants with nowhere to put a bathroom.
      */
     public static function maxBedroomsFor(float $floorArea, int $bathrooms): int
     {
         return self::roomsThatFit(
-            $floorArea - $bathrooms * (float) config('occuplace.units.minimum_bathroom_area'),
+            $floorArea - max($bathrooms, 1) * (float) config('occuplace.units.minimum_bathroom_area'),
             (float) config('occuplace.units.minimum_bedroom_area'),
             (int) config('occuplace.units.bedrooms.max'),
         );

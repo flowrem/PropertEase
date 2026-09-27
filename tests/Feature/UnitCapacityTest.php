@@ -23,10 +23,15 @@ test('the most bedrooms a unit fits depends on its floor area and bathrooms', fu
     expect(Unit::maxBedroomsFor($floorArea, $bathrooms))->toBe($expected);
 })->with([
     '24 m², 1 bathroom' => [24, 1, 3],
-    '24 m², 0 bathrooms' => [24, 0, 4],
+    '24 m², 0 bathrooms still reserves room for one' => [24, 0, 3],
     'a huge unit is still capped at the configured ceiling' => [300, 0, 10],
     'never below zero' => [6, 10, 0],
 ]);
+
+test('bedrooms can never claim the entire floor area and leave no room for a bathroom', function () {
+    expect(Unit::maxBedroomsFor(30, bathrooms: 0))->toBe(4)
+        ->and(Unit::minimumFloorAreaFor(bedrooms: 5, bathrooms: 0))->toBe(31.2);
+});
 
 test('the most bathrooms a unit fits depends on its floor area and bedrooms', function (float $floorArea, int $bedrooms, int $expected) {
     expect(Unit::maxBathroomsFor($floorArea, $bedrooms))->toBe($expected);
