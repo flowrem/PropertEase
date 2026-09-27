@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\ConcernPhotoController;
 use App\Http\Controllers\ForcedPasswordChangeController;
 use App\Http\Controllers\LandlordVerificationController;
 use App\Http\Controllers\PublicListingController;
@@ -39,6 +40,9 @@ Route::prefix('{current_team}')
         Route::livewire('complaints', 'pages::complaints')->name('complaints');
         Route::livewire('announcements', 'pages::announcements')->name('announcements');
         Route::livewire('move-in-checklist', 'pages::move-in-checklist')->name('move-in-checklist');
+        Route::get('reports/{concern}/photo', ConcernPhotoController::class)
+            ->whereNumber('concern')
+            ->name('concerns.photo');
 
         Route::middleware(EnsureTeamMembership::class.':member')->group(function () {
             Route::livewire('setup', 'pages::landlord.setup')->name('setup');
