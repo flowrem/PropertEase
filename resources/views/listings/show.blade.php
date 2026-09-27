@@ -34,6 +34,27 @@
                 <h2 class="font-semibold text-white">{{ __('About this place') }}</h2>
                 <p class="mt-2 whitespace-pre-line text-zinc-300">{{ $listing->description }}</p>
 
+                @if ($unit->amenities->isNotEmpty())
+                    <h2 class="mt-8 font-semibold text-white">{{ __("What's included") }}</h2>
+                    <div class="mt-2 grid gap-4 sm:grid-cols-2">
+                        @foreach (\App\Models\Amenity::groupByCategory($unit->amenities) as $category => $amenities)
+                            <div>
+                                <h3 class="text-xs font-medium uppercase tracking-wide text-zinc-400">{{ $category }}</h3>
+                                <ul class="mt-1 space-y-1 text-zinc-300">
+                                    @foreach ($amenities as $amenity)
+                                        <li>
+                                            {{ $amenity->name }}
+                                            @if ($amenity->pivot->quantity > 1)
+                                                <span class="text-zinc-400">&times; {{ $amenity->pivot->quantity }}</span>
+                                            @endif
+                                        </li>
+                                    @endforeach
+                                </ul>
+                            </div>
+                        @endforeach
+                    </div>
+                @endif
+
                 <h2 class="mt-8 font-semibold text-white">{{ __('Location') }}</h2>
                 <p class="mt-2 text-zinc-300">
                     {{ $property->address_line }}, {{ $property->city }}, {{ $property->province }} {{ $property->postal_code }}

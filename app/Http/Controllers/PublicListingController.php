@@ -3,10 +3,13 @@
 namespace App\Http\Controllers;
 
 use App\Http\Requests\BrowseListingsRequest;
+use App\Models\Amenity;
 use App\Models\PaymentChannel;
 use App\Models\UnitListing;
 use Illuminate\Contracts\View\View;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Collection as EloquentCollection;
+use Illuminate\Support\Collection;
 
 class PublicListingController extends Controller
 {
@@ -35,6 +38,11 @@ class PublicListingController extends Controller
                 ->whereHas('unit.property', fn (Builder $property) => $property->where('type', $type)))
             ->when($filters['max_price'] ?? null, fn (Builder $query, $maxPrice) => $query
                 ->whereHas('unit', fn (Builder $unit) => $unit->where('price', '<=', $maxPrice)))
+            ->when($filters['amenities'] ?? [], function (Builder $query, array $amenityIds) {
+                foreach ($amenityIds as $amenityId) {
+                    $query->whereHas('unit.amenities', fn (Builder $amenity) => $amenity->whereKey($amenityId));
+                }
+            })
             ->latest('reviewed_at')
             ->paginate(12)
             ->withQueryString();
@@ -42,7 +50,22 @@ class PublicListingController extends Controller
         return view('listings.index', [
             'listings' => $listings,
             'filters' => $filters,
+            'amenityFilters' => $this->amenityFilters(),
         ]);
+    }
+
+    /**
+     * The platform amenities guests can filter by, grouped by category
+     * label. Teams name their own amenities differently, so only the
+     * shared platform list makes a useful filter.
+     *
+     * @return Collection<string, EloquentCollection<int, Amenity>>
+     */
+    private function amenityFilters(): Collection
+    {
+        return Amenity::groupByCategory(
+            Amenity::query()->whereNull('team_id')->active()->orderBy('name')->get(),
+        );
     }
 
     /**
@@ -55,7 +78,7 @@ class PublicListingController extends Controller
             ->publiclyVisible()
             ->with([
                 'photos',
-                'unit' => fn ($unit) => $unit->withCount(['activeLeases', 'heldReservations'])->withBedSpaces()->with('property.team'),
+                'unit' => fn ($unit) => $unit->withCount(['activeLeases', 'heldReservations'])->withBedSpaces()->with(['property.team', 'amenities' => fn ($amenities) => $amenities->orderBy('name')]),
             ])
             ->findOrFail($listing);
 

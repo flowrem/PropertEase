@@ -5,6 +5,7 @@ use App\Enums\ListingStatus;
 use App\Enums\PropertyType;
 use App\Enums\TeamRole;
 use App\Enums\UnitStatus;
+use App\Models\Amenity;
 use App\Models\Lease;
 use App\Models\ListingPhoto;
 use App\Models\PaymentChannel;
@@ -210,4 +211,48 @@ test('a super admin without a team can view the public pages', function () {
     $admin->forceFill(['current_team_id' => null])->save();
 
     $this->actingAs($admin)->get(route('home'))->assertOk()->assertSee(route('admin.dashboard'));
+});
+
+function platformAmenityId(string $name): int
+{
+    return Amenity::query()->whereNull('team_id')->where('name', $name)->value('id');
+}
+
+test('a listing shows what its unit comes with', function () {
+    $listing = publicListing();
+    $listing->unit->amenities()->attach([
+        platformAmenityId('Double deck') => ['quantity' => 2],
+        platformAmenityId('Wi-Fi') => ['quantity' => 1],
+    ]);
+
+    $this->get(route('listings.show', $listing))
+        ->assertOk()
+        ->assertSee("What's included")
+        ->assertSeeInOrder(['Double deck', '&times; 2'], false)
+        ->assertSee('Wi-Fi');
+});
+
+test('guests can filter listings by amenities, matching only units with all of them', function () {
+    $wifi = platformAmenityId('Wi-Fi');
+    $aircon = platformAmenityId('Air conditioner');
+    publicListing(property: ['name' => 'Both Residences'])->unit->amenities()->attach([$wifi, $aircon]);
+    publicListing(property: ['name' => 'Wifi Only Dorm'])->unit->amenities()->attach($wifi);
+    publicListing(property: ['name' => 'Bare Rooms']);
+
+    $this->get(route('listings.index', ['amenities' => [$wifi]]))
+        ->assertOk()
+        ->assertSee('Both Residences')
+        ->assertSee('Wifi Only Dorm')
+        ->assertDontSee('Bare Rooms');
+
+    $this->get(route('listings.index', ['amenities' => [$wifi, $aircon]]))
+        ->assertOk()
+        ->assertSee('Both Residences')
+        ->assertDontSee('Wifi Only Dorm');
+});
+
+test('listings cannot be filtered by a team\'s own amenity', function () {
+    $custom = Amenity::factory()->create();
+
+    $this->get(route('listings.index', ['amenities' => [$custom->id]]))->assertSessionHasErrors('amenities.0');
 });

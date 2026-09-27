@@ -26,6 +26,11 @@ class BrowseListingsRequest extends FormRequest
             'q' => ['nullable', 'string', 'max:100'],
             'type' => ['nullable', Rule::enum(PropertyType::class)],
             'max_price' => ['nullable', 'numeric', 'min:0', 'max:99999999'],
+            'amenities' => ['nullable', 'array', 'max:10'],
+            'amenities.*' => [
+                'integer', 'distinct',
+                Rule::exists('amenities', 'id')->whereNull('team_id')->where('is_active', true),
+            ],
         ];
     }
 }

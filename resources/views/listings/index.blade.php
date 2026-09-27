@@ -39,6 +39,39 @@
                 >
             </div>
 
+            @php($selectedAmenities = array_map('intval', $filters['amenities'] ?? []))
+
+            <details class="rounded-lg border border-zinc-700 bg-brand-800 px-4 py-3 sm:col-span-4" @if ($selectedAmenities !== []) open @endif>
+                <summary class="cursor-pointer text-sm text-zinc-300">
+                    {{ __('Amenities') }}
+                    @if ($selectedAmenities !== [])
+                        <span class="text-zinc-400">({{ count($selectedAmenities) }})</span>
+                    @endif
+                </summary>
+
+                <div class="mt-3 grid gap-4 sm:grid-cols-3">
+                    @foreach ($amenityFilters as $category => $amenities)
+                        <fieldset>
+                            <legend class="text-xs font-medium uppercase tracking-wide text-zinc-400">{{ $category }}</legend>
+                            <div class="mt-2 space-y-1">
+                                @foreach ($amenities as $amenity)
+                                    <label class="flex items-center gap-2 text-sm text-zinc-200">
+                                        <input
+                                            type="checkbox"
+                                            name="amenities[]"
+                                            value="{{ $amenity->id }}"
+                                            @checked(in_array($amenity->id, $selectedAmenities, true))
+                                            class="rounded border-zinc-600 bg-brand-900"
+                                        >
+                                        {{ $amenity->name }}
+                                    </label>
+                                @endforeach
+                            </div>
+                        </fieldset>
+                    @endforeach
+                </div>
+            </details>
+
             <div class="flex gap-2 sm:col-span-4">
                 <button type="submit" class="rounded-lg bg-brand-600 px-5 py-2 text-sm font-medium text-white transition-colors hover:bg-brand-500">
                     {{ __('Search') }}
