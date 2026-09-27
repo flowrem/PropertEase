@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Enums\AmenityCategory;
+use App\Enums\AmenityQuantityBasis;
 use Database\Factories\AmenityFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Builder;
@@ -21,11 +22,19 @@ use Illuminate\Support\Collection;
  * unit's capacity. It is deliberately not fillable: only the seeded platform
  * beds set it, so a landlord can never invent a "bed" that sleeps ten.
  *
+ * `quantity_basis` and `quantity_per` cap how many of it a unit can list
+ * (one refrigerator per unit, one air conditioner per room), and beds also
+ * carry the floor space one of them covers. None of these are fillable
+ * either, so a team's own amenities always keep the default: one per tenant.
+ *
  * @property int $id
  * @property int|null $team_id
  * @property string $name
  * @property AmenityCategory $category
  * @property int $sleeps
+ * @property AmenityQuantityBasis $quantity_basis
+ * @property int $quantity_per
+ * @property string|null $footprint_sqm
  * @property bool $is_active
  * @property Carbon|null $created_at
  * @property Carbon|null $updated_at
@@ -38,6 +47,14 @@ class Amenity extends Model
     use HasFactory;
 
     /**
+     * @var array<string, mixed>
+     */
+    protected $attributes = [
+        'quantity_basis' => 'per_tenant',
+        'quantity_per' => 1,
+    ];
+
+    /**
      * @return array<string, string>
      */
     protected function casts(): array
@@ -45,6 +62,9 @@ class Amenity extends Model
         return [
             'category' => AmenityCategory::class,
             'sleeps' => 'integer',
+            'quantity_basis' => AmenityQuantityBasis::class,
+            'quantity_per' => 'integer',
+            'footprint_sqm' => 'decimal:2',
             'is_active' => 'boolean',
         ];
     }
@@ -55,6 +75,22 @@ class Amenity extends Model
     public function team(): BelongsTo
     {
         return $this->belongsTo(Team::class);
+    }
+
+    /**
+     * Whether this is a bed, which decides how many tenants a unit fits.
+     */
+    public function isBed(): bool
+    {
+        return $this->sleeps > 0;
+    }
+
+    /**
+     * Whether a unit either has this or doesn't, so the form asks for no quantity.
+     */
+    public function isSingle(): bool
+    {
+        return $this->quantity_basis === AmenityQuantityBasis::Single;
     }
 
     /**

@@ -36,6 +36,14 @@ return [
 
         'amenity_quantity' => ['max' => 20],
 
+        /*
+         * The share of a unit's sleeping area (its floor area less the
+         * common area and bathrooms) that beds may cover. The rest is left
+         * for walking space, cabinets and doors. A judgment call, not a
+         * code figure: confirm it before citing it.
+         */
+        'bed_floor_coverage' => 0.5,
+
         'name_max_length' => 40,
 
         'highest_floor' => 50,

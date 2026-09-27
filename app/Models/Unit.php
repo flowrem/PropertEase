@@ -199,7 +199,7 @@ class Unit extends Model
      */
     public static function maxCapacityFor(float $floorArea, PropertyType $type, int $bedrooms, int $bedSpaces = 0): int
     {
-        $tenantsThatFit = (int) floor($floorArea / $type->areaPerTenant() + 1e-9);
+        $tenantsThatFit = self::tenantsThatFitIn($floorArea, $type);
 
         if ($bedSpaces > 0) {
             $tenantsThatFit = min($tenantsThatFit, $bedSpaces);
@@ -207,7 +207,34 @@ class Unit extends Model
             $tenantsThatFit = min($tenantsThatFit, $bedrooms * $type->tenantsPerBedroom());
         }
 
-        return max(1, min((int) config('occuplace.units.max_capacity'), $tenantsThatFit));
+        return max(1, $tenantsThatFit);
+    }
+
+    /**
+     * The most tenants a floor area fits by its area per tenant alone, never
+     * more than the configured maximum capacity. Beds may not sleep more.
+     */
+    public static function tenantsThatFitIn(float $floorArea, PropertyType $type): int
+    {
+        return min(
+            (int) config('occuplace.units.max_capacity'),
+            (int) floor($floorArea / $type->areaPerTenant() + 1e-9),
+        );
+    }
+
+    /**
+     * How much floor, in m², the beds of a unit may cover: the configured
+     * share of what is left once the common area and bathrooms (at least
+     * one, even when shared) are set aside. The rest stays free for walking,
+     * cabinets and doors.
+     */
+    public static function bedFloorSpaceFor(float $floorArea, int $bedrooms, int $bathrooms): float
+    {
+        $sleepingArea = $floorArea
+            - self::commonAreaFor($bedrooms)
+            - max($bathrooms, 1) * (float) config('occuplace.units.minimum_bathroom_area');
+
+        return max(0.0, $sleepingArea) * (float) config('occuplace.units.bed_floor_coverage');
     }
 
     /**
