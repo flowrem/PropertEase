@@ -162,6 +162,16 @@ class Team extends Model
     }
 
     /**
+     * Get the amenities this team added on top of the platform defaults.
+     *
+     * @return HasMany<Amenity, $this>
+     */
+    public function amenities(): HasMany
+    {
+        return $this->hasMany(Amenity::class);
+    }
+
+    /**
      * Get all billable services this team offers.
      *
      * @return HasMany<Service, $this>

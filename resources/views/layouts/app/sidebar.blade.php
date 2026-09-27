@@ -51,6 +51,9 @@
                             <flux:sidebar.item icon="building-office-2" :href="route('properties')" :current="request()->routeIs('properties')" wire:navigate>
                                 {{ __('Properties') }}
                             </flux:sidebar.item>
+                            <flux:sidebar.item icon="sparkles" :href="route('amenities')" :current="request()->routeIs('amenities')" wire:navigate>
+                                {{ __('Amenities') }}
+                            </flux:sidebar.item>
                             <flux:sidebar.item icon="users" :href="route('tenants')" :current="request()->routeIs('tenants')" wire:navigate>
                                 {{ __('Tenants') }}
                             </flux:sidebar.item>
