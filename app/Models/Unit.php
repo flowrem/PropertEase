@@ -2,10 +2,12 @@
 
 namespace App\Models;
 
+use App\Enums\ConditionCheckKind;
 use App\Enums\LeaseStatus;
 use App\Enums\PropertyType;
 use App\Enums\ReservationStatus;
 use App\Enums\UnitStatus;
+use Carbon\CarbonImmutable;
 use Closure;
 use Database\Factories\UnitFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
@@ -47,6 +49,8 @@ use Illuminate\Support\Facades\DB;
  * @property-read int|null $held_reservations_count
  * @property-read int|string|null $bed_spaces
  * @property-read Collection<int, Concern> $concerns
+ * @property-read Collection<int, UnitItem> $items
+ * @property-read Collection<int, ConditionCheck> $conditionChecks
  */
 #[Fillable(['property_id', 'unit_number', 'floor_level', 'bedrooms', 'bathrooms', 'floor_area_sqm', 'status', 'allows_multiple_tenants', 'tenant_limit', 'price'])]
 class Unit extends Model
@@ -130,6 +134,43 @@ class Unit extends Model
         }
 
         return $this->activeLeases()->count();
+    }
+
+    /**
+     * Everything in the unit that gets checked, including removed items.
+     *
+     * @return HasMany<UnitItem, $this>
+     */
+    public function items(): HasMany
+    {
+        return $this->hasMany(UnitItem::class);
+    }
+
+    /**
+     * @return HasMany<ConditionCheck, $this>
+     */
+    public function conditionChecks(): HasMany
+    {
+        return $this->hasMany(ConditionCheck::class);
+    }
+
+    /**
+     * The move-in check the next tenant assigned here would claim: the
+     * newest one not yet claimed by a lease and recorded no earlier than the
+     * day the last tenant moved out, since a check from before then no
+     * longer shows the unit's condition. Null when there is none.
+     */
+    public function pendingMoveInCheck(): ?ConditionCheck
+    {
+        $lastMoveOut = $this->leases()->where('status', '!=', LeaseStatus::Active->value)->max('end_date');
+
+        return $this->conditionChecks()
+            ->where('kind', ConditionCheckKind::MoveIn->value)
+            ->whereNull('lease_id')
+            ->when($lastMoveOut, fn (Builder $checks) => $checks->where('checked_at', '>=', CarbonImmutable::parse($lastMoveOut)->startOfDay()))
+            ->latest('checked_at')
+            ->latest('id')
+            ->first();
     }
 
     /**

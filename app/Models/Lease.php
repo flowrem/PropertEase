@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Enums\BillingTiming;
+use App\Enums\ConditionCheckKind;
 use App\Enums\LeaseStatus;
 use Carbon\CarbonImmutable;
 use Carbon\CarbonInterface;
@@ -26,6 +27,7 @@ use Illuminate\Support\Carbon;
  * @property int $due_day
  * @property BillingTiming $billing_timing
  * @property LeaseStatus $status
+ * @property string|null $move_in_override_reason
  * @property Carbon|null $created_at
  * @property Carbon|null $updated_at
  * @property-read Unit $unit
@@ -37,8 +39,9 @@ use Illuminate\Support\Carbon;
  * @property-read Invoice|null $currentInvoice
  * @property-read Collection<int, Document> $documents
  * @property-read Collection<int, Concern> $concerns
+ * @property-read ConditionCheck|null $moveInCheck
  */
-#[Fillable(['unit_id', 'tenant_id', 'start_date', 'end_date', 'due_day', 'billing_timing', 'status'])]
+#[Fillable(['unit_id', 'tenant_id', 'start_date', 'end_date', 'due_day', 'billing_timing', 'status', 'move_in_override_reason'])]
 class Lease extends Model
 {
     /** @use HasFactory<LeaseFactory> */
@@ -157,6 +160,16 @@ class Lease extends Model
     public function currentInvoice(): HasOne
     {
         return $this->hasOne(Invoice::class)->latestOfMany('due_date');
+    }
+
+    /**
+     * The move-in check this lease claimed when the tenant was assigned.
+     *
+     * @return HasOne<ConditionCheck, $this>
+     */
+    public function moveInCheck(): HasOne
+    {
+        return $this->hasOne(ConditionCheck::class)->where('kind', ConditionCheckKind::MoveIn->value);
     }
 
     /**
