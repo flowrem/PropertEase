@@ -201,9 +201,13 @@ new #[Title('Maintenance')] class extends Component
 }; ?>
 
 <section class="flex w-full flex-col gap-6">
-    <div>
-        <flux:heading size="xl" level="1">{{ __('Maintenance') }}</flux:heading>
-        <flux:subheading>{{ __('Repair requests from every tenant under :team, most urgent first. Open one to reply or resolve it.', ['team' => $this->team->name]) }}</flux:subheading>
+    <div class="flex flex-wrap items-end justify-between gap-3">
+        <div>
+            <flux:heading size="xl" level="1">{{ __('Maintenance') }}</flux:heading>
+            <flux:subheading>{{ __('Repair requests from every tenant under :team, most urgent first. Open one to reply or resolve it.', ['team' => $this->team->name]) }}</flux:subheading>
+        </div>
+
+        <flux:button size="sm" icon="tag" :href="route('issue-types')" wire:navigate>{{ __('Issue types') }}</flux:button>
     </div>
 
     <x-concern-list

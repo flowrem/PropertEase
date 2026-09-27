@@ -56,6 +56,7 @@ Route::prefix('{current_team}')
             Route::livewire('invoices', 'pages::landlord.invoices')->name('invoices');
             Route::livewire('requests/maintenance', 'pages::landlord.maintenance')->name('landlord.maintenance');
             Route::livewire('requests/complaints', 'pages::landlord.complaints')->name('landlord.complaints');
+            Route::livewire('requests/issue-types', 'pages::landlord.issue-types')->name('issue-types');
             Route::get('inbox', fn () => redirect()->route('landlord.maintenance'))->name('inbox');
             Route::livewire('listings', 'pages::landlord.listings')->name('listings');
             Route::livewire('payment-settings', 'pages::landlord.payment-settings')->name('payment-settings');

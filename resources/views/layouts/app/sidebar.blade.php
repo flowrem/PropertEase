@@ -76,7 +76,7 @@
                             <flux:sidebar.item icon="qr-code" :href="route('payment-settings')" :current="request()->routeIs('payment-settings')" wire:navigate>
                                 {{ __('Payment settings') }}
                             </flux:sidebar.item>
-                            <flux:sidebar.item icon="wrench-screwdriver" :href="route('landlord.maintenance')" :current="request()->routeIs('landlord.maintenance')" wire:navigate>
+                            <flux:sidebar.item icon="wrench-screwdriver" :href="route('landlord.maintenance')" :current="request()->routeIs('landlord.maintenance', 'issue-types')" wire:navigate>
                                 {{ __('Maintenance') }}
                             </flux:sidebar.item>
                             <flux:sidebar.item icon="flag" :href="route('landlord.complaints')" :current="request()->routeIs('landlord.complaints')" wire:navigate>
