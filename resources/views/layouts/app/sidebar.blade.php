@@ -48,7 +48,7 @@
                         </flux:sidebar.item>
 
                         @if ($isLandlord)
-                            <flux:sidebar.item icon="building-office-2" :href="route('properties')" :current="request()->routeIs('properties')" wire:navigate>
+                            <flux:sidebar.item icon="building-office-2" :href="route('properties')" :current="request()->routeIs('properties', 'units.inventory')" wire:navigate>
                                 {{ __('Properties') }}
                             </flux:sidebar.item>
                             <flux:sidebar.item icon="sparkles" :href="route('amenities')" :current="request()->routeIs('amenities')" wire:navigate>

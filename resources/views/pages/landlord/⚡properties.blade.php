@@ -564,6 +564,8 @@ new #[Title('Properties')] class extends Component
                                             {{ $unit->status->label() }}
                                         </flux:badge>
 
+                                        <flux:button variant="ghost" size="sm" icon="clipboard-document-check" :href="route('units.inventory', ['unit' => $unit])" wire:navigate :aria-label="__('Inventory and checks')" :tooltip="__('Inventory and checks')" />
+
                                         <flux:button variant="ghost" size="sm" icon="pencil" :aria-label="__('Edit unit')" wire:click="startEditingUnit({{ $unit->id }})" />
                                     </div>
                                 </div>

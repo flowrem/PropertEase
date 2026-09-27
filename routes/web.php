@@ -42,6 +42,9 @@ Route::prefix('{current_team}')
         Route::middleware(EnsureTeamMembership::class.':member')->group(function () {
             Route::livewire('setup', 'pages::landlord.setup')->name('setup');
             Route::livewire('properties', 'pages::landlord.properties')->name('properties');
+            Route::livewire('units/{unit}/inventory', 'pages::landlord.unit-inventory')
+                ->whereNumber('unit')
+                ->name('units.inventory');
             Route::livewire('amenities', 'pages::landlord.amenities')->name('amenities');
             Route::livewire('tenants', 'pages::landlord.tenants')->name('tenants');
             Route::livewire('invoices', 'pages::landlord.invoices')->name('invoices');
