@@ -190,6 +190,35 @@ test('submitting for review needs at least one photo', function () {
     expect($listing->refresh()->status)->toBe(ListingStatus::Draft);
 });
 
+test('submitting for review needs the unit\'s floor area and rooms', function () {
+    $landlord = User::factory()->create();
+    $listing = listingWithPhoto($landlord);
+    $listing->unit->update(['floor_area_sqm' => null]);
+    PaymentChannel::factory()->for($landlord->currentTeam)->create();
+
+    $this->actingAs($landlord);
+
+    Livewire::test('pages::landlord.listings')->call('submitForReview', $listing->id);
+
+    expect($listing->refresh()->status)->toBe(ListingStatus::Draft);
+});
+
+test('an approved listing for a unit without its floor area cannot be edited', function () {
+    $landlord = User::factory()->create();
+    $listing = listingWithPhoto($landlord, 'approved');
+    $listing->unit->update(['floor_area_sqm' => null]);
+
+    $this->actingAs($landlord);
+
+    Livewire::test('pages::landlord.listings')
+        ->call('openEdit', $listing->id)
+        ->set('title', 'A new title')
+        ->call('save');
+
+    expect($listing->refresh()->status)->toBe(ListingStatus::Approved)
+        ->and($listing->title)->not->toBe('A new title');
+});
+
 test('a draft with a photo and an active channel can be submitted', function () {
     $landlord = User::factory()->create();
     $listing = listingWithPhoto($landlord);

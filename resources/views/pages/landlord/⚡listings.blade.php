@@ -179,6 +179,13 @@ new #[Title('Listings')] class extends Component
 
         if ($listing) {
             Gate::authorize('update', $listing);
+
+            // Saving an approved listing sends it back for review, which an incomplete unit cannot go through.
+            if ($listing->status === ListingStatus::Approved && ! $listing->unit->hasLockedDetails()) {
+                Flux::toast(variant: 'danger', text: __('Add this unit\'s floor area and rooms on the Properties page before editing this listing.'));
+
+                return;
+            }
         } else {
             $unit = $this->unitsWithoutListing->firstWhere('id', $this->unit_id);
             abort_if($unit === null, 404);
@@ -257,11 +264,17 @@ new #[Title('Listings')] class extends Component
 
     public function submitForReview(int $listingId): void
     {
-        $listing = UnitListing::forTeam($this->team)->withCount('photos')->findOrFail($listingId);
+        $listing = UnitListing::forTeam($this->team)->with('unit')->withCount('photos')->findOrFail($listingId);
 
         Gate::authorize('update', $listing);
 
         if (! in_array($listing->status, [ListingStatus::Draft, ListingStatus::Rejected, ListingStatus::Unlisted], true)) {
+            return;
+        }
+
+        if (! $listing->unit->hasLockedDetails()) {
+            Flux::toast(variant: 'danger', text: __('Add this unit\'s floor area and rooms on the Properties page before submitting.'));
+
             return;
         }
 
