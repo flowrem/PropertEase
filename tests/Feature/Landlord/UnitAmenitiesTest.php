@@ -426,3 +426,29 @@ test('a quantity typed past the limit snaps back to it and the form shows the li
         ->assertSet("form.amenityQuantities.{$doubleDeck->id}", '3')
         ->assertSee('Up to 3');
 });
+
+test('unticking an amenity clears its quantity error', function () {
+    $user = User::factory()->create();
+    $doubleDeck = defaultAmenity('Double deck');
+
+    addSizedUnitWithAmenities($user, PropertyType::Dormitory, ['floor_area_sqm' => '24', 'bedrooms' => 2, 'bathrooms' => 2], ['Double deck' => '13'])
+        ->assertHasErrors(["form.amenityQuantities.{$doubleDeck->id}"])
+        ->set('form.amenityIds', [])
+        ->assertHasNoErrors()
+        ->assertSet('form.amenityQuantities', []);
+});
+
+test('an amenity a unit can only have one of asks for no quantity', function () {
+    $user = User::factory()->create();
+    $property = Property::factory()->for($user->currentTeam)->create(['type' => PropertyType::Apartment]);
+    $refrigerator = defaultAmenity('Refrigerator');
+    $chair = defaultAmenity('Chair');
+
+    Livewire::actingAs($user)
+        ->test('pages::landlord.properties')
+        ->call('startAddingUnit', $property->id)
+        ->set(['form.floor_area_sqm' => '30', 'form.bedrooms' => 2, 'form.bathrooms' => 1])
+        ->set('form.amenityIds', [(string) $refrigerator->id, (string) $chair->id])
+        ->assertDontSeeHtml("form.amenityQuantities.{$refrigerator->id}")
+        ->assertSeeHtml("form.amenityQuantities.{$chair->id}");
+});

@@ -372,12 +372,24 @@ class UnitForm extends Form
 
     /**
      * Give a newly ticked amenity a quantity of 1, so the landlord only has
-     * to type one when the unit has more than one of it.
+     * to type one when the unit has more than one of it, and forget the
+     * quantity and any error of one that was unticked, so a message about
+     * an amenity no longer on the unit doesn't linger on the form.
      */
     public function updatedAmenityIds(): void
     {
         foreach ($this->amenityIds as $amenityId) {
             $this->amenityQuantities[$amenityId] ??= '1';
+        }
+
+        $untickedIds = array_diff(array_keys($this->amenityQuantities), $this->amenityIds);
+
+        foreach ($untickedIds as $amenityId) {
+            unset($this->amenityQuantities[$amenityId]);
+        }
+
+        if ($untickedIds !== []) {
+            $this->resetErrorBag(array_map(fn (int|string $amenityId): string => "amenityQuantities.{$amenityId}", $untickedIds));
         }
     }
 
@@ -605,9 +617,9 @@ class UnitForm extends Form
                             'rule' => $amenity->quantity_basis->describe($amenity->quantity_per),
                         ]));
                     } elseif ($limit === 0) {
-                        $fail(__('There is no floor space or tenant room left for this bed with the other beds ticked.'));
+                        $fail(__('No room for this bed with the other beds ticked.'));
                     } else {
-                        $fail(__('The floor area has room for at most :max with the other beds ticked.', ['max' => $limit]));
+                        $fail(__('Room for at most :max with the other beds ticked.', ['max' => $limit]));
                     }
                 },
             ];

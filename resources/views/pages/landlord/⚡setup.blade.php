@@ -312,6 +312,7 @@ new #[Title('Add a property')] class extends Component
                     :amenity-groups="$this->formAmenityGroups"
                     :selected-amenities="$form->amenityIds"
                     :amenity-limits="$this->formAmenityLimits"
+                    :amenity-quantities="$form->amenityQuantities"
                     :bed-spaces="$this->formBedSpacesPreview"
                     :bed-summary="$form->bedSummary()"
                     :max-capacity="$this->formMaxCapacityPreview"

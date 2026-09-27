@@ -4,6 +4,7 @@
     'amenityGroups' => collect(),
     'selectedAmenities' => [],
     'amenityLimits' => [],
+    'amenityQuantities' => [],
     'bedSpaces' => 0,
     'bedSummary' => null,
     'maxCapacity' => null,
@@ -133,33 +134,40 @@
 
                     <div class="grid gap-x-4 gap-y-2 sm:grid-cols-2">
                         @foreach ($amenities as $amenity)
-                            <div class="flex min-h-9 items-center justify-between gap-3" wire:key="amenity-{{ $amenity->id }}">
-                                <flux:checkbox value="{{ $amenity->id }}" :label="$amenity->name" />
+                            @php
+                                $isTicked = in_array((string) $amenity->id, $selectedAmenities, true);
+                                $amenityLimit = $amenityLimits[$amenity->id] ?? $limits['amenity_quantity']['max'];
+                                $asksQuantity = $isTicked && ! $amenity->isSingle()
+                                    && ($amenityLimit !== 1 || (string) ($amenityQuantities[$amenity->id] ?? '1') !== '1');
+                            @endphp
 
-                                @if (! $amenity->isSingle() && in_array((string) $amenity->id, $selectedAmenities, true))
-                                    @php
-                                        $amenityLimit = $amenityLimits[$amenity->id] ?? $limits['amenity_quantity']['max'];
-                                    @endphp
+                            <div wire:key="amenity-{{ $amenity->id }}">
+                                <div class="flex min-h-9 items-center justify-between gap-3">
+                                    <flux:checkbox value="{{ $amenity->id }}" :label="$amenity->name" />
 
-                                    <div class="flex items-center gap-2">
-                                        <flux:text size="sm" class="whitespace-nowrap">
-                                            {{ $amenityLimit > 0 ? __('Up to :max', ['max' => $amenityLimit]) : __('No room left') }}
-                                        </flux:text>
+                                    @if ($asksQuantity)
+                                        <div class="flex items-center gap-2">
+                                            <flux:text size="sm" class="whitespace-nowrap">
+                                                {{ $amenityLimit > 0 ? __('Up to :max', ['max' => $amenityLimit]) : __('No room left') }}
+                                            </flux:text>
 
-                                        <flux:input
-                                            wire:model.blur="form.amenityQuantities.{{ $amenity->id }}"
-                                            type="number"
-                                            min="1"
-                                            max="{{ max(1, $amenityLimit) }}"
-                                            size="sm"
-                                            class="max-w-20"
-                                            :aria-label="__('How many :amenity', ['amenity' => $amenity->name])"
-                                        />
-                                    </div>
+                                            <flux:input
+                                                wire:model.blur="form.amenityQuantities.{{ $amenity->id }}"
+                                                type="number"
+                                                min="1"
+                                                max="{{ max(1, $amenityLimit) }}"
+                                                size="sm"
+                                                class="max-w-20"
+                                                :aria-label="__('How many :amenity', ['amenity' => $amenity->name])"
+                                            />
+                                        </div>
+                                    @endif
+                                </div>
+
+                                @if ($isTicked)
+                                    <flux:error name="form.amenityQuantities.{{ $amenity->id }}" />
                                 @endif
                             </div>
-
-                            <flux:error name="form.amenityQuantities.{{ $amenity->id }}" />
                         @endforeach
                     </div>
                 </div>
