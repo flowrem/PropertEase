@@ -108,6 +108,41 @@ class UnitForm extends Form
     }
 
     /**
+     * Snap bedrooms (or bathrooms) back down the moment it's typed past what
+     * the current floor area allows, so a landlord can't leave an
+     * unrealistic number, like 15 bedrooms in a 24 m² unit, sitting in the
+     * field: the browser's "max" attribute only marks the input invalid, it
+     * doesn't stop an out-of-range value from being typed and left there.
+     *
+     * This only clamps the field the landlord is actively editing. Typing a
+     * smaller floor area does not retroactively shrink rooms entered
+     * earlier; that mismatch is instead caught by validation, so the
+     * message points at the floor area they just changed.
+     */
+    public function updatedBedrooms(): void
+    {
+        $limits = config('occuplace.units.bedrooms');
+
+        $this->bedrooms = $this->clampToRange($this->bedrooms, $limits['min'], $this->maxBedrooms() ?? $limits['max']);
+    }
+
+    public function updatedBathrooms(): void
+    {
+        $limits = config('occuplace.units.bathrooms');
+
+        $this->bathrooms = $this->clampToRange($this->bathrooms, $limits['min'], $this->maxBathrooms() ?? $limits['max']);
+    }
+
+    private function clampToRange(string $value, int $min, int $max): string
+    {
+        if (! is_numeric($value)) {
+            return (string) $min;
+        }
+
+        return (string) max($min, min($max, (int) $value));
+    }
+
+    /**
      * Validate the form for a new unit (no $unit) or an existing one, and
      * return the unit attributes to save. Physical details are only
      * validated and returned while the unit is not locked yet.

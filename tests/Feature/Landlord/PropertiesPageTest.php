@@ -297,17 +297,70 @@ test('unit details outside the allowed limits are rejected', function (array $in
     'floor area below the minimum' => [['floor_area_sqm' => '5', 'bedrooms' => 0, 'bathrooms' => 0], 'floor_area_sqm'],
     'floor area above the maximum' => [['floor_area_sqm' => '301'], 'floor_area_sqm'],
     'floor area with two decimals' => [['floor_area_sqm' => '24.25'], 'floor_area_sqm'],
-    'floor area too small for its rooms' => [['floor_area_sqm' => '13', 'bedrooms' => 2, 'bathrooms' => 1], 'floor_area_sqm'],
-    'too many bedrooms' => [['bedrooms' => 11, 'floor_area_sqm' => '150'], 'bedrooms'],
-    'too many bathrooms' => [['bathrooms' => 11], 'bathrooms'],
-    'too many bedrooms for a small floor area' => [['floor_area_sqm' => '24', 'bedrooms' => 4, 'bathrooms' => 1], 'bedrooms'],
-    'too many bathrooms for a small floor area' => [['floor_area_sqm' => '13', 'bedrooms' => 1, 'bathrooms' => 6], 'bathrooms'],
-    'a bedroom count too large to be an integer' => [['bedrooms' => '99999999999999999999999999999999999999999999999'], 'bedrooms'],
-    'a bathroom count too large to be an integer' => [['bathrooms' => '99999999999999999999999999999999999999999999999'], 'bathrooms'],
     'a floor not on the list' => [['floor_level' => '1st floor'], 'floor_level'],
     'rent below the minimum' => [['price' => '499'], 'price'],
     'rent above the maximum' => [['price' => '200001'], 'price'],
     'a name longer than 40 characters' => [['unit_number' => str_repeat('A', 41)], 'unit_number'],
+]);
+
+test('shrinking an existing unit\'s floor area below what its rooms need is rejected', function () {
+    $user = User::factory()->create();
+    $property = Property::factory()->for($user->currentTeam)->create();
+    $unit = Unit::factory()->for($property)->withoutFloorArea()->create(['bedrooms' => 2, 'bathrooms' => 1]);
+
+    $this->actingAs($user);
+
+    Livewire::test('pages::landlord.properties')
+        ->call('startEditingUnit', $unit->id)
+        ->set('form.floor_area_sqm', '10')
+        ->call('updateUnit')
+        ->assertHasErrors(['form.floor_area_sqm']);
+});
+
+test('typing more bedrooms or bathrooms than the floor area fits snaps the value back down', function () {
+    $user = User::factory()->create();
+    $property = Property::factory()->for($user->currentTeam)->create(['type' => PropertyType::Apartment]);
+
+    $this->actingAs($user);
+
+    Livewire::test('pages::landlord.properties')
+        ->call('startAddingUnit', $property->id)
+        ->set('form.floor_area_sqm', '24')
+        ->set('form.bedrooms', 15)
+        ->assertSet('form.bedrooms', (string) Unit::maxBedroomsFor(24, bathrooms: 1))
+        ->set('form.bathrooms', 15)
+        ->assertSet('form.bathrooms', (string) Unit::maxBathroomsFor(24, bedrooms: (int) Unit::maxBedroomsFor(24, bathrooms: 1)));
+});
+
+test('bedrooms and bathrooms never exceed the configured ceiling, even in a huge unit', function () {
+    $user = User::factory()->create();
+    $property = Property::factory()->for($user->currentTeam)->create(['type' => PropertyType::Apartment]);
+
+    $this->actingAs($user);
+
+    Livewire::test('pages::landlord.properties')
+        ->call('startAddingUnit', $property->id)
+        ->set('form.floor_area_sqm', '300')
+        ->set('form.bedrooms', 50)
+        ->assertSet('form.bedrooms', (string) config('occuplace.units.bedrooms.max'))
+        ->set('form.bathrooms', 50)
+        ->assertSet('form.bathrooms', (string) config('occuplace.units.bathrooms.max'));
+});
+
+test('a bedroom or bathroom count too large for PHP\'s integer type is clamped instead of crashing', function (string $field) {
+    $user = User::factory()->create();
+    $property = Property::factory()->for($user->currentTeam)->create(['type' => PropertyType::Apartment]);
+
+    $this->actingAs($user);
+
+    Livewire::test('pages::landlord.properties')
+        ->call('startAddingUnit', $property->id)
+        ->set('form.floor_area_sqm', '150')
+        ->set("form.{$field}", '99999999999999999999999999999999999999999999999')
+        ->assertSet("form.{$field}", (string) config("occuplace.units.{$field}.max"));
+})->with([
+    'bedrooms' => ['bedrooms'],
+    'bathrooms' => ['bathrooms'],
 ]);
 
 test('a shared unit cannot hold more tenants than its floor area allows', function () {
