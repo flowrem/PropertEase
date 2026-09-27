@@ -7,6 +7,7 @@
         <flux:sidebar sticky collapsible="mobile" class="border-e border-sand bg-brand-100">
             <flux:sidebar.header>
                 <x-app-logo :sidebar="true" href="{{ auth()->user()->is_super_admin ? route('admin.dashboard') : route('dashboard') }}" wire:navigate />
+                <x-notification-bell class="ms-auto max-lg:hidden" />
                 <flux:sidebar.collapse class="lg:hidden" />
             </flux:sidebar.header>
 
@@ -112,6 +113,8 @@
             <flux:sidebar.toggle class="lg:hidden" icon="bars-2" inset="left" />
 
             <flux:spacer />
+
+            <x-notification-bell class="me-2" />
 
             <flux:dropdown position="top" align="end">
                 <flux:profile

@@ -40,6 +40,7 @@ Route::prefix('{current_team}')
         Route::livewire('complaints', 'pages::complaints')->name('complaints');
         Route::livewire('announcements', 'pages::announcements')->name('announcements');
         Route::livewire('move-in-checklist', 'pages::move-in-checklist')->name('move-in-checklist');
+        Route::livewire('notifications', 'pages::notifications')->name('notifications');
         Route::get('reports/{concern}/photo', ConcernPhotoController::class)
             ->whereNumber('concern')
             ->name('concerns.photo');

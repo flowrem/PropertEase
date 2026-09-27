@@ -8,10 +8,12 @@ use App\Enums\TeamPermission;
 use App\Enums\TeamRole;
 use App\Models\Membership;
 use App\Models\Team;
+use Illuminate\Database\Eloquent\Collection as EloquentCollection;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasManyThrough;
+use Illuminate\Notifications\DatabaseNotification;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\URL;
 
@@ -170,6 +172,38 @@ trait HasTeams
     public function canManageListingsOn(Team $team): bool
     {
         return $this->teamRole($team)?->isAtLeast(TeamRole::Admin) ?? false;
+    }
+
+    /**
+     * This user's most recent notifications about the given team, plus any
+     * sent before notifications carried a team. Filtered in PHP because
+     * `notifications.data` is a text column: a JSON query on it works on
+     * SQLite but fails on Postgres.
+     *
+     * @return EloquentCollection<int, DatabaseNotification>
+     */
+    public function notificationsForTeam(Team $team, int $limit = 100): EloquentCollection
+    {
+        return $this->notifications()->limit($limit)->get()
+            ->filter(fn (DatabaseNotification $notification): bool => $this->notificationIsAbout($notification, $team))
+            ->values();
+    }
+
+    /**
+     * How many of this user's unread notifications are about the given team.
+     */
+    public function unreadNotificationCountFor(Team $team): int
+    {
+        return $this->unreadNotifications()->limit(500)->get(['id', 'data'])
+            ->filter(fn (DatabaseNotification $notification): bool => $this->notificationIsAbout($notification, $team))
+            ->count();
+    }
+
+    private function notificationIsAbout(DatabaseNotification $notification, Team $team): bool
+    {
+        $teamId = $notification->data['team_id'] ?? null;
+
+        return $teamId === null || (int) $teamId === $team->id;
     }
 
     /**

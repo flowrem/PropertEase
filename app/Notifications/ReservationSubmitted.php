@@ -29,11 +29,14 @@ class ReservationSubmitted extends Notification
      * Get the database representation of the notification. It carries no
      * ID or payment details, only enough to say who applied and for what.
      *
-     * @return array{reservation_id: int, code: string, applicant: string, message: string}
+     * @return array{team_id: int, reservation_id: int, code: string, applicant: string, message: string, route: string, route_parameters: array<string, mixed>}
      */
     public function toArray(object $notifiable): array
     {
         return [
+            'team_id' => $this->reservation->team_id,
+            'route' => 'reservations',
+            'route_parameters' => [],
             'reservation_id' => $this->reservation->id,
             'code' => $this->reservation->code,
             'applicant' => $this->reservation->fullName(),

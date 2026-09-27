@@ -29,13 +29,16 @@ class ListingReviewed extends Notification
     /**
      * Get the database representation of the notification.
      *
-     * @return array{listing_id: int, title: string, status: string, message: string, reason: string|null}
+     * @return array{team_id: int, listing_id: int, title: string, status: string, message: string, reason: string|null, route: string, route_parameters: array<string, mixed>}
      */
     public function toArray(object $notifiable): array
     {
         $approved = $this->listing->status === ListingStatus::Approved;
 
         return [
+            'team_id' => $this->listing->team()->id,
+            'route' => 'listings',
+            'route_parameters' => [],
             'listing_id' => $this->listing->id,
             'title' => $this->listing->title,
             'status' => $this->listing->status->value,
