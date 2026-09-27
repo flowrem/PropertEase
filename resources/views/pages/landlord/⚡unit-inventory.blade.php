@@ -2,6 +2,7 @@
 
 use App\Enums\ConditionCheckKind;
 use App\Enums\ItemCondition;
+use App\Enums\ItemServiceAction;
 use App\Enums\UnitItemType;
 use App\Models\ConditionCheck;
 use App\Models\Team;
@@ -32,6 +33,16 @@ new #[Title('Unit inventory')] class extends Component
     public string $itemInstalledAt = '';
 
     public ?int $copyFromUnitId = null;
+
+    public ?int $loggingServiceForItemId = null;
+
+    public string $serviceAction = '';
+
+    public string $servicePerformedAt = '';
+
+    public string $serviceCost = '';
+
+    public string $serviceNotes = '';
 
     public bool $recordingCheck = false;
 
@@ -89,7 +100,64 @@ new #[Title('Unit inventory')] class extends Component
     #[Computed]
     public function items(): EloquentCollection
     {
-        return $this->unit->items()->active()->with('amenity')->orderBy('item_type')->orderBy('name')->get();
+        return $this->unit->items()->active()
+            ->with(['amenity', 'services.recorder'])
+            ->withRecentFixCount()
+            ->orderBy('item_type')
+            ->orderBy('name')
+            ->get();
+    }
+
+    /**
+     * Start logging a repair, replacement or inspection done without a
+     * tenant's report, like a routine aircon cleaning.
+     */
+    public function startLoggingService(int $itemId): void
+    {
+        Gate::authorize('manageInventory', $this->unit);
+
+        $this->loggingServiceForItemId = $this->unit->items()->active()->findOrFail($itemId)->id;
+        $this->reset('serviceAction', 'serviceCost', 'serviceNotes');
+        $this->servicePerformedAt = today()->toDateString();
+        $this->resetValidation();
+    }
+
+    public function cancelLoggingService(): void
+    {
+        $this->reset('loggingServiceForItemId', 'serviceAction', 'serviceCost', 'serviceNotes', 'servicePerformedAt');
+        $this->resetValidation();
+    }
+
+    public function saveService(): void
+    {
+        Gate::authorize('manageInventory', $this->unit);
+
+        $item = $this->unit->items()->active()->findOrFail($this->loggingServiceForItemId);
+
+        $validated = $this->validate([
+            'serviceAction' => ['required', Rule::enum(ItemServiceAction::class)],
+            'servicePerformedAt' => ['required', 'date', 'before_or_equal:today'],
+            'serviceCost' => ['nullable', 'numeric', 'min:0', 'max:1000000'],
+            'serviceNotes' => ['nullable', 'string', 'max:1000'],
+        ], attributes: [
+            'serviceAction' => __('what was done'),
+            'servicePerformedAt' => __('date'),
+            'serviceCost' => __('cost'),
+            'serviceNotes' => __('notes'),
+        ]);
+
+        $item->services()->create([
+            'action' => $validated['serviceAction'],
+            'performed_at' => $validated['servicePerformedAt'],
+            'cost' => $validated['serviceCost'] !== '' ? $validated['serviceCost'] : null,
+            'notes' => trim((string) $validated['serviceNotes']) ?: null,
+            'recorded_by' => Auth::id(),
+        ]);
+
+        $this->cancelLoggingService();
+        unset($this->items);
+
+        Flux::toast(variant: 'success', text: __('Work logged.'));
     }
 
     /**
@@ -470,23 +538,78 @@ new #[Title('Unit inventory')] class extends Component
 
         <div class="divide-y divide-zinc-200 rounded-lg border border-zinc-200 dark:divide-zinc-700 dark:border-zinc-700">
             @forelse ($this->items as $item)
-                <div wire:key="item-{{ $item->id }}" class="flex flex-wrap items-center justify-between gap-3 px-4 py-3">
-                    <div class="flex flex-wrap items-center gap-2">
-                        <flux:text class="font-medium text-zinc-800 dark:text-white">{{ $item->name }}</flux:text>
-                        <flux:badge size="sm" color="zinc">{{ $item->item_type->label() }}</flux:badge>
-                        @if ($item->amenity_id)
-                            <flux:badge size="sm" color="sky">{{ __('Amenity') }}</flux:badge>
-                        @endif
-                        @if ($item->installed_at)
-                            <flux:text class="text-xs">{{ __('Installed :date', ['date' => $item->installed_at->format('M j, Y')]) }}</flux:text>
+                <div wire:key="item-{{ $item->id }}" @class(['space-y-2 px-4 py-3', 'bg-red-50' => $item->hasRepeatedProblems()])>
+                    <div class="flex flex-wrap items-center justify-between gap-3">
+                        <div class="flex flex-wrap items-center gap-2">
+                            <flux:text class="font-medium text-zinc-800 dark:text-white">{{ $item->name }}</flux:text>
+                            <flux:badge size="sm" color="zinc">{{ $item->item_type->label() }}</flux:badge>
+                            @if ($item->amenity_id)
+                                <flux:badge size="sm" color="sky">{{ __('Amenity') }}</flux:badge>
+                            @endif
+                            @if ($item->hasRepeatedProblems())
+                                <flux:badge size="sm" color="red" icon="exclamation-triangle">
+                                    {{ __('Repeated problems: :count fixes in :months months', ['count' => $item->recent_fixes_count, 'months' => config('occuplace.items.repeated_problems.months')]) }}
+                                </flux:badge>
+                            @endif
+                            @if ($item->installed_at)
+                                <flux:text class="text-xs">{{ __('Installed :date', ['date' => $item->installed_at->format('M j, Y')]) }}</flux:text>
+                            @endif
+                        </div>
+
+                        @if ($this->canManage)
+                            <div class="flex gap-1">
+                                <flux:button size="sm" variant="ghost" icon="wrench" wire:click="startLoggingService({{ $item->id }})" :aria-label="__('Log work on :item', ['item' => $item->name])" :tooltip="__('Log a repair, replacement or inspection')" />
+                                <flux:button size="sm" variant="ghost" icon="pencil" wire:click="editItem({{ $item->id }})" :aria-label="__('Edit :item', ['item' => $item->name])" />
+                                <flux:button size="sm" variant="ghost" icon="trash" wire:click="removeItem({{ $item->id }})" :aria-label="__('Remove :item', ['item' => $item->name])" />
+                            </div>
                         @endif
                     </div>
 
-                    @if ($this->canManage)
-                        <div class="flex gap-1">
-                            <flux:button size="sm" variant="ghost" icon="pencil" wire:click="editItem({{ $item->id }})" :aria-label="__('Edit :item', ['item' => $item->name])" />
-                            <flux:button size="sm" variant="ghost" icon="trash" wire:click="removeItem({{ $item->id }})" :aria-label="__('Remove :item', ['item' => $item->name])" />
-                        </div>
+                    @if ($item->services->isNotEmpty())
+                        <details class="text-sm">
+                            <summary class="cursor-pointer text-zinc-600">
+                                {{ $item->fixSummary() ?? trans_choice('Inspected once|Inspected :count times', $item->services->count()) }}
+                            </summary>
+                            <ul class="mt-2 space-y-1 border-s-2 border-sand ps-3">
+                                @foreach ($item->services as $service)
+                                    <li wire:key="service-{{ $service->id }}">
+                                        <span class="font-medium">{{ $service->action->label() }}</span>
+                                        <span class="text-zinc-500">
+                                            &middot; {{ $service->performed_at->format('M j, Y') }}
+                                            @if ($service->cost !== null)
+                                                &middot; &#8369;{{ number_format((float) $service->cost, 2) }}
+                                            @endif
+                                            @if ($service->recorder)
+                                                &middot; {{ __('by :name', ['name' => $service->recorder->name]) }}
+                                            @endif
+                                            @if ($service->concern_id)
+                                                &middot; {{ __('from a tenant report') }}
+                                            @endif
+                                        </span>
+                                        @if ($service->notes)
+                                            <div class="text-zinc-600">{{ $service->notes }}</div>
+                                        @endif
+                                    </li>
+                                @endforeach
+                            </ul>
+                        </details>
+                    @endif
+
+                    @if ($loggingServiceForItemId === $item->id)
+                        <form wire:submit="saveService" class="grid gap-3 rounded-lg border border-sand bg-brand-50 p-3 sm:grid-cols-[10rem_10rem_8rem_1fr_auto] sm:items-end">
+                            <flux:select wire:model="serviceAction" :label="__('What was done')" :placeholder="__('Choose')" required>
+                                @foreach (ItemServiceAction::cases() as $action)
+                                    <flux:select.option value="{{ $action->value }}">{{ $action->label() }}</flux:select.option>
+                                @endforeach
+                            </flux:select>
+                            <flux:input wire:model="servicePerformedAt" type="date" max="{{ today()->toDateString() }}" :label="__('Done on')" required />
+                            <flux:input wire:model="serviceCost" type="number" step="0.01" min="0" :label="__('Cost (₱)')" />
+                            <flux:input wire:model="serviceNotes" maxlength="1000" :label="__('Notes')" :placeholder="__('Cleaned the filter')" />
+                            <div class="flex gap-2">
+                                <flux:button variant="filled" wire:click="cancelLoggingService">{{ __('Cancel') }}</flux:button>
+                                <flux:button type="submit" variant="primary">{{ __('Log') }}</flux:button>
+                            </div>
+                        </form>
                     @endif
                 </div>
             @empty

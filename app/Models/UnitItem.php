@@ -110,6 +110,35 @@ class UnitItem extends Model
     }
 
     /**
+     * The item's repairs and replacements in words, like "Replaced 2 times
+     * and repaired once, last on Sep 12, 2026", or null when it has none.
+     * Uses the loaded services.
+     */
+    public function fixSummary(): ?string
+    {
+        $fixes = $this->services->filter(fn (ItemService $service): bool => $service->action->isFix());
+
+        if ($fixes->isEmpty()) {
+            return null;
+        }
+
+        $counts = collect([ItemServiceAction::Replaced, ItemServiceAction::Repaired])
+            ->map(fn (ItemServiceAction $action): array => [$action, $fixes->where('action', $action)->count()])
+            ->filter(fn (array $count): bool => $count[1] > 0)
+            ->values()
+            ->map(fn (array $count, int $index): string => trans_choice(
+                $index === 0 ? ':action once|:action :count times' : ':action_lower once|:action_lower :count times',
+                $count[1],
+                ['action' => $count[0]->label(), 'action_lower' => mb_strtolower($count[0]->label())],
+            ));
+
+        return __(':counts, last on :date', [
+            'counts' => $counts->join(', ', ' and '),
+            'date' => $fixes->max('performed_at')->format('M j, Y'),
+        ]);
+    }
+
+    /**
      * Items still in the unit, the ones a new check covers.
      *
      * @param  Builder<UnitItem>  $query

@@ -2,11 +2,13 @@
 
 use App\Enums\ConditionCheckKind;
 use App\Enums\ItemCondition;
+use App\Enums\ItemServiceAction;
 use App\Enums\TeamRole;
 use App\Enums\UnitItemType;
 use App\Models\Amenity;
 use App\Models\ConditionCheck;
 use App\Models\ConditionCheckItem;
+use App\Models\ItemService;
 use App\Models\Property;
 use App\Models\Unit;
 use App\Models\UnitItem;
@@ -248,4 +250,62 @@ test('a new check can start from what the last check found', function () {
         ->call('fillFromLastCheck')
         ->assertSet("conditions.{$item->id}", ItemCondition::NeedsRepair->value)
         ->assertSet("remarks.{$item->id}", 'Flickers');
+});
+
+test('an item fixed 3 or more times in the last 6 months is flagged as having repeated problems', function (array $fixesMonthsAgo, bool $flagged) {
+    $landlord = User::factory()->create();
+    $unit = inventoryUnit($landlord);
+    $item = UnitItem::factory()->for($unit)->create(['name' => 'Aircon, bedroom']);
+
+    foreach ($fixesMonthsAgo as $monthsAgo) {
+        ItemService::factory()->for($item)->create(['performed_at' => today()->subMonths($monthsAgo)->addDay()]);
+    }
+    ItemService::factory()->for($item)->action(ItemServiceAction::Inspected)->create();
+
+    $page = inventoryPage($landlord, $unit);
+
+    $flagged ? $page->assertSee('Repeated problems') : $page->assertDontSee('Repeated problems');
+})->with([
+    'three recent fixes' => [[0, 2, 6], true],
+    'two recent fixes and an older one' => [[0, 2, 7], false],
+    'two recent fixes (the inspection does not count)' => [[0, 1], false],
+]);
+
+test('an item shows how often it was repaired and replaced', function () {
+    $landlord = User::factory()->create();
+    $unit = inventoryUnit($landlord);
+    $item = UnitItem::factory()->for($unit)->create();
+    ItemService::factory()->for($item)->action(ItemServiceAction::Replaced)->create(['performed_at' => '2026-03-01']);
+    ItemService::factory()->for($item)->action(ItemServiceAction::Replaced)->create(['performed_at' => '2026-09-12']);
+    ItemService::factory()->for($item)->action(ItemServiceAction::Repaired)->create(['performed_at' => '2026-05-01', 'cost' => 350]);
+
+    inventoryPage($landlord, $unit)
+        ->assertSee('Replaced 2 times and repaired once, last on Sep 12, 2026')
+        ->assertSeeHtml('&#8369;350.00');
+});
+
+test('a landlord can log work on an item without a tenant report, and staff cannot', function () {
+    $landlord = User::factory()->create();
+    $unit = inventoryUnit($landlord);
+    $item = UnitItem::factory()->for($unit)->create();
+
+    inventoryPage($landlord, $unit)
+        ->call('startLoggingService', $item->id)
+        ->set('serviceAction', ItemServiceAction::Inspected->value)
+        ->set('servicePerformedAt', now()->addDay()->toDateString())
+        ->call('saveService')
+        ->assertHasErrors(['servicePerformedAt'])
+        ->set('servicePerformedAt', today()->toDateString())
+        ->set('serviceNotes', 'Cleaned the filter')
+        ->call('saveService')
+        ->assertHasNoErrors();
+
+    expect($item->services()->sole())
+        ->action->toBe(ItemServiceAction::Inspected)
+        ->notes->toBe('Cleaned the filter')
+        ->concern_id->toBeNull();
+
+    $staff = inventoryTeamMember($landlord, TeamRole::Member);
+
+    inventoryPage($staff, $unit)->call('startLoggingService', $item->id)->assertForbidden();
 });
