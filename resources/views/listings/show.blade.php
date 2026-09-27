@@ -59,7 +59,7 @@
                         <dd class="text-white">
                             {{ trans_choice(':count slot available|:count slots available', $slots) }}
                             @if ($isShared)
-                                ({{ __('up to :count tenants', ['count' => $unit->tenant_limit]) }})
+                                ({{ __('up to :count tenants', ['count' => $unit->capacity()]) }})
                             @endif
                         </dd>
                     </div>

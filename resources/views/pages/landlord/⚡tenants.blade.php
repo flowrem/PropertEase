@@ -388,7 +388,7 @@ new #[Title('Tenants')] class extends Component
                                 {{ $unit->property->name }} &mdash; {{ __('Unit :number', ['number' => $unit->unit_number]) }}
                                 &mdash; &#8369;{{ number_format((float) $unit->price, 2) }}/mo
                                 @if ($unit->allows_multiple_tenants && $unit->tenant_limit !== null)
-                                    ({{ $unit->active_leases_count }}/{{ $unit->tenant_limit }} {{ __('tenants') }})
+                                    ({{ $unit->active_leases_count }}/{{ $unit->capacity() }} {{ __('tenants') }})
                                 @endif
                             </flux:select.option>
                         @endforeach

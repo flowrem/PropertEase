@@ -57,16 +57,42 @@ test('a landlord can add a unit in step two', function () {
     Livewire::test('pages::landlord.setup')
         ->set('propertyId', $property->id)
         ->set('step', 2)
-        ->set('unit_number', '101')
-        ->set('bedrooms', 2)
-        ->set('bathrooms', 1)
+        ->set('form.unit_number', '101')
+        ->set('form.floor_level', 'Ground floor')
+        ->set('form.floor_area_sqm', '24')
+        ->set('form.bedrooms', 2)
+        ->set('form.bathrooms', 1)
+        ->set('form.price', '5000')
         ->call('addUnit')
         ->assertHasNoErrors();
 
     $this->assertDatabaseHas('units', [
         'property_id' => $property->id,
         'unit_number' => '101',
+        'floor_level' => 'Ground floor',
+        'floor_area_sqm' => 24,
+        'price' => 5000,
     ]);
+});
+
+test('step two asks for confirmation before saving a unit', function () {
+    $user = User::factory()->create();
+    $property = Property::factory()->for($user->currentTeam)->create();
+
+    $this->actingAs($user);
+
+    Livewire::test('pages::landlord.setup')
+        ->set('propertyId', $property->id)
+        ->set('step', 2)
+        ->set('form.unit_number', '101')
+        ->set('form.floor_level', 'Ground floor')
+        ->set('form.floor_area_sqm', '24')
+        ->set('form.price', '5000')
+        ->call('reviewNewUnit')
+        ->assertHasNoErrors()
+        ->assertSet('showConfirmUnitModal', true);
+
+    expect($property->units()->count())->toBe(0);
 });
 
 test('a landlord can invite a tenant in step three', function () {

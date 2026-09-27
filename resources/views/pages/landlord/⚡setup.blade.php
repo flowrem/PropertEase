@@ -3,8 +3,10 @@
 use App\Enums\PropertyType;
 use App\Enums\TeamRole;
 use App\Enums\UnitStatus;
+use App\Livewire\Forms\UnitForm;
 use App\Models\Property;
 use App\Models\Team;
+use App\Models\Unit;
 use App\Notifications\Teams\TeamInvitation as TeamInvitationNotification;
 use App\Rules\UniqueTeamInvitation;
 use Flux\Flux;
@@ -18,6 +20,10 @@ use Livewire\Component;
 
 new #[Title('Add a property')] class extends Component
 {
+    public UnitForm $form;
+
+    public bool $showConfirmUnitModal = false;
+
     public int $step = 1;
 
     public ?int $propertyId = null;
@@ -33,14 +39,6 @@ new #[Title('Add a property')] class extends Component
     public string $postal_code = '';
 
     public string $type = PropertyType::Apartment->value;
-
-    public string $unit_number = '';
-
-    public string $floor_level = '';
-
-    public int $bedrooms = 1;
-
-    public int $bathrooms = 1;
 
     public string $inviteEmail = '';
 
@@ -86,26 +84,41 @@ new #[Title('Add a property')] class extends Component
         unset($this->property);
     }
 
+    #[Computed]
+    public function formMaxCapacityPreview(): ?int
+    {
+        return $this->property ? $this->form->maxCapacity($this->property->type) : null;
+    }
+
+    /**
+     * Validate the new unit, then ask the landlord to confirm the details
+     * that will be locked once it is saved.
+     */
+    public function reviewNewUnit(): void
+    {
+        $property = $this->team->properties()->findOrFail($this->propertyId);
+
+        $this->form->validatedAttributes($property->type, $property->id);
+
+        $this->showConfirmUnitModal = true;
+    }
+
+    public function closeConfirmUnitModal(): void
+    {
+        $this->showConfirmUnitModal = false;
+    }
+
     public function addUnit(): void
     {
         $property = $this->team->properties()->findOrFail($this->propertyId);
 
-        $validated = $this->validate([
-            'unit_number' => [
-                'required', 'string', 'max:255',
-                Rule::unique('units', 'unit_number')->where('property_id', $property->id),
-            ],
-            'floor_level' => ['nullable', 'string', 'max:255'],
-            'bedrooms' => ['required', 'integer', 'min:0', 'max:20'],
-            'bathrooms' => ['required', 'integer', 'min:0', 'max:20'],
-        ]);
-
         $property->units()->create([
-            ...$validated,
+            ...$this->form->validatedAttributes($property->type, $property->id),
             'status' => UnitStatus::Vacant,
         ]);
 
-        $this->reset('unit_number', 'floor_level', 'bedrooms', 'bathrooms');
+        $this->showConfirmUnitModal = false;
+        $this->form->reset();
 
         unset($this->property);
     }
@@ -167,7 +180,7 @@ new #[Title('Add a property')] class extends Component
         <form wire:submit="createProperty" class="flex flex-col gap-6">
             <flux:input wire:model="name" :label="__('Property name')" placeholder="Sunrise Apartments" required autofocus />
 
-            <flux:select wire:model="type" :label="__('Property type')" required>
+            <flux:select wire:model="type" :label="__('Property type')" :description="__('This cannot be changed after you continue.')" required>
                 @foreach ($this->propertyTypes as $option)
                     <flux:select.option value="{{ $option->value }}">{{ $option->label() }}</flux:select.option>
                 @endforeach
@@ -194,26 +207,20 @@ new #[Title('Add a property')] class extends Component
                         <li wire:key="unit-{{ $unit->id }}" class="flex items-center justify-between rounded-lg border border-zinc-200 px-4 py-3 text-sm dark:border-zinc-700">
                             <span class="font-medium">{{ __('Unit :number', ['number' => $unit->unit_number]) }}</span>
                             <span class="text-zinc-500 dark:text-zinc-400">
-                                {{ $unit->bedrooms }} {{ Str::plural('bed', $unit->bedrooms) }} &middot;
-                                {{ $unit->bathrooms }} {{ Str::plural('bath', $unit->bathrooms) }}
+                                {{ $unit->floor_level }} &middot;
+                                {{ $unit->bedrooms === 0 ? __('Studio') : $unit->bedrooms.' '.Str::plural('bed', $unit->bedrooms) }} &middot;
+                                {{ $unit->bathrooms === 0 ? __('Shared bath') : $unit->bathrooms.' '.Str::plural('bath', $unit->bathrooms) }} &middot;
+                                {{ Unit::formatFloorArea((float) $unit->floor_area_sqm) }} m²
                             </span>
                         </li>
                     @endforeach
                 </ul>
             @endif
 
-            <form wire:submit="addUnit" class="flex flex-col gap-4 rounded-lg border border-zinc-200 p-4 dark:border-zinc-700">
+            <form wire:submit="reviewNewUnit" class="flex flex-col gap-4 rounded-lg border border-zinc-200 p-4 dark:border-zinc-700">
                 <flux:heading size="sm">{{ __('Add a unit') }}</flux:heading>
 
-                <div class="grid gap-4 sm:grid-cols-2">
-                    <flux:input wire:model="unit_number" :label="__('Unit number')" placeholder="101" required />
-                    <flux:input wire:model="floor_level" :label="__('Floor level')" placeholder="1st floor" />
-                </div>
-
-                <div class="grid gap-4 sm:grid-cols-2">
-                    <flux:input wire:model="bedrooms" type="number" min="0" max="20" :label="__('Bedrooms')" required />
-                    <flux:input wire:model="bathrooms" type="number" min="0" max="20" :label="__('Bathrooms')" required />
-                </div>
+                <x-unit-form-fields :occupancy="$form->occupancy" :max-capacity="$this->formMaxCapacityPreview" examples />
 
                 <div class="flex justify-end">
                     <flux:button type="submit" variant="filled">{{ __('Add unit') }}</flux:button>
@@ -229,6 +236,8 @@ new #[Title('Add a property')] class extends Component
                     {{ __('Continue') }}
                 </flux:button>
             </div>
+
+            <x-confirm-unit-modal :floor-level="$form->floor_level" :floor-area="$form->floor_area_sqm" :bedrooms="$form->bedrooms" :bathrooms="$form->bathrooms" />
         </div>
     @elseif ($step === 3)
         <form wire:submit="sendInvite" class="flex flex-col gap-6">
