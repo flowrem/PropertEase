@@ -90,6 +90,18 @@ new #[Title('Add a property')] class extends Component
         return $this->property ? $this->form->maxCapacity($this->property->type) : null;
     }
 
+    #[Computed]
+    public function formMaxBedroomsPreview(): ?int
+    {
+        return $this->form->maxBedrooms();
+    }
+
+    #[Computed]
+    public function formMaxBathroomsPreview(): ?int
+    {
+        return $this->form->maxBathrooms();
+    }
+
     /**
      * Validate the new unit, then ask the landlord to confirm the details
      * that will be locked once it is saved.
@@ -220,7 +232,13 @@ new #[Title('Add a property')] class extends Component
             <form wire:submit="reviewNewUnit" class="flex flex-col gap-4 rounded-lg border border-zinc-200 p-4 dark:border-zinc-700">
                 <flux:heading size="sm">{{ __('Add a unit') }}</flux:heading>
 
-                <x-unit-form-fields :occupancy="$form->occupancy" :max-capacity="$this->formMaxCapacityPreview" examples />
+                <x-unit-form-fields
+                    :occupancy="$form->occupancy"
+                    :max-capacity="$this->formMaxCapacityPreview"
+                    :max-bedrooms="$this->formMaxBedroomsPreview"
+                    :max-bathrooms="$this->formMaxBathroomsPreview"
+                    examples
+                />
 
                 <div class="flex justify-end">
                     <flux:button type="submit" variant="filled">{{ __('Add unit') }}</flux:button>

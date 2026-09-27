@@ -101,6 +101,18 @@ new #[Title('Properties')] class extends Component
             : null;
     }
 
+    #[Computed]
+    public function formMaxBedroomsPreview(): ?int
+    {
+        return $this->form->maxBedrooms();
+    }
+
+    #[Computed]
+    public function formMaxBathroomsPreview(): ?int
+    {
+        return $this->form->maxBathrooms();
+    }
+
     public function toggleProperty(int $propertyId): void
     {
         if (isset($this->expanded[$propertyId])) {
@@ -382,6 +394,8 @@ new #[Title('Properties')] class extends Component
                                     <x-unit-form-fields
                                         :occupancy="$form->occupancy"
                                         :max-capacity="$this->formMaxCapacityPreview"
+                                        :max-bedrooms="$this->formMaxBedroomsPreview"
+                                        :max-bathrooms="$this->formMaxBathroomsPreview"
                                         :locked-unit="$unit->hasLockedDetails() ? $unit : null"
                                     />
 
@@ -472,7 +486,13 @@ new #[Title('Properties')] class extends Component
                 <div class="border-t border-zinc-200 p-4 dark:border-zinc-700">
                     @if ($addingUnitTo === $property->id)
                         <form wire:submit="reviewNewUnit" class="flex flex-col gap-4">
-                            <x-unit-form-fields :occupancy="$form->occupancy" :max-capacity="$this->formMaxCapacityPreview" examples />
+                            <x-unit-form-fields
+                                :occupancy="$form->occupancy"
+                                :max-capacity="$this->formMaxCapacityPreview"
+                                :max-bedrooms="$this->formMaxBedroomsPreview"
+                                :max-bathrooms="$this->formMaxBathroomsPreview"
+                                examples
+                            />
 
                             <div class="flex justify-end gap-2">
                                 <flux:button variant="filled" wire:click="cancelAddingUnit">{{ __('Cancel') }}</flux:button>

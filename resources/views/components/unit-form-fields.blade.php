@@ -1,6 +1,8 @@
 @props([
     'occupancy',
     'maxCapacity' => null,
+    'maxBedrooms' => null,
+    'maxBathrooms' => null,
     'lockedUnit' => null,
     'examples' => false,
 ])
@@ -69,24 +71,30 @@
 
     <div class="grid gap-4 sm:grid-cols-2">
         <flux:input
-            wire:model="form.bedrooms"
+            wire:model.live.blur="form.bedrooms"
             type="number"
             min="{{ $limits['bedrooms']['min'] }}"
-            max="{{ $limits['bedrooms']['max'] }}"
+            max="{{ $maxBedrooms ?? $limits['bedrooms']['max'] }}"
             :label="__('Bedrooms')"
             :description="__('0 for a studio or bedspace')"
             required
         />
         <flux:input
-            wire:model="form.bathrooms"
+            wire:model.live.blur="form.bathrooms"
             type="number"
             min="{{ $limits['bathrooms']['min'] }}"
-            max="{{ $limits['bathrooms']['max'] }}"
+            max="{{ $maxBathrooms ?? $limits['bathrooms']['max'] }}"
             :label="__('Bathrooms')"
             :description="__('0 if tenants use a shared bathroom')"
             required
         />
     </div>
+
+    @if ($maxBedrooms !== null)
+        <flux:text class="text-zinc-500 dark:text-zinc-400">
+            {{ __('This floor area fits up to :bedrooms bedrooms and :bathrooms bathrooms.', ['bedrooms' => $maxBedrooms, 'bathrooms' => $maxBathrooms]) }}
+        </flux:text>
+    @endif
 
     <div class="flex items-start gap-2">
         <flux:icon.lock-closed variant="micro" class="mt-0.5 shrink-0 text-zinc-500 dark:text-zinc-400" />

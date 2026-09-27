@@ -55,15 +55,50 @@ class UnitForm extends Form
             return $unit->maxCapacity();
         }
 
-        $limits = config('occuplace.units.floor_area');
-
-        if (! is_numeric($this->floor_area_sqm)
-            || (float) $this->floor_area_sqm < $limits['min']
-            || (float) $this->floor_area_sqm > $limits['max']) {
+        if (! $this->hasUsableFloorArea()) {
             return null;
         }
 
         return Unit::maxCapacityFor((float) $this->floor_area_sqm, $type);
+    }
+
+    /**
+     * The most bedrooms the typed floor area allows given the typed
+     * bathrooms, or null while the area is missing or out of range.
+     */
+    public function maxBedrooms(): ?int
+    {
+        if (! $this->hasUsableFloorArea()) {
+            return null;
+        }
+
+        return Unit::maxBedroomsFor((float) $this->floor_area_sqm, $this->bathrooms);
+    }
+
+    /**
+     * The most bathrooms the typed floor area allows given the typed
+     * bedrooms, or null while the area is missing or out of range.
+     */
+    public function maxBathrooms(): ?int
+    {
+        if (! $this->hasUsableFloorArea()) {
+            return null;
+        }
+
+        return Unit::maxBathroomsFor((float) $this->floor_area_sqm, $this->bedrooms);
+    }
+
+    /**
+     * Whether the typed floor area is a number within the configured range,
+     * so it can be used to derive capacity and room limits.
+     */
+    private function hasUsableFloorArea(): bool
+    {
+        $limits = config('occuplace.units.floor_area');
+
+        return is_numeric($this->floor_area_sqm)
+            && (float) $this->floor_area_sqm >= $limits['min']
+            && (float) $this->floor_area_sqm <= $limits['max'];
     }
 
     /**
@@ -154,11 +189,28 @@ class UnitForm extends Form
             return $rules;
         }
 
+        $maxBedrooms = $this->maxBedrooms();
+        $maxBathrooms = $this->maxBathrooms();
+
         return [
             ...$rules,
             'floor_level' => ['required', Rule::in(Unit::floorLevelOptions())],
-            'bedrooms' => ['required', 'integer', 'min:'.$limits['bedrooms']['min'], 'max:'.$limits['bedrooms']['max']],
-            'bathrooms' => ['required', 'integer', 'min:'.$limits['bathrooms']['min'], 'max:'.$limits['bathrooms']['max']],
+            'bedrooms' => [
+                'required', 'integer', 'min:'.$limits['bedrooms']['min'], 'max:'.$limits['bedrooms']['max'],
+                function (string $attribute, mixed $value, Closure $fail) use ($maxBedrooms): void {
+                    if ($maxBedrooms !== null && $value > $maxBedrooms) {
+                        $fail(__('This floor area fits at most :max bedrooms.', ['max' => $maxBedrooms]));
+                    }
+                },
+            ],
+            'bathrooms' => [
+                'required', 'integer', 'min:'.$limits['bathrooms']['min'], 'max:'.$limits['bathrooms']['max'],
+                function (string $attribute, mixed $value, Closure $fail) use ($maxBathrooms): void {
+                    if ($maxBathrooms !== null && $value > $maxBathrooms) {
+                        $fail(__('This floor area fits at most :max bathrooms.', ['max' => $maxBathrooms]));
+                    }
+                },
+            ],
             'floor_area_sqm' => [
                 'required', 'numeric', 'decimal:0,1',
                 'min:'.$limits['floor_area']['min'], 'max:'.$limits['floor_area']['max'],

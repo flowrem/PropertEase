@@ -187,6 +187,43 @@ class Unit extends Model
     }
 
     /**
+     * The most bedrooms a unit of the given floor area can have, once the
+     * given number of bathrooms is accounted for.
+     */
+    public static function maxBedroomsFor(float $floorArea, int $bathrooms): int
+    {
+        return self::roomsThatFit(
+            $floorArea - $bathrooms * (float) config('occuplace.units.minimum_bathroom_area'),
+            (float) config('occuplace.units.minimum_bedroom_area'),
+            (int) config('occuplace.units.bedrooms.max'),
+        );
+    }
+
+    /**
+     * The most bathrooms a unit of the given floor area can have, once the
+     * given number of bedrooms is accounted for.
+     */
+    public static function maxBathroomsFor(float $floorArea, int $bedrooms): int
+    {
+        return self::roomsThatFit(
+            $floorArea - $bedrooms * (float) config('occuplace.units.minimum_bedroom_area'),
+            (float) config('occuplace.units.minimum_bathroom_area'),
+            (int) config('occuplace.units.bathrooms.max'),
+        );
+    }
+
+    /**
+     * How many rooms of the given minimum area fit in the remaining floor
+     * area, clamped between 0 and the configured ceiling for that room type.
+     */
+    private static function roomsThatFit(float $remainingArea, float $minimumRoomArea, int $ceiling): int
+    {
+        $fits = (int) floor($remainingArea / $minimumRoomArea + 1e-9);
+
+        return max(0, min($ceiling, $fits));
+    }
+
+    /**
      * Format a floor area for display, dropping a trailing ".0" ("24", "24.5").
      */
     public static function formatFloorArea(float $floorArea): string

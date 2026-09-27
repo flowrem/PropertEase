@@ -19,6 +19,23 @@ test('the most tenants a unit fits depends on its floor area and property type',
     'never more than twenty' => [300, PropertyType::Dormitory, 20],
 ]);
 
+test('the most bedrooms a unit fits depends on its floor area and bathrooms', function (float $floorArea, int $bathrooms, int $expected) {
+    expect(Unit::maxBedroomsFor($floorArea, $bathrooms))->toBe($expected);
+})->with([
+    '24 m², 1 bathroom' => [24, 1, 3],
+    '24 m², 0 bathrooms' => [24, 0, 4],
+    'a huge unit is still capped at the configured ceiling' => [300, 0, 10],
+    'never below zero' => [6, 10, 0],
+]);
+
+test('the most bathrooms a unit fits depends on its floor area and bedrooms', function (float $floorArea, int $bedrooms, int $expected) {
+    expect(Unit::maxBathroomsFor($floorArea, $bedrooms))->toBe($expected);
+})->with([
+    '13 m², 1 bedroom' => [13, 1, 5],
+    'a huge unit is still capped at the configured ceiling' => [300, 0, 10],
+    'never below zero' => [6, 10, 0],
+]);
+
 function sharedApartmentUnit(?float $floorArea, int $tenantLimit, int $activeTenants): Unit
 {
     $unit = Unit::factory()
