@@ -302,6 +302,8 @@ test('unit details outside the allowed limits are rejected', function (array $in
     'too many bathrooms' => [['bathrooms' => 11], 'bathrooms'],
     'too many bedrooms for a small floor area' => [['floor_area_sqm' => '24', 'bedrooms' => 4, 'bathrooms' => 1], 'bedrooms'],
     'too many bathrooms for a small floor area' => [['floor_area_sqm' => '13', 'bedrooms' => 1, 'bathrooms' => 6], 'bathrooms'],
+    'a bedroom count too large to be an integer' => [['bedrooms' => '99999999999999999999999999999999999999999999999'], 'bedrooms'],
+    'a bathroom count too large to be an integer' => [['bathrooms' => '99999999999999999999999999999999999999999999999'], 'bathrooms'],
     'a floor not on the list' => [['floor_level' => '1st floor'], 'floor_level'],
     'rent below the minimum' => [['price' => '499'], 'price'],
     'rent above the maximum' => [['price' => '200001'], 'price'],

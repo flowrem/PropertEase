@@ -20,9 +20,15 @@ class UnitForm extends Form
 
     public string $floor_level = '';
 
-    public int $bedrooms = 1;
+    /**
+     * Bedrooms, bathrooms and the tenant limit are kept as strings, like the
+     * form's other numeric fields, so an oversized or malformed number a
+     * landlord types in fails validation instead of crashing the page when
+     * Livewire tries to coerce it into a typed int property.
+     */
+    public string $bedrooms = '1';
 
-    public int $bathrooms = 1;
+    public string $bathrooms = '1';
 
     public string $floor_area_sqm = '';
 
@@ -36,8 +42,8 @@ class UnitForm extends Form
     {
         $this->unit_number = $unit->unit_number;
         $this->floor_level = (string) $unit->floor_level;
-        $this->bedrooms = $unit->bedrooms;
-        $this->bathrooms = $unit->bathrooms;
+        $this->bedrooms = (string) $unit->bedrooms;
+        $this->bathrooms = (string) $unit->bathrooms;
         $this->floor_area_sqm = (string) $unit->floor_area_sqm;
         $this->occupancy = $unit->allows_multiple_tenants ? 'multiple' : 'single';
         $this->tenant_limit = $unit->tenant_limit;
@@ -72,7 +78,7 @@ class UnitForm extends Form
             return null;
         }
 
-        return Unit::maxBedroomsFor((float) $this->floor_area_sqm, $this->bathrooms);
+        return Unit::maxBedroomsFor((float) $this->floor_area_sqm, (int) $this->bathrooms);
     }
 
     /**
@@ -85,7 +91,7 @@ class UnitForm extends Form
             return null;
         }
 
-        return Unit::maxBathroomsFor((float) $this->floor_area_sqm, $this->bedrooms);
+        return Unit::maxBathroomsFor((float) $this->floor_area_sqm, (int) $this->bedrooms);
     }
 
     /**
@@ -215,7 +221,7 @@ class UnitForm extends Form
                 'required', 'numeric', 'decimal:0,1',
                 'min:'.$limits['floor_area']['min'], 'max:'.$limits['floor_area']['max'],
                 function (string $attribute, mixed $value, Closure $fail): void {
-                    $minimum = Unit::minimumFloorAreaFor($this->bedrooms, $this->bathrooms);
+                    $minimum = Unit::minimumFloorAreaFor((int) $this->bedrooms, (int) $this->bathrooms);
 
                     if ((float) $value < $minimum) {
                         $fail(__('These rooms need at least :area m² of floor area.', ['area' => Unit::formatFloorArea($minimum)]));
