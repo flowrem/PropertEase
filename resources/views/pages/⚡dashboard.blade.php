@@ -519,13 +519,11 @@ new #[Title('Home')] class extends Component
             </div>
 
             <div class="flex flex-wrap items-center justify-end gap-2">
-                @if ($this->currentLease->moveInCheck)
-                    <flux:button size="sm" icon="clipboard-document-check" :href="route('move-in-checklist')" wire:navigate>
-                        {{ __('Move-in checklist') }}
-                    </flux:button>
-                    @unless ($this->currentLease->moveInCheck->tenant_acknowledged_at)
-                        <flux:badge size="sm" color="amber">{{ __('Please acknowledge') }}</flux:badge>
-                    @endunless
+                <flux:button size="sm" icon="clipboard-document-check" :href="route('unit-checks')" wire:navigate>
+                    {{ __('Unit checks') }}
+                </flux:button>
+                @if ($this->currentLease->moveInCheck && ! $this->currentLease->moveInCheck->tenant_acknowledged_at)
+                    <flux:badge size="sm" color="amber">{{ __('Please acknowledge') }}</flux:badge>
                 @endif
 
                 <flux:button variant="danger" size="sm" wire:click="confirmLeaveUnit">

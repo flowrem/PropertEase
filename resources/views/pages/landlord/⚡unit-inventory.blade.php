@@ -5,9 +5,11 @@ use App\Enums\ItemCondition;
 use App\Enums\ItemServiceAction;
 use App\Enums\UnitItemType;
 use App\Models\ConditionCheck;
+use App\Models\Lease;
 use App\Models\Team;
 use App\Models\Unit;
 use App\Models\UnitItem;
+use App\Notifications\RoutineCheckRecorded;
 use Flux\Flux;
 use Illuminate\Database\Eloquent\Collection as EloquentCollection;
 use Illuminate\Support\Facades\Auth;
@@ -434,7 +436,7 @@ new #[Title('Unit inventory')] class extends Component
             'remarks.*' => __('remarks'),
         ]);
 
-        DB::transaction(function () use ($items): void {
+        $check = DB::transaction(function () use ($items): ConditionCheck {
             $check = $this->unit->conditionChecks()->create([
                 'kind' => $this->checkKind,
                 'checked_by' => Auth::id(),
@@ -447,7 +449,14 @@ new #[Title('Unit inventory')] class extends Component
                 'condition' => $this->conditions[$item->id],
                 'remarks' => trim($this->remarks[$item->id] ?? '') ?: null,
             ])->all());
+
+            return $check;
         });
+
+        if ($check->kind === ConditionCheckKind::Routine) {
+            $this->unit->activeLeases()->with('tenant')->get()
+                ->each(fn (Lease $lease) => $lease->tenant->notify(new RoutineCheckRecorded($check)));
+        }
 
         $this->cancelCheck();
         unset($this->checks, $this->pendingMoveInCheck);
