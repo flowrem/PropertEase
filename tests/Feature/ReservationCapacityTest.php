@@ -62,7 +62,7 @@ test('a holder can be assigned to their held unit and the reservation becomes fu
     $tenant = User::factory()->create();
     $landlord->currentTeam->members()->attach($tenant, ['role' => TeamRole::Tenant]);
 
-    $unit = Unit::factory()->for(Property::factory()->for($landlord->currentTeam))->create([
+    $unit = Unit::factory()->for(Property::factory()->for($landlord->currentTeam))->readyForMoveIn()->create([
         'status' => UnitStatus::Vacant,
         'price' => 5000,
     ]);

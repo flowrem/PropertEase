@@ -15,6 +15,7 @@ use Flux\Flux;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 use Livewire\Attributes\Computed;
@@ -32,6 +33,14 @@ new #[Title('Tenants')] class extends Component
     public int $due_day = 1;
 
     public string $billing_timing = 'advance';
+
+    /**
+     * Assign the tenant even though the unit has no clean move-in check.
+     * Only the landlord and managers can, and they must say why.
+     */
+    public bool $proceedAnyway = false;
+
+    public string $overrideReason = '';
 
     public string $search = '';
 
@@ -189,7 +198,27 @@ new #[Title('Tenants')] class extends Component
     {
         $this->showManageModal = false;
         $this->managingTenantId = null;
-        $this->reset('unit_id', 'due_day', 'billing_timing');
+        $this->reset('unit_id', 'due_day', 'billing_timing', 'proceedAnyway', 'overrideReason');
+    }
+
+    /**
+     * A reason to proceed past one unit's move-in check doesn't carry over
+     * to another unit picked afterwards.
+     */
+    public function updatedUnitId(): void
+    {
+        $this->reset('proceedAnyway', 'overrideReason');
+        $this->resetValidation();
+    }
+
+    /**
+     * Whether the current user may let a tenant move in past a missing or
+     * failed move-in check (the landlord and managers).
+     */
+    #[Computed]
+    public function canOverrideMoveInCheck(): bool
+    {
+        return Auth::user()->canManageListingsOn($this->team);
     }
 
     /**
@@ -218,6 +247,26 @@ new #[Title('Tenants')] class extends Component
 
         abort_unless($unit->hasRoomForAnotherTenant(excludingOwnHold: $holdsThisUnit), 403);
 
+        $moveInCheck = $unit->pendingMoveInCheck();
+        $moveInCheckPasses = $moveInCheck !== null && $moveInCheck->blockingItemCount() === 0;
+
+        if (! $moveInCheckPasses) {
+            if (! $this->proceedAnyway) {
+                $this->addError('unit_id', $moveInCheck
+                    ? __('This unit\'s move-in check found items not working or missing.')
+                    : __('Record a move-in check for this unit first.'));
+
+                return;
+            }
+
+            Gate::authorize('manageInventory', $unit);
+
+            $this->validate(
+                ['overrideReason' => ['required', 'string', 'min:10', 'max:500']],
+                attributes: ['overrideReason' => __('reason')],
+            );
+        }
+
         $currentLease = $tenant->leases->first();
 
         if ($currentLease) {
@@ -228,13 +277,16 @@ new #[Title('Tenants')] class extends Component
             $heldReservation->forceFill(['status' => ReservationStatus::Fulfilled])->save();
         }
 
-        $unit->leases()->create([
+        $lease = $unit->leases()->create([
             'tenant_id' => $tenant->id,
             'start_date' => now(),
             'due_day' => $validated['due_day'],
             'billing_timing' => BillingTiming::from($validated['billing_timing']),
             'status' => LeaseStatus::Active,
+            'move_in_override_reason' => $moveInCheckPasses ? null : trim($this->overrideReason),
         ]);
+
+        $moveInCheck?->claimFor($lease);
 
         $unit->update(['status' => UnitStatus::Occupied]);
         $unit->splitRentAmongActiveTenants();
@@ -404,6 +456,36 @@ new #[Title('Tenants')] class extends Component
                                 'count' => $selectedUnit->active_leases_count + 1,
                             ]) }}
                         </flux:text>
+
+                        @php($moveInCheck = $selectedUnit->pendingMoveInCheck())
+                        @php($blockingItems = $moveInCheck?->blockingItemCount() ?? 0)
+
+                        @if ($moveInCheck && $blockingItems === 0)
+                            <flux:callout icon="check-circle" color="green">
+                                <flux:callout.text>
+                                    {{ __('Move-in check recorded on :date. The tenant will be asked to acknowledge it.', ['date' => $moveInCheck->checked_at->format('M j, Y')]) }}
+                                </flux:callout.text>
+                            </flux:callout>
+                        @else
+                            <flux:callout icon="exclamation-triangle" :color="$moveInCheck ? 'red' : 'amber'">
+                                <flux:callout.text>
+                                    {{ $moveInCheck
+                                        ? trans_choice('The move-in check on :date found :count item not working or missing.|The move-in check on :date found :count items not working or missing.', $blockingItems, ['date' => $moveInCheck->checked_at->format('M j, Y')])
+                                        : __('This unit has no move-in check since its last tenant left.') }}
+                                    <flux:link :href="route('units.inventory', ['unit' => $selectedUnit])" wire:navigate>{{ __('Open the unit\'s checks') }}</flux:link>
+                                </flux:callout.text>
+                            </flux:callout>
+
+                            @if ($this->canOverrideMoveInCheck)
+                                <flux:checkbox wire:model.live="proceedAnyway" :label="__('Proceed anyway')" :description="__('Assign the tenant without a clean move-in check. Your reason is kept on the lease.')" />
+
+                                @if ($proceedAnyway)
+                                    <flux:textarea wire:model="overrideReason" :label="__('Reason')" rows="2" maxlength="500" :placeholder="__('The tenant agreed to move in while the faucet is being replaced this week.')" required />
+                                @endif
+                            @else
+                                <flux:text class="text-zinc-500 dark:text-zinc-400">{{ __('Only the landlord or a manager can assign a tenant without a clean move-in check.') }}</flux:text>
+                            @endif
+                        @endif
                     @endif
 
                     <flux:input wire:model="due_day" type="number" min="1" max="28" :label="__('Due day of month')" required />

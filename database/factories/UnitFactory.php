@@ -3,6 +3,7 @@
 namespace Database\Factories;
 
 use App\Enums\UnitStatus;
+use App\Models\ConditionCheck;
 use App\Models\Property;
 use App\Models\Unit;
 use Illuminate\Database\Eloquent\Factories\Factory;
@@ -40,5 +41,14 @@ class UnitFactory extends Factory
         return $this->state(fn (array $attributes) => [
             'floor_area_sqm' => null,
         ]);
+    }
+
+    /**
+     * A unit with a clean move-in check waiting for its next tenant, so a
+     * tenant can be assigned to it.
+     */
+    public function readyForMoveIn(): static
+    {
+        return $this->afterCreating(fn (Unit $unit) => ConditionCheck::factory()->for($unit)->create());
     }
 }

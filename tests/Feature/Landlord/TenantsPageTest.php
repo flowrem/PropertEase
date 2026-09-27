@@ -87,7 +87,7 @@ test('a landlord can assign a vacant unit to a tenant', function () {
     $landlord->currentTeam->members()->attach($tenant, ['role' => TeamRole::Tenant]);
 
     $property = Property::factory()->for($landlord->currentTeam)->create();
-    $unit = Unit::factory()->for($property)->create(['status' => UnitStatus::Vacant, 'price' => 5000]);
+    $unit = Unit::factory()->for($property)->readyForMoveIn()->create(['status' => UnitStatus::Vacant, 'price' => 5000]);
 
     $this->actingAs($landlord);
 
@@ -121,7 +121,7 @@ test('assigning a unit defaults billing timing to advance and lets the landlord 
     $landlord->currentTeam->members()->attach($tenant, ['role' => TeamRole::Tenant]);
 
     $property = Property::factory()->for($landlord->currentTeam)->create();
-    $unit = Unit::factory()->for($property)->create(['status' => UnitStatus::Vacant, 'price' => 5000]);
+    $unit = Unit::factory()->for($property)->readyForMoveIn()->create(['status' => UnitStatus::Vacant, 'price' => 5000]);
 
     $this->actingAs($landlord);
 
@@ -182,7 +182,7 @@ test('a unit that does not allow multiple tenants is unavailable once occupied',
 test('a landlord can assign a second tenant to a unit that allows multiple tenants', function () {
     $landlord = User::factory()->create();
     $property = Property::factory()->for($landlord->currentTeam)->create();
-    $unit = Unit::factory()->for($property)->create([
+    $unit = Unit::factory()->for($property)->readyForMoveIn()->create([
         'status' => UnitStatus::Occupied,
         'allows_multiple_tenants' => true,
         'tenant_limit' => 2,
@@ -276,7 +276,7 @@ test('a landlord can move a tenant to a different unit, re-splitting rent on bot
         'tenant_limit' => 2,
         'price' => 4000,
     ]);
-    $newUnit = Unit::factory()->for($property)->create([
+    $newUnit = Unit::factory()->for($property)->readyForMoveIn()->create([
         'status' => UnitStatus::Vacant,
         'price' => 6000,
     ]);
