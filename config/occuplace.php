@@ -34,6 +34,8 @@ return [
 
         'rent' => ['min' => 500, 'max' => 200000],
 
+        'amenity_quantity' => ['max' => 20],
+
         'name_max_length' => 40,
 
         'highest_floor' => 50,

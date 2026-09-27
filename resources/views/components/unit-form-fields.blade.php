@@ -1,6 +1,8 @@
 @props([
     'occupancy',
     'bedrooms' => 0,
+    'amenityGroups' => collect(),
+    'selectedAmenities' => [],
     'maxCapacity' => null,
     'maxBedrooms' => null,
     'maxBathrooms' => null,
@@ -115,6 +117,45 @@
     :placeholder="$examples ? '5000' : null"
     required
 />
+
+@if ($amenityGroups->isNotEmpty())
+    <flux:fieldset>
+        <flux:legend>{{ __('Amenities') }}</flux:legend>
+        <flux:description>{{ __('Tick what comes with this unit, and how many of each.') }}</flux:description>
+
+        <flux:checkbox.group wire:model.live="form.amenityIds" class="mt-4 space-y-5">
+            @foreach ($amenityGroups as $category => $amenities)
+                <div class="space-y-2">
+                    <flux:heading size="sm">{{ $category }}</flux:heading>
+
+                    <div class="grid gap-x-4 gap-y-2 sm:grid-cols-2">
+                        @foreach ($amenities as $amenity)
+                            <div class="flex min-h-9 items-center justify-between gap-3" wire:key="amenity-{{ $amenity->id }}">
+                                <flux:checkbox value="{{ $amenity->id }}" :label="$amenity->name" />
+
+                                @if (in_array((string) $amenity->id, $selectedAmenities, true))
+                                    <flux:input
+                                        wire:model.blur="form.amenityQuantities.{{ $amenity->id }}"
+                                        type="number"
+                                        min="1"
+                                        max="{{ $limits['amenity_quantity']['max'] }}"
+                                        size="sm"
+                                        class="max-w-20"
+                                        :aria-label="__('How many :amenity', ['amenity' => $amenity->name])"
+                                    />
+                                @endif
+                            </div>
+
+                            <flux:error name="form.amenityQuantities.{{ $amenity->id }}" />
+                        @endforeach
+                    </div>
+                </div>
+            @endforeach
+        </flux:checkbox.group>
+
+        <flux:error name="form.amenityIds.*" />
+    </flux:fieldset>
+@endif
 
 <flux:radio.group wire:model.live="form.occupancy" :label="__('Occupancy')" variant="segmented">
     <flux:radio value="single">{{ __('Single tenant') }}</flux:radio>

@@ -4,13 +4,17 @@ use App\Enums\PropertyType;
 use App\Enums\TeamRole;
 use App\Enums\UnitStatus;
 use App\Livewire\Forms\UnitForm;
+use App\Models\Amenity;
 use App\Models\Property;
 use App\Models\Team;
 use App\Models\Unit;
 use App\Notifications\Teams\TeamInvitation as TeamInvitationNotification;
 use App\Rules\UniqueTeamInvitation;
 use Flux\Flux;
+use Illuminate\Database\Eloquent\Collection as EloquentCollection;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Notification;
 use Illuminate\Validation\Rule;
@@ -90,6 +94,15 @@ new #[Title('Add a property')] class extends Component
         return $this->property ? $this->form->maxCapacity($this->property->type) : null;
     }
 
+    /**
+     * @return Collection<string, EloquentCollection<int, Amenity>>
+     */
+    #[Computed]
+    public function formAmenityGroups(): Collection
+    {
+        return $this->form->amenityGroups($this->team);
+    }
+
     #[Computed]
     public function formMaxBedroomsPreview(): ?int
     {
@@ -133,10 +146,13 @@ new #[Title('Add a property')] class extends Component
     {
         $property = $this->team->properties()->findOrFail($this->propertyId);
 
-        $property->units()->create([
-            ...$this->form->validatedAttributes($property->type, $property->id),
-            'status' => UnitStatus::Vacant,
-        ]);
+        $attributes = $this->form->validatedAttributes($property->type, $property->id);
+
+        DB::transaction(function () use ($property, $attributes): void {
+            $unit = $property->units()->create([...$attributes, 'status' => UnitStatus::Vacant]);
+
+            $this->form->syncAmenities($unit);
+        });
 
         $this->showConfirmUnitModal = false;
         $this->form->reset();
@@ -244,6 +260,8 @@ new #[Title('Add a property')] class extends Component
                 <x-unit-form-fields
                     :occupancy="$form->occupancy"
                     :bedrooms="$form->bedrooms"
+                    :amenity-groups="$this->formAmenityGroups"
+                    :selected-amenities="$form->amenityIds"
                     :max-capacity="$this->formMaxCapacityPreview"
                     :max-bedrooms="$this->formMaxBedroomsPreview"
                     :max-bathrooms="$this->formMaxBathroomsPreview"

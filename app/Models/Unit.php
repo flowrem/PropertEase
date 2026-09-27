@@ -14,9 +14,11 @@ use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasManyThrough;
 use Illuminate\Database\Eloquent\Relations\HasOne;
+use Illuminate\Database\Eloquent\Relations\Pivot;
 use Illuminate\Support\Carbon;
 
 /**
@@ -35,6 +37,7 @@ use Illuminate\Support\Carbon;
  * @property Carbon|null $updated_at
  * @property-read Property $property
  * @property-read UnitListing|null $listing
+ * @property-read Collection<int, Amenity> $amenities
  * @property-read Collection<int, Lease> $leases
  * @property-read Collection<int, Lease> $activeLeases
  * @property-read int|null $active_leases_count
@@ -63,6 +66,16 @@ class Unit extends Model
     public function listing(): HasOne
     {
         return $this->hasOne(UnitListing::class);
+    }
+
+    /**
+     * What the unit comes with, and how many of each.
+     *
+     * @return BelongsToMany<Amenity, $this, Pivot, 'pivot'>
+     */
+    public function amenities(): BelongsToMany
+    {
+        return $this->belongsToMany(Amenity::class)->withPivot('quantity')->withTimestamps();
     }
 
     /**

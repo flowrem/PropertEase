@@ -2,9 +2,16 @@
 
 namespace App\Livewire\Forms;
 
+use App\Enums\AmenityCategory;
 use App\Enums\PropertyType;
+use App\Models\Amenity;
+use App\Models\Property;
+use App\Models\Team;
 use App\Models\Unit;
 use Closure;
+use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Collection as EloquentCollection;
+use Illuminate\Support\Collection;
 use Illuminate\Validation\Rule;
 use Livewire\Form;
 
@@ -38,8 +45,27 @@ class UnitForm extends Form
 
     public string $price = '';
 
+    /**
+     * IDs of the amenities ticked on the form, as the checkboxes send them.
+     *
+     * @var array<int, string>
+     */
+    public array $amenityIds = [];
+
+    /**
+     * How many of each ticked amenity the unit has, keyed by amenity ID.
+     *
+     * @var array<int|string, string>
+     */
+    public array $amenityQuantities = [];
+
     public function fillFromUnit(Unit $unit): void
     {
+        $quantities = $unit->amenities()->pluck('amenity_unit.quantity', 'amenities.id');
+
+        $this->amenityIds = $quantities->keys()->map(fn (int $amenityId): string => (string) $amenityId)->all();
+        $this->amenityQuantities = $quantities->map(fn (int $quantity): string => (string) $quantity)->all();
+
         $this->unit_number = $unit->unit_number;
         $this->floor_level = (string) $unit->floor_level;
         $this->bedrooms = (string) $unit->bedrooms;
@@ -164,6 +190,67 @@ class UnitForm extends Form
     }
 
     /**
+     * Give a newly ticked amenity a quantity of 1, so the landlord only has
+     * to type one when the unit has more than one of it.
+     */
+    public function updatedAmenityIds(): void
+    {
+        foreach ($this->amenityIds as $amenityId) {
+            $this->amenityQuantities[$amenityId] ??= '1';
+        }
+    }
+
+    /**
+     * The amenities this form may put on the unit: the platform defaults
+     * and the team's own, active ones, plus any inactive ones the unit
+     * already has so editing it doesn't silently drop them.
+     *
+     * @return EloquentCollection<int, Amenity>
+     */
+    public function selectableAmenities(Team $team, ?Unit $unit = null): EloquentCollection
+    {
+        $attachedIds = $unit?->amenities()->pluck('amenities.id')->all() ?? [];
+
+        return Amenity::availableTo($team)
+            ->where(fn (Builder $selectable) => $selectable
+                ->where('is_active', true)
+                ->orWhereIn('id', $attachedIds))
+            ->orderBy('name')
+            ->get();
+    }
+
+    /**
+     * The selectable amenities grouped under their category labels, in the
+     * category order the enum lists them, for the form's checkboxes.
+     *
+     * @return Collection<string, EloquentCollection<int, Amenity>>
+     */
+    public function amenityGroups(Team $team, ?Unit $unit = null): Collection
+    {
+        $categoryOrder = array_map(fn (AmenityCategory $category): string => $category->label(), AmenityCategory::cases());
+
+        return $this->selectableAmenities($team, $unit)
+            ->groupBy(fn (Amenity $amenity): string => $amenity->category->label())
+            ->sortBy(fn (EloquentCollection $amenities, string $label): int => (int) array_search($label, $categoryOrder, true));
+    }
+
+    /**
+     * Save the validated amenities onto the unit, replacing what it had.
+     * Call after validatedAttributes(), which checks every ID and quantity.
+     */
+    public function syncAmenities(Unit $unit): void
+    {
+        $unit->amenities()->sync(
+            collect($this->amenityIds)
+                ->unique()
+                ->mapWithKeys(fn (string $amenityId): array => [
+                    (int) $amenityId => ['quantity' => (int) $this->amenityQuantities[$amenityId]],
+                ])
+                ->all(),
+        );
+    }
+
+    /**
      * Validate the form for a new unit (no $unit) or an existing one, and
      * return the unit attributes to save. Physical details are only
      * validated and returned while the unit is not locked yet.
@@ -178,6 +265,8 @@ class UnitForm extends Form
             'floor_area_sqm' => __('floor area'),
             'tenant_limit' => __('maximum tenants'),
             'price' => __('monthly rent'),
+            'amenityIds.*' => __('amenity'),
+            'amenityQuantities.*' => __('quantity'),
         ]);
 
         $allowsMultipleTenants = $validated['occupancy'] === 'multiple';
@@ -242,6 +331,7 @@ class UnitForm extends Form
                     },
                 ],
             'price' => ['required', 'numeric', 'min:'.$limits['rent']['min'], 'max:'.$limits['rent']['max']],
+            ...$this->amenityRules($propertyId, $unit),
         ];
 
         if ($unit?->hasLockedDetails()) {
@@ -282,5 +372,30 @@ class UnitForm extends Form
                 },
             ],
         ];
+    }
+
+    /**
+     * Only amenities this team may use can be ticked, each with a quantity
+     * within bounds, so a crafted request can't attach another team's
+     * custom amenity.
+     *
+     * @return array<string, array<int, mixed>>
+     */
+    private function amenityRules(int $propertyId, ?Unit $unit): array
+    {
+        $team = Property::query()->findOrFail($propertyId)->team;
+        $selectableIds = $this->selectableAmenities($team, $unit)->pluck('id')->all();
+        $maxQuantity = (int) config('occuplace.units.amenity_quantity.max');
+
+        $rules = [
+            'amenityIds' => ['array'],
+            'amenityIds.*' => ['integer', 'distinct', Rule::in($selectableIds)],
+        ];
+
+        foreach ($this->amenityIds as $amenityId) {
+            $rules["amenityQuantities.{$amenityId}"] = ['required', 'integer', 'min:1', 'max:'.$maxQuantity];
+        }
+
+        return $rules;
     }
 }

@@ -4,11 +4,13 @@ use App\Enums\ConcernStatus;
 use App\Enums\ListingStatus;
 use App\Enums\UnitStatus;
 use App\Livewire\Forms\UnitForm;
+use App\Models\Amenity;
 use App\Models\Property;
 use App\Models\Team;
 use App\Models\Unit;
 use App\Models\UnitListing;
 use Flux\Flux;
+use Illuminate\Database\Eloquent\Collection as EloquentCollection;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
@@ -101,6 +103,15 @@ new #[Title('Properties')] class extends Component
             : null;
     }
 
+    /**
+     * @return Collection<string, EloquentCollection<int, Amenity>>
+     */
+    #[Computed]
+    public function formAmenityGroups(): Collection
+    {
+        return $this->form->amenityGroups($this->team, $this->editingUnit);
+    }
+
     #[Computed]
     public function formMaxBedroomsPreview(): ?int
     {
@@ -171,10 +182,13 @@ new #[Title('Properties')] class extends Component
     {
         $property = $this->team->properties()->findOrFail($this->addingUnitTo);
 
-        $property->units()->create([
-            ...$this->form->validatedAttributes($property->type, $property->id),
-            'status' => UnitStatus::Vacant,
-        ]);
+        $attributes = $this->form->validatedAttributes($property->type, $property->id);
+
+        DB::transaction(function () use ($property, $attributes): void {
+            $unit = $property->units()->create([...$attributes, 'status' => UnitStatus::Vacant]);
+
+            $this->form->syncAmenities($unit);
+        });
 
         $this->showConfirmUnitModal = false;
         $this->addingUnitTo = null;
@@ -208,11 +222,14 @@ new #[Title('Properties')] class extends Component
 
         $priceChanged = round((float) $unit->price, 2) !== round((float) $attributes['price'], 2);
 
-        $unit->update($attributes);
+        DB::transaction(function () use ($unit, $attributes, $priceChanged): void {
+            $unit->update($attributes);
+            $this->form->syncAmenities($unit);
 
-        if ($priceChanged) {
-            $unit->splitRentAmongActiveTenants();
-        }
+            if ($priceChanged) {
+                $unit->splitRentAmongActiveTenants();
+            }
+        });
 
         $this->editingUnitId = null;
         unset($this->properties, $this->editingUnit);
@@ -403,6 +420,8 @@ new #[Title('Properties')] class extends Component
                                     <x-unit-form-fields
                                         :occupancy="$form->occupancy"
                                         :bedrooms="$form->bedrooms"
+                                        :amenity-groups="$this->formAmenityGroups"
+                                        :selected-amenities="$form->amenityIds"
                                         :max-capacity="$this->formMaxCapacityPreview"
                                         :max-bedrooms="$this->formMaxBedroomsPreview"
                                         :max-bathrooms="$this->formMaxBathroomsPreview"
@@ -499,6 +518,8 @@ new #[Title('Properties')] class extends Component
                             <x-unit-form-fields
                                 :occupancy="$form->occupancy"
                                 :bedrooms="$form->bedrooms"
+                                :amenity-groups="$this->formAmenityGroups"
+                                :selected-amenities="$form->amenityIds"
                                 :max-capacity="$this->formMaxCapacityPreview"
                                 :max-bedrooms="$this->formMaxBedroomsPreview"
                                 :max-bathrooms="$this->formMaxBathroomsPreview"
