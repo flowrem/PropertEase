@@ -1,7 +1,9 @@
 <?php
 
+use App\Enums\PropertyType;
 use App\Enums\TeamRole;
 use App\Models\Property;
+use App\Models\Unit;
 use App\Models\User;
 use Illuminate\Support\Facades\Notification;
 use Livewire\Livewire;
@@ -93,6 +95,21 @@ test('step two asks for confirmation before saving a unit', function () {
         ->assertSet('showConfirmUnitModal', true);
 
     expect($property->units()->count())->toBe(0);
+});
+
+test('typing more tenants than the floor area fits snaps the value back down', function () {
+    $user = User::factory()->create();
+    $property = Property::factory()->for($user->currentTeam)->create(['type' => PropertyType::Apartment]);
+
+    $this->actingAs($user);
+
+    Livewire::test('pages::landlord.setup')
+        ->set('propertyId', $property->id)
+        ->set('step', 2)
+        ->set('form.floor_area_sqm', '18')
+        ->set('form.occupancy', 'multiple')
+        ->set('form.tenant_limit', 67)
+        ->assertSet('form.tenant_limit', (string) Unit::maxCapacityFor(18, PropertyType::Apartment));
 });
 
 test('a landlord can invite a tenant in step three', function () {

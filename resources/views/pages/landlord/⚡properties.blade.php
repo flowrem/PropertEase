@@ -113,6 +113,15 @@ new #[Title('Properties')] class extends Component
         return $this->form->maxBathrooms();
     }
 
+    /**
+     * Snap the typed tenant limit back down as soon as it exceeds what this
+     * unit can hold, the same way bedrooms and bathrooms clamp themselves.
+     */
+    public function updatedFormTenantLimit(): void
+    {
+        $this->form->clampTenantLimit($this->formMaxCapacityPreview, $this->editingUnit?->takenSlotCount() ?? 0);
+    }
+
     public function toggleProperty(int $propertyId): void
     {
         if (isset($this->expanded[$propertyId])) {

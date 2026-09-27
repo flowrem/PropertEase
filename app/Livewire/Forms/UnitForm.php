@@ -34,7 +34,7 @@ class UnitForm extends Form
 
     public string $occupancy = 'single';
 
-    public ?int $tenant_limit = null;
+    public string $tenant_limit = '';
 
     public string $price = '';
 
@@ -46,7 +46,7 @@ class UnitForm extends Form
         $this->bathrooms = (string) $unit->bathrooms;
         $this->floor_area_sqm = (string) $unit->floor_area_sqm;
         $this->occupancy = $unit->allows_multiple_tenants ? 'multiple' : 'single';
-        $this->tenant_limit = $unit->tenant_limit;
+        $this->tenant_limit = $unit->tenant_limit !== null ? (string) $unit->tenant_limit : '';
         $this->price = (string) $unit->price;
     }
 
@@ -143,6 +143,27 @@ class UnitForm extends Form
     }
 
     /**
+     * Snap the tenant limit back down the moment it's typed past what this
+     * unit can hold, the same way bedrooms and bathrooms clamp themselves.
+     * The form has no property type or existing unit of its own to work out
+     * the ceiling from, so the caller passes in the max capacity (from
+     * maxCapacity()) and how many slots are already taken.
+     */
+    public function clampTenantLimit(?int $maxCapacity, int $takenSlots): void
+    {
+        if ($this->occupancy !== 'multiple' || ! is_numeric($this->tenant_limit)) {
+            return;
+        }
+
+        $min = max(2, $takenSlots);
+        $max = $maxCapacity !== null
+            ? max($maxCapacity, $takenSlots)
+            : (int) config('occuplace.units.max_capacity');
+
+        $this->tenant_limit = (string) max($min, min($max, (int) $this->tenant_limit));
+    }
+
+    /**
      * Validate the form for a new unit (no $unit) or an existing one, and
      * return the unit attributes to save. Physical details are only
      * validated and returned while the unit is not locked yet.
@@ -206,23 +227,20 @@ class UnitForm extends Form
                     }
                 },
             ],
-            'tenant_limit' => [
-                $this->occupancy === 'multiple' ? 'required' : 'nullable',
-                'integer', 'min:2', 'max:'.$limits['max_capacity'],
-                function (string $attribute, mixed $value, Closure $fail) use ($maxCapacity, $takenSlots): void {
-                    if ($this->occupancy !== 'multiple') {
-                        return;
-                    }
+            'tenant_limit' => $this->occupancy !== 'multiple'
+                ? ['nullable']
+                : [
+                    'required', 'integer', 'min:2', 'max:'.$limits['max_capacity'],
+                    function (string $attribute, mixed $value, Closure $fail) use ($maxCapacity, $takenSlots): void {
+                        if ($maxCapacity !== null && $value > max($maxCapacity, $takenSlots)) {
+                            $fail(__('This unit fits at most :max tenants.', ['max' => $maxCapacity]));
+                        }
 
-                    if ($maxCapacity !== null && $value > max($maxCapacity, $takenSlots)) {
-                        $fail(__('This unit fits at most :max tenants.', ['max' => $maxCapacity]));
-                    }
-
-                    if ($value < $takenSlots) {
-                        $fail(__(':count tenants or reservations already hold this unit.', ['count' => $takenSlots]));
-                    }
-                },
-            ],
+                        if ($value < $takenSlots) {
+                            $fail(__(':count tenants or reservations already hold this unit.', ['count' => $takenSlots]));
+                        }
+                    },
+                ],
             'price' => ['required', 'numeric', 'min:'.$limits['rent']['min'], 'max:'.$limits['rent']['max']],
         ];
 

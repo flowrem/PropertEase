@@ -103,6 +103,15 @@ new #[Title('Add a property')] class extends Component
     }
 
     /**
+     * Snap the typed tenant limit back down as soon as it exceeds what this
+     * unit can hold, the same way bedrooms and bathrooms clamp themselves.
+     */
+    public function updatedFormTenantLimit(): void
+    {
+        $this->form->clampTenantLimit($this->formMaxCapacityPreview, takenSlots: 0);
+    }
+
+    /**
      * Validate the new unit, then ask the landlord to confirm the details
      * that will be locked once it is saved.
      */

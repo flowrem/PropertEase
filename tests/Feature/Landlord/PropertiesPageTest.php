@@ -392,8 +392,37 @@ test('a shared unit cannot hold more tenants than its floor area allows', functi
         ])
         ->assertSee('This floor area fits up to 3 tenants.');
 
-    $component->set('form.tenant_limit', 4)->call('addUnit')->assertHasErrors(['form.tenant_limit']);
-    $component->set('form.tenant_limit', 3)->call('addUnit')->assertHasNoErrors();
+    $component->set('form.tenant_limit', 4)
+        ->assertSet('form.tenant_limit', '3')
+        ->call('addUnit')
+        ->assertHasNoErrors();
+});
+
+test('the tenant limit never exceeds the configured ceiling when the floor area is not yet usable', function () {
+    $user = User::factory()->create();
+    $property = Property::factory()->for($user->currentTeam)->create(['type' => PropertyType::Apartment]);
+
+    $this->actingAs($user);
+
+    Livewire::test('pages::landlord.properties')
+        ->call('startAddingUnit', $property->id)
+        ->set('form.occupancy', 'multiple')
+        ->set('form.tenant_limit', 50)
+        ->assertSet('form.tenant_limit', (string) config('occuplace.units.max_capacity'));
+});
+
+test('a tenant limit too large for PHP\'s integer type is clamped instead of crashing', function () {
+    $user = User::factory()->create();
+    $property = Property::factory()->for($user->currentTeam)->create(['type' => PropertyType::Apartment]);
+
+    $this->actingAs($user);
+
+    Livewire::test('pages::landlord.properties')
+        ->call('startAddingUnit', $property->id)
+        ->set('form.floor_area_sqm', '24')
+        ->set('form.occupancy', 'multiple')
+        ->set('form.tenant_limit', '99999999999999999999999999999999999999999999999')
+        ->assertSet('form.tenant_limit', (string) Unit::maxCapacityFor(24, PropertyType::Apartment));
 });
 
 test('a unit too small for two tenants cannot be shared', function () {
@@ -431,7 +460,7 @@ test('dormitories fit more tenants in the same floor area', function () {
         ->assertSee('This floor area fits up to 4 tenants.');
 });
 
-test('a shared unit\'s limit cannot drop below the tenants and reservations holding it', function () {
+test('a shared unit\'s limit snaps back up to the tenants and reservations already holding it', function () {
     $user = User::factory()->create();
     $property = Property::factory()->for($user->currentTeam)->create();
     $unit = Unit::factory()->for($property)->create([
@@ -447,13 +476,11 @@ test('a shared unit\'s limit cannot drop below the tenants and reservations hold
     Livewire::test('pages::landlord.properties')
         ->call('startEditingUnit', $unit->id)
         ->set('form.tenant_limit', 2)
-        ->call('updateUnit')
-        ->assertHasErrors(['form.tenant_limit'])
+        ->assertSet('form.tenant_limit', '3')
         ->set('form.occupancy', 'single')
         ->call('updateUnit')
         ->assertHasErrors(['form.occupancy'])
         ->set('form.occupancy', 'multiple')
-        ->set('form.tenant_limit', 3)
         ->call('updateUnit')
         ->assertHasNoErrors();
 
