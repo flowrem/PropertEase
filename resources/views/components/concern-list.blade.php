@@ -1,12 +1,26 @@
 @props([
     'concerns',
     'showPriority' => false,
+    'openAction' => null,
     'emptyTitle',
     'emptyText',
 ])
 
+{{-- With an openAction (a Livewire method taking the concern ID), each row opens that concern. --}}
 @forelse ($concerns as $concern)
-    <div wire:key="concern-{{ $concern->id }}" class="rounded-lg border border-zinc-200 p-4 dark:border-zinc-700">
+    <div
+        wire:key="concern-{{ $concern->id }}"
+        @if ($openAction)
+            wire:click="{{ $openAction }}({{ $concern->id }})"
+            role="button"
+            tabindex="0"
+            wire:keydown.enter="{{ $openAction }}({{ $concern->id }})"
+        @endif
+        @class([
+            'rounded-lg border border-zinc-200 p-4 dark:border-zinc-700',
+            'cursor-pointer transition-colors hover:border-brand-500' => $openAction,
+        ])
+    >
         <div class="flex items-start justify-between gap-4">
             <div>
                 <div class="flex flex-wrap items-center gap-2">
