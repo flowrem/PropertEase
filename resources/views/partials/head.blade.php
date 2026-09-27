@@ -13,3 +13,13 @@
 @fonts
 
 @vite(['resources/css/app.css', 'resources/js/app.js'])
+
+{{-- Light only: drop a "dark" class left on <html> by a page loaded before dark mode was removed,
+     since wire:navigate keeps the <html> element between pages. --}}
+<script data-navigate-once>
+    (() => {
+        const light = () => document.documentElement.classList.remove('dark');
+        light();
+        document.addEventListener('livewire:navigated', light);
+    })();
+</script>

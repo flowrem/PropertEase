@@ -6,7 +6,12 @@
 @source '../../vendor/livewire/flux-pro/stubs/**/*.blade.php';
 @source '../../vendor/livewire/flux/stubs/**/*.blade.php';
 
-@custom-variant dark (&:where(.dark, .dark *));
+/*
+ * The app is light only. The dark variant matches nothing, so the dark:
+ * classes still in the views (and in Flux's components) can never apply,
+ * even on a page whose <html> kept an old "dark" class.
+ */
+@custom-variant dark (&:not(*));
 
 @theme {
     --font-sans: 'Plus Jakarta Sans', ui-sans-serif, system-ui, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji', 'Segoe UI Symbol', 'Noto Color Emoji';
