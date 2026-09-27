@@ -48,15 +48,9 @@ new #[Title('Amenities')] class extends Component
     #[Computed]
     public function platformDefaults(): Collection
     {
-        $categoryOrder = array_map(fn (AmenityCategory $category): string => $category->label(), AmenityCategory::cases());
-
-        return Amenity::query()
-            ->whereNull('team_id')
-            ->active()
-            ->orderBy('name')
-            ->get()
-            ->groupBy(fn (Amenity $amenity): string => $amenity->category->label())
-            ->sortBy(fn (EloquentCollection $amenities, string $label): int => (int) array_search($label, $categoryOrder, true));
+        return Amenity::groupByCategory(
+            Amenity::query()->whereNull('team_id')->active()->orderBy('name')->get(),
+        );
     }
 
     public function addAmenity(): void

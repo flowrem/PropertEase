@@ -2,7 +2,6 @@
 
 namespace App\Livewire\Forms;
 
-use App\Enums\AmenityCategory;
 use App\Enums\PropertyType;
 use App\Models\Amenity;
 use App\Models\Property;
@@ -252,11 +251,7 @@ class UnitForm extends Form
      */
     public function amenityGroups(Team $team, ?Unit $unit = null): Collection
     {
-        $categoryOrder = array_map(fn (AmenityCategory $category): string => $category->label(), AmenityCategory::cases());
-
-        return $this->selectableAmenities($team, $unit)
-            ->groupBy(fn (Amenity $amenity): string => $amenity->category->label())
-            ->sortBy(fn (EloquentCollection $amenities, string $label): int => (int) array_search($label, $categoryOrder, true));
+        return Amenity::groupByCategory($this->selectableAmenities($team, $unit));
     }
 
     /**

@@ -6,10 +6,12 @@ use App\Enums\AmenityCategory;
 use Database\Factories\AmenityFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Collection as EloquentCollection;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Collection;
 
 /**
  * Something a unit comes with, like a bed, a fan or Wi-Fi. Platform
@@ -61,6 +63,22 @@ class Amenity extends Model
     public function isPlatformDefault(): bool
     {
         return $this->team_id === null;
+    }
+
+    /**
+     * Group amenities under their category labels, in the order the
+     * category enum lists them (Furniture first), for checkbox lists.
+     *
+     * @param  EloquentCollection<int, Amenity>  $amenities
+     * @return Collection<string, EloquentCollection<int, Amenity>>
+     */
+    public static function groupByCategory(EloquentCollection $amenities): Collection
+    {
+        $categoryOrder = array_map(fn (AmenityCategory $category): string => $category->label(), AmenityCategory::cases());
+
+        return $amenities
+            ->groupBy(fn (Amenity $amenity): string => $amenity->category->label())
+            ->sortBy(fn (EloquentCollection $group, string $label): int => (int) array_search($label, $categoryOrder, true));
     }
 
     /**
