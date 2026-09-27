@@ -389,7 +389,7 @@ class Unit extends Model
      * unit's property, with its bindings.
      *
      * @param  Closure(PropertyType): (int|float)  $valueFor
-     * @return array{0: string, 1: array<int, int|float|string>}
+     * @return array{0: literal-string, 1: array<int, int|float|string>}
      */
     private static function perPropertyTypeSql(Closure $valueFor): array
     {
