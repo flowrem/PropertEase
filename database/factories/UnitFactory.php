@@ -22,12 +22,23 @@ class UnitFactory extends Factory
         return [
             'property_id' => Property::factory(),
             'unit_number' => (string) fake()->unique()->numberBetween(100, 999),
-            'floor_level' => (string) fake()->numberBetween(1, 10),
+            'floor_level' => fake()->randomElement(array_slice(Unit::floorLevelOptions(), 1, 10)),
             'bedrooms' => fake()->numberBetween(0, 4),
             'bathrooms' => fake()->numberBetween(1, 3),
+            'floor_area_sqm' => 120,
             'status' => fake()->randomElement(UnitStatus::cases()),
             'allows_multiple_tenants' => false,
             'price' => fake()->numberBetween(2000, 15000),
         ];
+    }
+
+    /**
+     * A unit created before floor area was recorded, whose details are not locked yet.
+     */
+    public function withoutFloorArea(): static
+    {
+        return $this->state(fn (array $attributes) => [
+            'floor_area_sqm' => null,
+        ]);
     }
 }

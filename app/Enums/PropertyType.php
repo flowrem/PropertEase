@@ -20,4 +20,12 @@ enum PropertyType: string
             self::RentalHome => 'Rental Home',
         };
     }
+
+    /**
+     * Floor area, in square meters, each tenant needs in a unit of this type.
+     */
+    public function areaPerTenant(): float
+    {
+        return (float) config("occuplace.units.area_per_tenant.{$this->value}");
+    }
 }

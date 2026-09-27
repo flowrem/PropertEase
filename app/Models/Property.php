@@ -43,11 +43,14 @@ class Property extends Model
     }
 
     /**
+     * Each loaded unit gets this property set as its parent, since a unit's
+     * capacity depends on the property type.
+     *
      * @return HasMany<Unit, $this>
      */
     public function units(): HasMany
     {
-        return $this->hasMany(Unit::class);
+        return $this->hasMany(Unit::class)->chaperone();
     }
 
     /**

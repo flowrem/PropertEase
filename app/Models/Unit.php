@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Enums\LeaseStatus;
+use App\Enums\PropertyType;
 use App\Enums\ReservationStatus;
 use App\Enums\UnitStatus;
 use Database\Factories\UnitFactory;
@@ -24,6 +25,7 @@ use Illuminate\Support\Carbon;
  * @property string|null $floor_level
  * @property int $bedrooms
  * @property int $bathrooms
+ * @property string|null $floor_area_sqm
  * @property UnitStatus $status
  * @property bool $allows_multiple_tenants
  * @property int|null $tenant_limit
@@ -35,11 +37,12 @@ use Illuminate\Support\Carbon;
  * @property-read Collection<int, Lease> $leases
  * @property-read Collection<int, Lease> $activeLeases
  * @property-read int|null $active_leases_count
+ * @property-read Collection<int, Reservation> $reservations
  * @property-read Collection<int, Reservation> $heldReservations
  * @property-read int|null $held_reservations_count
  * @property-read Collection<int, Concern> $concerns
  */
-#[Fillable(['property_id', 'unit_number', 'floor_level', 'bedrooms', 'bathrooms', 'status', 'allows_multiple_tenants', 'tenant_limit', 'price'])]
+#[Fillable(['property_id', 'unit_number', 'floor_level', 'bedrooms', 'bathrooms', 'floor_area_sqm', 'status', 'allows_multiple_tenants', 'tenant_limit', 'price'])]
 class Unit extends Model
 {
     /** @use HasFactory<UnitFactory> */
@@ -106,6 +109,14 @@ class Unit extends Model
     }
 
     /**
+     * @return HasMany<Reservation, $this>
+     */
+    public function reservations(): HasMany
+    {
+        return $this->hasMany(Reservation::class);
+    }
+
+    /**
      * Approved reservations that are holding a slot until they are fulfilled,
      * cancelled or rejected.
      *
@@ -126,13 +137,114 @@ class Unit extends Model
     }
 
     /**
-     * How many tenants this unit can hold in total.
+     * How many tenants this unit can hold in total: the landlord's chosen
+     * limit, never more than its floor area allows.
      */
     public function capacity(): int
     {
-        return $this->allows_multiple_tenants && $this->tenant_limit !== null
+        $chosen = $this->allows_multiple_tenants && $this->tenant_limit !== null
             ? $this->tenant_limit
             : 1;
+
+        $maxCapacity = $this->maxCapacity();
+
+        return $maxCapacity === null ? $chosen : min($chosen, $maxCapacity);
+    }
+
+    /**
+     * The most tenants this unit's floor area allows, or null for an older
+     * unit whose floor area has not been entered yet.
+     */
+    public function maxCapacity(): ?int
+    {
+        if ($this->floor_area_sqm === null) {
+            return null;
+        }
+
+        return self::maxCapacityFor((float) $this->floor_area_sqm, $this->property->type);
+    }
+
+    /**
+     * The most tenants a unit of the given floor area and property type can hold.
+     */
+    public static function maxCapacityFor(float $floorArea, PropertyType $type): int
+    {
+        $tenantsThatFit = (int) floor($floorArea / $type->areaPerTenant() + 1e-9);
+
+        return max(1, min((int) config('occuplace.units.max_capacity'), $tenantsThatFit));
+    }
+
+    /**
+     * The smallest floor area that fits the given rooms.
+     */
+    public static function minimumFloorAreaFor(int $bedrooms, int $bathrooms): float
+    {
+        return max(
+            (float) config('occuplace.units.floor_area.min'),
+            $bedrooms * (float) config('occuplace.units.minimum_bedroom_area')
+                + $bathrooms * (float) config('occuplace.units.minimum_bathroom_area'),
+        );
+    }
+
+    /**
+     * Format a floor area for display, dropping a trailing ".0" ("24", "24.5").
+     */
+    public static function formatFloorArea(float $floorArea): string
+    {
+        return number_format($floorArea, floor($floorArea) === $floorArea ? 0 : 1);
+    }
+
+    /**
+     * The floor levels a landlord can pick from, lowest first.
+     *
+     * @return array<int, string>
+     */
+    public static function floorLevelOptions(): array
+    {
+        $levels = ['Basement', 'Ground floor'];
+
+        foreach (range(2, (int) config('occuplace.units.highest_floor')) as $floor) {
+            $suffix = match (true) {
+                in_array($floor % 100, [11, 12, 13], true) => 'th',
+                $floor % 10 === 1 => 'st',
+                $floor % 10 === 2 => 'nd',
+                $floor % 10 === 3 => 'rd',
+                default => 'th',
+            };
+
+            $levels[] = "{$floor}{$suffix} floor";
+        }
+
+        return $levels;
+    }
+
+    /**
+     * Determine whether the unit's physical details (floor level, bedrooms,
+     * bathrooms and floor area) are set and can no longer be changed. Older
+     * units stay open until their landlord completes them once.
+     */
+    public function hasLockedDetails(): bool
+    {
+        return $this->floor_area_sqm !== null;
+    }
+
+    /**
+     * Count the slots taken by active tenants and approved reservations.
+     */
+    public function takenSlotCount(): int
+    {
+        return $this->activeLeaseCount() + $this->heldReservationCount();
+    }
+
+    /**
+     * Determine whether the unit can be deleted: only if it was never used,
+     * meaning no lease, no reservation and no listing sent for review.
+     */
+    public function canBeDeleted(): bool
+    {
+        return ! $this->leases()->exists()
+            && ! $this->reservations()->exists()
+            && ! $this->listing()->whereNotNull('submitted_at')->exists();
     }
 
     /**
@@ -155,10 +267,28 @@ class Unit extends Model
      * Limit the query to units that currently have room for another tenant.
      * Mirrors hasRoomForAnotherTenant() so both stay the single rule for capacity.
      *
+     * The floor-area cap is written as "area >= (taken + 1) * area per tenant"
+     * instead of floor(area / area per tenant), so it reads the same on SQLite
+     * and Postgres.
+     *
      * @param  Builder<Unit>  $query
      */
     public function scopeHasRoom(Builder $query): void
     {
+        $taken = '((select count(*) from leases where leases.unit_id = units.id and leases.status = ?)'
+            .' + (select count(*) from reservations where reservations.unit_id = units.id and reservations.status = ?))';
+        $takenBindings = [LeaseStatus::Active->value, ReservationStatus::Approved->value];
+
+        $areaPerTenant = '(case (select properties.type from properties where properties.id = units.property_id)';
+        $areaPerTenantBindings = [];
+
+        foreach (PropertyType::cases() as $type) {
+            $areaPerTenant .= ' when ? then cast(? as decimal(6, 2))';
+            array_push($areaPerTenantBindings, $type->value, $type->areaPerTenant());
+        }
+
+        $areaPerTenant .= ' end)';
+
         $query
             ->where(fn (Builder $room) => $room
                 ->where('units.status', UnitStatus::Vacant->value)
@@ -167,10 +297,16 @@ class Unit extends Model
                     ->whereNotNull('units.tenant_limit')))
             ->whereRaw(
                 '(case when units.allows_multiple_tenants and units.tenant_limit is not null then units.tenant_limit else 1 end)'
-                .' > (select count(*) from leases where leases.unit_id = units.id and leases.status = ?)'
-                .' + (select count(*) from reservations where reservations.unit_id = units.id and reservations.status = ?)',
-                [LeaseStatus::Active->value, ReservationStatus::Approved->value],
-            );
+                ." > {$taken}",
+                $takenBindings,
+            )
+            ->where(fn (Builder $room) => $room
+                ->whereNull('units.floor_area_sqm')
+                ->orWhereRaw("{$taken} < 1", $takenBindings)
+                ->orWhereRaw(
+                    "{$taken} < ? and units.floor_area_sqm >= ({$taken} + 1) * {$areaPerTenant}",
+                    [...$takenBindings, (int) config('occuplace.units.max_capacity'), ...$takenBindings, ...$areaPerTenantBindings],
+                ));
     }
 
     /**
@@ -178,7 +314,7 @@ class Unit extends Model
      */
     public function slotsAvailable(): int
     {
-        return max(0, $this->capacity() - $this->activeLeaseCount() - $this->heldReservationCount());
+        return max(0, $this->capacity() - $this->takenSlotCount());
     }
 
     /**
@@ -245,6 +381,7 @@ class Unit extends Model
             'status' => UnitStatus::class,
             'allows_multiple_tenants' => 'boolean',
             'price' => 'decimal:2',
+            'floor_area_sqm' => 'decimal:1',
         ];
     }
 }
