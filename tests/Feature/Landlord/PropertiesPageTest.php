@@ -17,6 +17,7 @@ use App\Models\Unit;
 use App\Models\UnitListing;
 use App\Models\User;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
+use Livewire\Features\SupportTesting\Testable;
 use Livewire\Livewire;
 
 test('guests are redirected to the login page', function () {
@@ -252,6 +253,7 @@ test('an older unit without a floor area can have its details completed once', f
         ->assertHasErrors(['form.floor_area_sqm' => 'required', 'form.floor_level'])
         ->set('form.floor_level', '2nd floor')
         ->set('form.floor_area_sqm', '22')
+        ->set('form.isStudio', false)
         ->set('form.bedrooms', 2)
         ->set('form.bathrooms', 1)
         ->call('updateUnit')
@@ -294,7 +296,7 @@ test('unit details outside the allowed limits are rejected', function (array $in
 
     expect($property->units()->count())->toBe(0);
 })->with([
-    'floor area below the minimum' => [['floor_area_sqm' => '5', 'bedrooms' => 0, 'bathrooms' => 0], 'floor_area_sqm'],
+    'floor area below the minimum' => [['floor_area_sqm' => '5', 'isStudio' => true, 'hasSharedBathroom' => true], 'floor_area_sqm'],
     'floor area above the maximum' => [['floor_area_sqm' => '71'], 'floor_area_sqm'],
     'floor area with two decimals' => [['floor_area_sqm' => '24.25'], 'floor_area_sqm'],
     'a floor not on the list' => [['floor_level' => '1st floor'], 'floor_level'],
@@ -399,7 +401,7 @@ test('a shared studio cannot hold more tenants than its floor area allows', func
             'form.unit_number' => '101',
             'form.floor_level' => 'Ground floor',
             'form.floor_area_sqm' => '18',
-            'form.bedrooms' => 0,
+            'form.isStudio' => true,
             'form.bathrooms' => 1,
             'form.price' => '6000',
             'form.occupancy' => 'multiple',
@@ -476,7 +478,7 @@ test('a unit too small for two tenants cannot be shared', function () {
             'form.unit_number' => '101',
             'form.floor_level' => 'Ground floor',
             'form.floor_area_sqm' => '11',
-            'form.bedrooms' => 0,
+            'form.isStudio' => true,
             'form.bathrooms' => 1,
             'form.price' => '3000',
             'form.occupancy' => 'multiple',
@@ -495,7 +497,7 @@ test('dormitories fit more tenants in the same floor area', function () {
     Livewire::test('pages::landlord.properties')
         ->call('startAddingUnit', $property->id)
         ->set('form.floor_area_sqm', '18')
-        ->set('form.bedrooms', 0)
+        ->set('form.isStudio', true)
         ->set('form.occupancy', 'multiple')
         ->assertSee('This floor area fits up to 4 tenants.');
 });
@@ -733,4 +735,83 @@ test('a landlord cannot edit a unit belonging to another team', function () {
 
     Livewire::test('pages::landlord.properties')
         ->call('startEditingUnit', $otherUnit->id);
+});
+
+/**
+ * The Properties page with a new 24 m² unit on the form, ready to save.
+ *
+ * @param  array<string, mixed>  $rooms
+ */
+function unitWithRooms(User $user, array $rooms): Testable
+{
+    $property = Property::factory()->for($user->currentTeam)->create(['type' => PropertyType::Dormitory]);
+
+    return Livewire::actingAs($user)
+        ->test('pages::landlord.properties')
+        ->call('startAddingUnit', $property->id)
+        ->set([
+            'form.unit_number' => '101',
+            'form.floor_level' => 'Ground floor',
+            'form.floor_area_sqm' => '24',
+            'form.price' => '5000',
+        ])
+        ->set(collect($rooms)->mapWithKeys(fn (mixed $value, string $key): array => ["form.{$key}" => $value])->all());
+}
+
+test('ticking studio or bedspace and shared bathroom saves no bedroom and no bathroom of its own', function () {
+    $user = User::factory()->create();
+
+    unitWithRooms($user, ['isStudio' => true, 'hasSharedBathroom' => true])
+        ->assertDontSeeHtml('wire:model.live.blur="form.bedrooms"')
+        ->assertDontSeeHtml('wire:model.live.blur="form.bathrooms"')
+        ->call('addUnit')
+        ->assertHasNoErrors();
+
+    expect(Unit::query()->sole())
+        ->bedrooms->toBe(0)
+        ->bathrooms->toBe(0);
+});
+
+test('the ticked boxes decide the rooms, whatever number a request sends', function () {
+    $user = User::factory()->create();
+
+    unitWithRooms($user, ['isStudio' => true, 'hasSharedBathroom' => true, 'bedrooms' => '2', 'bathrooms' => '2'])
+        ->call('addUnit')
+        ->assertHasNoErrors();
+
+    expect(Unit::query()->sole())
+        ->bedrooms->toBe(0)
+        ->bathrooms->toBe(0);
+});
+
+test('zero bedrooms or bathrooms without ticking the box snaps back to one', function () {
+    unitWithRooms(User::factory()->create(), [])
+        ->set('form.bedrooms', '0')
+        ->set('form.bathrooms', '0')
+        ->assertSet('form.bedrooms', '1')
+        ->assertSet('form.bathrooms', '1')
+        ->call('addUnit')
+        ->assertHasNoErrors();
+
+    expect(Unit::query()->sole())
+        ->bedrooms->toBe(1)
+        ->bathrooms->toBe(1);
+});
+
+test('unticking studio or bedspace starts the bedrooms at one', function () {
+    unitWithRooms(User::factory()->create(), ['isStudio' => true])
+        ->assertSet('form.bedrooms', '0')
+        ->set('form.isStudio', false)
+        ->assertSet('form.bedrooms', '1');
+});
+
+test('editing a studio with a shared bathroom starts with both boxes ticked', function () {
+    $user = User::factory()->create();
+    $unit = Unit::factory()->for(Property::factory()->for($user->currentTeam))->withoutFloorArea()->create(['bedrooms' => 0, 'bathrooms' => 0]);
+
+    Livewire::actingAs($user)
+        ->test('pages::landlord.properties')
+        ->call('startEditingUnit', $unit->id)
+        ->assertSet('form.isStudio', true)
+        ->assertSet('form.hasSharedBathroom', true);
 });

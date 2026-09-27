@@ -38,6 +38,15 @@ class UnitForm extends Form
 
     public string $bathrooms = '1';
 
+    /**
+     * A studio or bedspace has no separate bedroom, and a unit with a shared
+     * bathroom has none of its own. The landlord ticks these instead of
+     * typing a 0, and they decide the stored 0 bedrooms or 0 bathrooms.
+     */
+    public bool $isStudio = false;
+
+    public bool $hasSharedBathroom = false;
+
     public string $floor_area_sqm = '';
 
     public string $occupancy = 'single';
@@ -71,6 +80,8 @@ class UnitForm extends Form
         $this->floor_level = (string) $unit->floor_level;
         $this->bedrooms = (string) $unit->bedrooms;
         $this->bathrooms = (string) $unit->bathrooms;
+        $this->isStudio = $unit->bedrooms === 0;
+        $this->hasSharedBathroom = $unit->bathrooms === 0;
         $this->floor_area_sqm = (string) $unit->floor_area_sqm;
         $this->occupancy = $unit->allows_multiple_tenants ? 'multiple' : 'single';
         $this->tenant_limit = $unit->tenant_limit !== null ? (string) $unit->tenant_limit : '';
@@ -328,16 +339,42 @@ class UnitForm extends Form
      */
     public function updatedBedrooms(): void
     {
-        $limits = config('occuplace.units.bedrooms');
+        if ($this->isStudio) {
+            $this->bedrooms = '0';
 
-        $this->bedrooms = $this->clampToRange($this->bedrooms, $limits['min'], $this->maxBedrooms() ?? $limits['max']);
+            return;
+        }
+
+        $this->bedrooms = $this->clampToRange($this->bedrooms, 1, $this->maxBedrooms() ?? config('occuplace.units.bedrooms.max'));
     }
 
     public function updatedBathrooms(): void
     {
-        $limits = config('occuplace.units.bathrooms');
+        if ($this->hasSharedBathroom) {
+            $this->bathrooms = '0';
 
-        $this->bathrooms = $this->clampToRange($this->bathrooms, $limits['min'], $this->maxBathrooms() ?? $limits['max']);
+            return;
+        }
+
+        $this->bathrooms = $this->clampToRange($this->bathrooms, 1, $this->maxBathrooms() ?? config('occuplace.units.bathrooms.max'));
+    }
+
+    /**
+     * Ticking "Studio or bedspace" means no separate bedroom; unticking it
+     * starts the bedroom count at one.
+     */
+    public function updatedIsStudio(): void
+    {
+        $this->bedrooms = $this->isStudio ? '0' : '1';
+    }
+
+    /**
+     * Ticking "Shared bathroom" means no bathroom of the unit's own;
+     * unticking it starts the bathroom count at one.
+     */
+    public function updatedHasSharedBathroom(): void
+    {
+        $this->bathrooms = $this->hasSharedBathroom ? '0' : '1';
     }
 
     private function clampToRange(string $value, int $min, int $max): string
@@ -448,6 +485,14 @@ class UnitForm extends Form
      */
     public function validatedAttributes(PropertyType $type, int $propertyId, ?Unit $unit = null): array
     {
+        if ($this->isStudio) {
+            $this->bedrooms = '0';
+        }
+
+        if ($this->hasSharedBathroom) {
+            $this->bathrooms = '0';
+        }
+
         $validated = $this->validate($this->rulesFor($type, $propertyId, $unit), attributes: [
             'unit_number' => __('unit name'),
             'floor_level' => __('floor level'),
@@ -533,18 +578,24 @@ class UnitForm extends Form
         return [
             ...$rules,
             'floor_level' => ['required', Rule::in(Unit::floorLevelOptions())],
+            'isStudio' => ['boolean'],
+            'hasSharedBathroom' => ['boolean'],
             'bedrooms' => [
-                'required', 'integer', 'min:'.$limits['bedrooms']['min'], 'max:'.$limits['bedrooms']['max'],
+                'required', 'integer', 'min:'.($this->isStudio ? 0 : 1), 'max:'.$limits['bedrooms']['max'],
                 function (string $attribute, mixed $value, Closure $fail) use ($maxBedrooms): void {
-                    if ($maxBedrooms !== null && $value > $maxBedrooms) {
+                    if ($maxBedrooms === 0 && $value > 0) {
+                        $fail(__('This floor area is too small for a separate bedroom. Tick "Studio or bedspace" instead.'));
+                    } elseif ($maxBedrooms !== null && $value > $maxBedrooms) {
                         $fail(__('This floor area fits at most :max bedrooms.', ['max' => $maxBedrooms]));
                     }
                 },
             ],
             'bathrooms' => [
-                'required', 'integer', 'min:'.$limits['bathrooms']['min'], 'max:'.$limits['bathrooms']['max'],
+                'required', 'integer', 'min:'.($this->hasSharedBathroom ? 0 : 1), 'max:'.$limits['bathrooms']['max'],
                 function (string $attribute, mixed $value, Closure $fail) use ($maxBathrooms): void {
-                    if ($maxBathrooms !== null && $value > $maxBathrooms) {
+                    if ($maxBathrooms === 0 && $value > 0) {
+                        $fail(__('This floor area is too small for a bathroom of its own. Tick "Shared bathroom" instead.'));
+                    } elseif ($maxBathrooms !== null && $value > $maxBathrooms) {
                         $fail(__('This floor area fits at most :max bathrooms.', ['max' => $maxBathrooms]));
                     }
                 },

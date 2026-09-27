@@ -23,7 +23,7 @@
             </div>
             <div>
                 <dt class="text-zinc-500 dark:text-zinc-400">{{ __('Bedrooms') }}</dt>
-                <dd class="font-medium">{{ (int) $bedrooms === 0 ? __('Studio') : $bedrooms }}</dd>
+                <dd class="font-medium">{{ (int) $bedrooms === 0 ? __('Studio or bedspace') : $bedrooms }}</dd>
             </div>
             <div>
                 <dt class="text-zinc-500 dark:text-zinc-400">{{ __('Bathrooms') }}</dt>

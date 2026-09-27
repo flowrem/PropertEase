@@ -1,6 +1,8 @@
 @props([
     'occupancy',
     'bedrooms' => 0,
+    'isStudio' => false,
+    'hasSharedBathroom' => false,
     'amenityGroups' => collect(),
     'selectedAmenities' => [],
     'amenityLimits' => [],
@@ -46,7 +48,7 @@
             </div>
             <div>
                 <dt class="text-zinc-500 dark:text-zinc-400">{{ __('Bedrooms') }}</dt>
-                <dd class="font-medium">{{ $lockedUnit->bedrooms === 0 ? __('Studio') : $lockedUnit->bedrooms }}</dd>
+                <dd class="font-medium">{{ $lockedUnit->bedrooms === 0 ? __('Studio or bedspace') : $lockedUnit->bedrooms }}</dd>
             </div>
             <div>
                 <dt class="text-zinc-500 dark:text-zinc-400">{{ __('Bathrooms') }}</dt>
@@ -77,30 +79,49 @@
     </div>
 
     <div class="grid gap-4 sm:grid-cols-2">
-        <flux:input
-            wire:model.live.blur="form.bedrooms"
-            type="number"
-            min="{{ $limits['bedrooms']['min'] }}"
-            max="{{ $maxBedrooms ?? $limits['bedrooms']['max'] }}"
-            :label="__('Bedrooms')"
-            :description="__('0 for a studio or bedspace')"
-            required
-        />
-        <flux:input
-            wire:model.live.blur="form.bathrooms"
-            type="number"
-            min="{{ $limits['bathrooms']['min'] }}"
-            max="{{ $maxBathrooms ?? $limits['bathrooms']['max'] }}"
-            :label="__('Bathrooms')"
-            :description="__('0 if tenants use a shared bathroom')"
-            required
-        />
+        <div class="space-y-3">
+            <flux:checkbox
+                wire:model.live="form.isStudio"
+                :label="__('Studio or bedspace')"
+                :description="__('No separate bedroom: one open room, or beds rented in a shared room.')"
+            />
+
+            @unless ($isStudio)
+                <flux:input
+                    wire:model.live.blur="form.bedrooms"
+                    type="number"
+                    min="1"
+                    max="{{ max(1, $maxBedrooms ?? $limits['bedrooms']['max']) }}"
+                    :label="__('Bedrooms')"
+                    required
+                />
+            @endunless
+        </div>
+
+        <div class="space-y-3">
+            <flux:checkbox
+                wire:model.live="form.hasSharedBathroom"
+                :label="__('Shared bathroom')"
+                :description="__('Tenants use a bathroom outside the unit, like a common CR on the floor.')"
+            />
+
+            @unless ($hasSharedBathroom)
+                <flux:input
+                    wire:model.live.blur="form.bathrooms"
+                    type="number"
+                    min="1"
+                    max="{{ max(1, $maxBathrooms ?? $limits['bathrooms']['max']) }}"
+                    :label="__('Bathrooms')"
+                    required
+                />
+            @endunless
+        </div>
     </div>
 
-    @if ($maxBedrooms !== null)
+    @if ($maxBedrooms !== null && ! $isStudio)
         <flux:text class="text-zinc-500 dark:text-zinc-400">
             {{ $maxBedrooms === 0
-                ? __('This floor area only fits a studio or bedspace.')
+                ? __('This floor area is too small for a separate bedroom. Tick "Studio or bedspace".')
                 : trans_choice('This floor area fits up to :count bedroom, keeping :area m² for a kitchen and living area.|This floor area fits up to :count bedrooms, keeping :area m² for a kitchen and living area.', $maxBedrooms, ['area' => $limits['common_area']]) }}
         </flux:text>
     @endif

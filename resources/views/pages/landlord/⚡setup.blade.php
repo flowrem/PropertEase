@@ -309,6 +309,8 @@ new #[Title('Add a property')] class extends Component
                 <x-unit-form-fields
                     :occupancy="$form->occupancy"
                     :bedrooms="$form->bedrooms"
+                    :is-studio="$form->isStudio"
+                    :has-shared-bathroom="$form->hasSharedBathroom"
                     :amenity-groups="$this->formAmenityGroups"
                     :selected-amenities="$form->amenityIds"
                     :amenity-limits="$this->formAmenityLimits"
