@@ -201,14 +201,18 @@ class Unit extends Model
 
     /**
      * The most bathrooms a unit of the given floor area can have, once the
-     * given number of bedrooms is accounted for.
+     * given number of bedrooms is accounted for. Never more than one
+     * bathroom per bedroom plus a shared one, since a unit's leftover floor
+     * area alone would otherwise "fit" far more bathrooms than any real
+     * rental has: a bathroom only needs a small minimum area, so a modest
+     * unit with few bedrooms would appear to have room for several of them.
      */
     public static function maxBathroomsFor(float $floorArea, int $bedrooms): int
     {
         return self::roomsThatFit(
             $floorArea - $bedrooms * (float) config('occuplace.units.minimum_bedroom_area'),
             (float) config('occuplace.units.minimum_bathroom_area'),
-            (int) config('occuplace.units.bathrooms.max'),
+            min($bedrooms + 1, (int) config('occuplace.units.bathrooms.max')),
         );
     }
 

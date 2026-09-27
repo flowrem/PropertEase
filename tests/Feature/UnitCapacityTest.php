@@ -31,8 +31,9 @@ test('the most bedrooms a unit fits depends on its floor area and bathrooms', fu
 test('the most bathrooms a unit fits depends on its floor area and bedrooms', function (float $floorArea, int $bedrooms, int $expected) {
     expect(Unit::maxBathroomsFor($floorArea, $bedrooms))->toBe($expected);
 })->with([
-    '13 m², 1 bedroom' => [13, 1, 5],
-    'a huge unit is still capped at the configured ceiling' => [300, 0, 10],
+    '13 m², 1 bedroom is capped at one more than the bedrooms' => [13, 1, 2],
+    '24 m², 3 bedrooms is capped at 4 even though the area alone fits 5' => [24, 3, 4],
+    'a huge unit is still capped at the configured ceiling' => [300, 15, 10],
     'never below zero' => [6, 10, 0],
 ]);
 
