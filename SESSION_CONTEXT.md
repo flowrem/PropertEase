@@ -300,15 +300,16 @@ Live at `https://occuplace.onrender.com`. GitHub repo `flowrem/PropertEase` (kep
 
 ## Design System
 
-**Palette — "Coastal Midnight"** (`resources/css/app.css`, `@theme`):
-- `--color-brand-900: #061222` — dominant background (~60%)
-- `--color-brand-800: #123249` — card/panel surfaces (~30%)
-- `--color-brand-600: #2d5b75` — secondary accent
-- `--color-brand-500: #447794` — **primary accent**, app-wide via `--color-accent`
+**Palette — warm, light only** (chosen by the user on 2026-09-27 from a Color Hunt palette; replaced "Coastal Midnight"). `resources/css/app.css`, `@theme`:
+- Palette colours: `brown #A47251`, `orange #DD9E59`, `sand #F0D8A1`, `sage #DCF0C3` (utilities `bg-sand`, `border-sand`, `bg-sage`, ...). Used for fills, borders, icons.
+- `brand-50 #FDF9F1` page background, `brand-100 #F8EDD5` sidebar/header, `brand-500 #8A5C3F` links/icons/charts (`--color-accent-content`), `brand-600 #74492F` buttons (`--color-accent`), `brand-700 #5C3A25`.
+- `zinc-*` is overridden with Tailwind's warm **stone** values, so every Flux neutral is warm.
+- **Dark mode is removed** (the brief's Phase 9 "light theme" is effectively done): no `class="dark"`, no `@fluxAppearance` (without it Flux clears any saved appearance), no Appearance settings page/route. `dark:` classes remain in views but never apply. `BrandLogoTest` guards this.
+- The logo and icons were recolored with a GD script (inverse-distance blend from the five mint source colours to the palette): brown ring, sage windows, sand ground, deep-brown `#7A5034` wordmark; icons on a sand `#FAF1DD` square. The sidebar mark has no square behind it any more.
 
 **Font**: Plus Jakarta Sans.
 
-**Contrast**: verified numerically against WCAG AA. `text-zinc-400` on `brand-900`/`brand-800` passes (7.33:1 / 5.19:1). `text-zinc-500` on `brand-900` **fails** (3.89:1). Check anything zinc-500 or darker before shipping.
+**Contrast** (WCAG AA): the raw brown `#A47251` is only 4.1:1 on white, so it is never used for text; `brand-500` is 5.7:1 and `brand-600` with white text 7.5:1. `text-zinc-500` (stone) is ~4.8:1 on white; **bare `text-zinc-400` fails on light backgrounds**, so it was replaced app-wide with `text-zinc-500`. Don't reintroduce it for text.
 
 **antislop skill is active in "during" mode** — no em dashes in UI copy, no fabricated stats/testimonials, real nav destinations only, honest empty states.
 
