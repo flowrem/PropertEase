@@ -230,7 +230,7 @@ new #[Title('Invoices')] class extends Component
                     <flux:badge color="lime">{{ __('Settled') }}</flux:badge>
                 @endif
 
-                <flux:text class="text-xs text-zinc-400 dark:text-zinc-500">
+                <flux:text class="text-xs text-zinc-500 dark:text-zinc-500">
                     {{ $invoices->count() }} {{ Str::plural('invoice', $invoices->count()) }}
                 </flux:text>
             </div>

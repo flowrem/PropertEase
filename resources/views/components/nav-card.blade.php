@@ -19,5 +19,5 @@
         <flux:text class="text-zinc-500 dark:text-zinc-400">{{ $description }}</flux:text>
     </div>
 
-    <flux:icon name="chevron-right" class="ms-auto mt-2 size-4 shrink-0 text-zinc-400 transition-transform group-hover:translate-x-0.5 group-hover:text-brand-500" />
+    <flux:icon name="chevron-right" class="ms-auto mt-2 size-4 shrink-0 text-zinc-500 transition-transform group-hover:translate-x-0.5 group-hover:text-brand-500" />
 </a>

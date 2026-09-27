@@ -253,7 +253,7 @@ new #[Title('Add a property')] class extends Component
 
     <ol class="flex items-center gap-4 text-sm">
         @foreach ([1 => __('Property'), 2 => __('Units'), 3 => __('Invite tenant'), 4 => __('Done')] as $number => $label)
-            <li class="flex items-center gap-2 {{ $step >= $number ? 'text-brand-500' : 'text-zinc-400 dark:text-zinc-600' }}">
+            <li class="flex items-center gap-2 {{ $step >= $number ? 'text-brand-500' : 'text-zinc-500 dark:text-zinc-600' }}">
                 <span class="flex size-6 items-center justify-center rounded-full border {{ $step >= $number ? 'border-brand-500 bg-brand-500/10' : 'border-zinc-300 dark:border-zinc-700' }} text-xs font-medium">
                     {{ $number }}
                 </span>

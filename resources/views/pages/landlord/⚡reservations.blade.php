@@ -193,7 +193,7 @@ new #[Title('Reservations')] class extends Component
     </div>
 
     @unless ($this->canReview)
-        <flux:text class="text-zinc-400">{{ __('You can view reservations. Ask your landlord or a manager to approve or reject them.') }}</flux:text>
+        <flux:text class="text-zinc-500">{{ __('You can view reservations. Ask your landlord or a manager to approve or reject them.') }}</flux:text>
     @endunless
 
     <div class="space-y-2">
@@ -208,18 +208,18 @@ new #[Title('Reservations')] class extends Component
             >
                 <div>
                     <flux:heading size="sm">{{ $reservation->fullName() }}</flux:heading>
-                    <flux:text class="text-zinc-400">
+                    <flux:text class="text-zinc-500">
                         {{ $reservation->unit->property->name }} &middot; {{ __('Unit :number', ['number' => $reservation->unit->unit_number]) }}
                         &middot; {{ $reservation->created_at?->diffForHumans() }}
                     </flux:text>
                 </div>
                 <div class="text-right">
                     <flux:text>&#8369;{{ number_format((float) $reservation->downpayment_amount, 2) }}</flux:text>
-                    <flux:text class="text-xs text-zinc-400">{{ $reservation->code }}</flux:text>
+                    <flux:text class="text-xs text-zinc-500">{{ $reservation->code }}</flux:text>
                 </div>
             </button>
         @empty
-            <flux:text class="text-zinc-400">{{ __('No reservations waiting for review.') }}</flux:text>
+            <flux:text class="text-zinc-500">{{ __('No reservations waiting for review.') }}</flux:text>
         @endforelse
     </div>
 
@@ -235,14 +235,14 @@ new #[Title('Reservations')] class extends Component
             >
                 <div>
                     <flux:heading size="sm">{{ $reservation->fullName() }}</flux:heading>
-                    <flux:text class="text-zinc-400">
+                    <flux:text class="text-zinc-500">
                         {{ $reservation->unit->property->name }} &middot; {{ __('Unit :number', ['number' => $reservation->unit->unit_number]) }}
                     </flux:text>
                 </div>
                 <flux:badge size="sm" :color="$reservation->status->color()">{{ $reservation->status->label() }}</flux:badge>
             </button>
         @empty
-            <flux:text class="text-zinc-400">{{ __('Nothing reviewed yet.') }}</flux:text>
+            <flux:text class="text-zinc-500">{{ __('Nothing reviewed yet.') }}</flux:text>
         @endforelse
     </div>
 
@@ -258,27 +258,27 @@ new #[Title('Reservations')] class extends Component
 
                 <dl class="grid gap-3 text-sm sm:grid-cols-2">
                     <div>
-                        <dt class="text-zinc-400">{{ __('Unit') }}</dt>
+                        <dt class="text-zinc-500">{{ __('Unit') }}</dt>
                         <dd>{{ $reservation->unit->property->name }} &middot; {{ __('Unit :number', ['number' => $reservation->unit->unit_number]) }}</dd>
                     </div>
                     <div>
-                        <dt class="text-zinc-400">{{ __('Reference code') }}</dt>
+                        <dt class="text-zinc-500">{{ __('Reference code') }}</dt>
                         <dd>{{ $reservation->code }}</dd>
                     </div>
                     <div>
-                        <dt class="text-zinc-400">{{ __('Email') }}</dt>
+                        <dt class="text-zinc-500">{{ __('Email') }}</dt>
                         <dd>{{ $reservation->email }}</dd>
                     </div>
                     <div>
-                        <dt class="text-zinc-400">{{ __('Requested username') }}</dt>
+                        <dt class="text-zinc-500">{{ __('Requested username') }}</dt>
                         <dd>{{ $reservation->desired_username }}</dd>
                     </div>
                     <div>
-                        <dt class="text-zinc-400">{{ __('Age') }}</dt>
+                        <dt class="text-zinc-500">{{ __('Age') }}</dt>
                         <dd>{{ $reservation->age }}</dd>
                     </div>
                     <div>
-                        <dt class="text-zinc-400">{{ __('Address') }}</dt>
+                        <dt class="text-zinc-500">{{ __('Address') }}</dt>
                         <dd>{{ $reservation->address }}</dd>
                     </div>
                 </dl>
@@ -287,19 +287,19 @@ new #[Title('Reservations')] class extends Component
                     <flux:heading size="sm">{{ __('Downpayment') }}</flux:heading>
                     <dl class="grid gap-3 text-sm sm:grid-cols-2">
                         <div>
-                            <dt class="text-zinc-400">{{ __('Amount') }}</dt>
+                            <dt class="text-zinc-500">{{ __('Amount') }}</dt>
                             <dd>&#8369;{{ number_format((float) $reservation->downpayment_amount, 2) }}</dd>
                         </div>
                         <div>
-                            <dt class="text-zinc-400">{{ __('Paid to') }}</dt>
+                            <dt class="text-zinc-500">{{ __('Paid to') }}</dt>
                             <dd>{{ $reservation->paymentChannel ? $reservation->paymentChannel->method->label().' · '.$reservation->paymentChannel->account_name : $reservation->downpayment_method->label() }}</dd>
                         </div>
                         <div>
-                            <dt class="text-zinc-400">{{ __('Reference number') }}</dt>
+                            <dt class="text-zinc-500">{{ __('Reference number') }}</dt>
                             <dd>{{ $reservation->downpayment_reference }}</dd>
                         </div>
                         <div>
-                            <dt class="text-zinc-400">{{ __('Method') }}</dt>
+                            <dt class="text-zinc-500">{{ __('Method') }}</dt>
                             <dd>{{ $reservation->downpayment_method->label() }}</dd>
                         </div>
                     </dl>
@@ -312,7 +312,7 @@ new #[Title('Reservations')] class extends Component
                                     alt="{{ __('Proof of payment') }}"
                                     class="max-h-72 w-full rounded-md border border-zinc-200 object-contain dark:border-zinc-700"
                                 >
-                                <flux:text class="mt-1 text-xs text-zinc-400">{{ __('Proof of payment') }}</flux:text>
+                                <flux:text class="mt-1 text-xs text-zinc-500">{{ __('Proof of payment') }}</flux:text>
                             </a>
                             <a href="{{ route('reservations.files', ['reservation' => $reservation->id, 'kind' => 'id']) }}" target="_blank" rel="noopener">
                                 <img
@@ -320,11 +320,11 @@ new #[Title('Reservations')] class extends Component
                                     alt="{{ __('Valid ID') }}"
                                     class="max-h-72 w-full rounded-md border border-zinc-200 object-contain dark:border-zinc-700"
                                 >
-                                <flux:text class="mt-1 text-xs text-zinc-400">{{ __('Valid ID') }}</flux:text>
+                                <flux:text class="mt-1 text-xs text-zinc-500">{{ __('Valid ID') }}</flux:text>
                             </a>
                         </div>
                     @else
-                        <flux:text class="text-zinc-400">{{ __('The ID and payment proof were deleted after the retention period.') }}</flux:text>
+                        <flux:text class="text-zinc-500">{{ __('The ID and payment proof were deleted after the retention period.') }}</flux:text>
                     @endif
                 </div>
 
@@ -401,7 +401,7 @@ new #[Title('Reservations')] class extends Component
 
                 @if ($this->canReview && $reservation->status === ReservationStatus::Approved && $reservation->tenant?->must_change_password)
                     <div class="flex items-center justify-between gap-3 rounded-lg border border-zinc-200 p-4 dark:border-zinc-700">
-                        <flux:text class="text-zinc-400">
+                        <flux:text class="text-zinc-500">
                             {{ __('The applicant has not logged in yet. Send a fresh temporary password if the email never arrived or expired.') }}
                         </flux:text>
                         <flux:button wire:click="resendLoginDetails">{{ __('Resend login details') }}</flux:button>

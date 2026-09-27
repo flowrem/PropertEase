@@ -157,10 +157,10 @@ new #[Title('Listing review')] class extends Component
                     ])
                 >
                     <flux:heading size="sm">{{ $listing->title }}</flux:heading>
-                    <flux:text class="text-zinc-400">
+                    <flux:text class="text-zinc-500">
                         {{ $listing->unit->property->name }} &middot; {{ __('Unit :number', ['number' => $listing->unit->unit_number]) }}
                     </flux:text>
-                    <flux:text class="text-xs text-zinc-400">
+                    <flux:text class="text-xs text-zinc-500">
                         {{ __('Submitted :time', ['time' => $listing->submitted_at?->diffForHumans()]) }}
                     </flux:text>
                 </button>
@@ -180,7 +180,7 @@ new #[Title('Listing review')] class extends Component
                 <div class="flex flex-col gap-5 rounded-lg border border-zinc-200 p-5 dark:border-zinc-700">
                     <div>
                         <flux:heading size="lg">{{ $listing->title }}</flux:heading>
-                        <flux:text class="text-zinc-400">
+                        <flux:text class="text-zinc-500">
                             {{ $property->team->name }} &middot; {{ $property->name }} ({{ $property->type->label() }})
                             &middot; {{ __('Unit :number', ['number' => $listing->unit->unit_number]) }}
                         </flux:text>
@@ -200,19 +200,19 @@ new #[Title('Listing review')] class extends Component
 
                     <dl class="grid gap-3 text-sm sm:grid-cols-2">
                         <div>
-                            <dt class="text-zinc-400">{{ __('Address') }}</dt>
+                            <dt class="text-zinc-500">{{ __('Address') }}</dt>
                             <dd>{{ $property->address_line }}, {{ $property->city }}, {{ $property->province }} {{ $property->postal_code }}</dd>
                         </div>
                         <div>
-                            <dt class="text-zinc-400">{{ __('Monthly price') }}</dt>
+                            <dt class="text-zinc-500">{{ __('Monthly price') }}</dt>
                             <dd>&#8369;{{ number_format((float) $listing->unit->price, 2) }}</dd>
                         </div>
                         <div>
-                            <dt class="text-zinc-400">{{ __('Contact') }}</dt>
+                            <dt class="text-zinc-500">{{ __('Contact') }}</dt>
                             <dd>{{ $listing->contact_name }} &middot; {{ $listing->contact_phone }} &middot; {{ $listing->contact_email }}</dd>
                         </div>
                         <div>
-                            <dt class="text-zinc-400">{{ __('Downpayment requested') }}</dt>
+                            <dt class="text-zinc-500">{{ __('Downpayment requested') }}</dt>
                             <dd>{{ $listing->downpayment_amount !== null ? '₱'.number_format((float) $listing->downpayment_amount, 2) : __('Not set') }}</dd>
                         </div>
                     </dl>
@@ -226,12 +226,12 @@ new #[Title('Listing review')] class extends Component
                                 @endif
                                 <div>
                                     <flux:text class="font-medium">{{ $channel->method->label() }}</flux:text>
-                                    <flux:text class="text-zinc-400">{{ $channel->account_name }}</flux:text>
+                                    <flux:text class="text-zinc-500">{{ $channel->account_name }}</flux:text>
                                     @if ($channel->bank_name)
-                                        <flux:text class="text-zinc-400">{{ $channel->bank_name }}</flux:text>
+                                        <flux:text class="text-zinc-500">{{ $channel->bank_name }}</flux:text>
                                     @endif
                                     @if ($channel->account_number)
-                                        <flux:text class="text-zinc-400">{{ $channel->account_number }}</flux:text>
+                                        <flux:text class="text-zinc-500">{{ $channel->account_number }}</flux:text>
                                     @endif
                                 </div>
                             </div>
@@ -250,7 +250,7 @@ new #[Title('Listing review')] class extends Component
                     </div>
                 </div>
             @else
-                <flux:text class="text-zinc-400">{{ __('Select a listing to review it.') }}</flux:text>
+                <flux:text class="text-zinc-500">{{ __('Select a listing to review it.') }}</flux:text>
             @endif
         </div>
     </div>

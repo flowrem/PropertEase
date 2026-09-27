@@ -453,9 +453,9 @@ new #[Title('Properties')] class extends Component
                         wire:click.stop="startEditingProperty({{ $property->id }})"
                     />
                     @if (isset($expanded[$property->id]))
-                        <flux:icon.chevron-up class="size-4 text-zinc-400" />
+                        <flux:icon.chevron-up class="size-4 text-zinc-500" />
                     @else
-                        <flux:icon.chevron-down class="size-4 text-zinc-400" />
+                        <flux:icon.chevron-down class="size-4 text-zinc-500" />
                     @endif
                 </div>
             </div>

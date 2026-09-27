@@ -11,35 +11,40 @@
 @theme {
     --font-sans: 'Plus Jakarta Sans', ui-sans-serif, system-ui, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji', 'Segoe UI Symbol', 'Noto Color Emoji';
 
-    --color-zinc-50: #fafafa;
-    --color-zinc-100: #f5f5f5;
-    --color-zinc-200: #e5e5e5;
-    --color-zinc-300: #d4d4d4;
-    --color-zinc-400: #a3a3a3;
-    --color-zinc-500: #737373;
-    --color-zinc-600: #525252;
-    --color-zinc-700: #404040;
-    --color-zinc-800: #262626;
-    --color-zinc-900: #171717;
-    --color-zinc-950: #0a0a0a;
+    /* Warm greys (Tailwind's stone scale) so Flux's neutrals sit with the browns. */
+    --color-zinc-50: #fafaf9;
+    --color-zinc-100: #f5f5f4;
+    --color-zinc-200: #e7e5e4;
+    --color-zinc-300: #d6d3d1;
+    --color-zinc-400: #a8a29e;
+    --color-zinc-500: #78716c;
+    --color-zinc-600: #57534e;
+    --color-zinc-700: #44403c;
+    --color-zinc-800: #292524;
+    --color-zinc-900: #1c1917;
+    --color-zinc-950: #0c0a09;
 
-    --color-accent: var(--color-neutral-800);
-    --color-accent-content: var(--color-neutral-800);
+    /*
+     * Occuplace palette: brown #A47251, orange #DD9E59, sand #F0D8A1 and
+     * sage #DCF0C3. Brown on its own is 4.1:1 against white, short of WCAG
+     * AA for body text, so text, links and buttons use the darker brand-500
+     * and brand-600 shades of it; the palette colours themselves go on
+     * fills, borders and icons.
+     */
+    --color-brown: #a47251;
+    --color-orange: #dd9e59;
+    --color-sand: #f0d8a1;
+    --color-sage: #dcf0c3;
+
+    --color-brand-50: #fdf9f1;
+    --color-brand-100: #f8edd5;
+    --color-brand-500: #8a5c3f;
+    --color-brand-600: #74492f;
+    --color-brand-700: #5c3a25;
+
+    --color-accent: var(--color-brand-600);
+    --color-accent-content: var(--color-brand-500);
     --color-accent-foreground: var(--color-white);
-
-    /* Occuplace brand palette (Coastal Midnight) */
-    --color-brand-500: #447794;
-    --color-brand-600: #2d5b75;
-    --color-brand-800: #123249;
-    --color-brand-900: #061222;
-}
-
-@layer theme {
-    .dark {
-        --color-accent: var(--color-brand-500);
-        --color-accent-content: var(--color-brand-500);
-        --color-accent-foreground: var(--color-white);
-    }
 }
 
 @layer base {

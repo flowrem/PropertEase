@@ -465,7 +465,7 @@ new #[Title('Unit inventory')] class extends Component
                 </div>
             </form>
         @else
-            <flux:text class="text-zinc-400">{{ __('You can view the inventory and record checks. Ask your landlord or a manager to change the item list.') }}</flux:text>
+            <flux:text class="text-zinc-500">{{ __('You can view the inventory and record checks. Ask your landlord or a manager to change the item list.') }}</flux:text>
         @endif
 
         <div class="divide-y divide-zinc-200 rounded-lg border border-zinc-200 dark:divide-zinc-700 dark:border-zinc-700">
@@ -490,7 +490,7 @@ new #[Title('Unit inventory')] class extends Component
                     @endif
                 </div>
             @empty
-                <flux:text class="px-4 py-3 text-zinc-400">
+                <flux:text class="px-4 py-3 text-zinc-500">
                     {{ __('No items listed yet. Start with "Add from amenities", then add the rest.') }}
                 </flux:text>
             @endforelse
@@ -608,7 +608,7 @@ new #[Title('Unit inventory')] class extends Component
                     </div>
                 </details>
             @empty
-                <flux:text class="text-zinc-400">{{ __('No checks recorded yet.') }}</flux:text>
+                <flux:text class="text-zinc-500">{{ __('No checks recorded yet.') }}</flux:text>
             @endforelse
         </div>
     </div>

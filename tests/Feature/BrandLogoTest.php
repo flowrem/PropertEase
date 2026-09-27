@@ -2,6 +2,7 @@
 
 use App\Models\Property;
 use App\Models\User;
+use Illuminate\Support\Facades\Route;
 
 test('the logo files and icons exist', function (string $path) {
     expect(public_path($path))->toBeFile();
@@ -43,4 +44,15 @@ test('the app sidebar shows the logo mark for a logged in landlord', function ()
         ->get(route('dashboard'))
         ->assertOk()
         ->assertSee('images/logo-mark.png', false);
+});
+
+test('the app has a single light theme with no appearance setting', function () {
+    $landlord = User::factory()->create();
+    Property::factory()->for($landlord->currentTeam)->create();
+
+    $this->get(route('home'))->assertOk()->assertDontSee('class="dark"', false)->assertDontSee('applyAppearance', false);
+    $this->get(route('login'))->assertOk()->assertDontSee('class="dark"', false)->assertDontSee('applyAppearance', false);
+    $this->actingAs($landlord)->get(route('dashboard'))->assertOk()->assertDontSee('class="dark"', false)->assertDontSee('applyAppearance', false);
+
+    expect(Route::has('appearance.edit'))->toBeFalse();
 });

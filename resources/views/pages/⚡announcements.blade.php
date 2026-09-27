@@ -178,7 +178,7 @@ new #[Title('Announcements')] class extends Component
                     <flux:text class="text-zinc-500 dark:text-zinc-400">{{ $announcement->author->name }}</flux:text>
                 </div>
                 <div class="flex shrink-0 items-center gap-2">
-                    <flux:text class="text-xs text-zinc-400 dark:text-zinc-500">
+                    <flux:text class="text-xs text-zinc-500 dark:text-zinc-500">
                         {{ $announcement->created_at->diffForHumans() }}
                     </flux:text>
 

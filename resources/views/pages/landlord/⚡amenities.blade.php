@@ -104,7 +104,7 @@ new #[Title('Amenities')] class extends Component
     </div>
 
     @if (! $this->canManage)
-        <flux:text class="text-zinc-400">{{ __('You can view this list. Ask your landlord or a manager to change it.') }}</flux:text>
+        <flux:text class="text-zinc-500">{{ __('You can view this list. Ask your landlord or a manager to change it.') }}</flux:text>
     @endif
 
     <div class="space-y-4">
@@ -147,7 +147,7 @@ new #[Title('Amenities')] class extends Component
                     @endif
                 </div>
             @empty
-                <flux:text class="px-4 py-3 text-zinc-400">{{ __('You have not added any of your own yet.') }}</flux:text>
+                <flux:text class="px-4 py-3 text-zinc-500">{{ __('You have not added any of your own yet.') }}</flux:text>
             @endforelse
         </div>
     </div>

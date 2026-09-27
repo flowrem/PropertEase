@@ -1,24 +1,24 @@
 <x-public-layout :title="__('Find a place')">
     <section class="mx-auto w-full max-w-5xl px-6 pb-16 sm:px-8">
-        <h1 class="text-3xl font-semibold tracking-tight text-white">{{ __('Find an apartment or dorm') }}</h1>
-        <p class="mt-2 text-zinc-400">{{ __('Approved listings with room available right now.') }}</p>
+        <h1 class="text-3xl font-semibold tracking-tight text-zinc-900">{{ __('Find an apartment or dorm') }}</h1>
+        <p class="mt-2 text-zinc-600">{{ __('Approved listings with room available right now.') }}</p>
 
         <form method="GET" action="{{ route('listings.index') }}" class="mt-6 grid gap-3 sm:grid-cols-4">
             <div class="sm:col-span-2">
-                <label for="q" class="mb-1 block text-sm text-zinc-300">{{ __('City or province') }}</label>
+                <label for="q" class="mb-1 block text-sm text-zinc-700">{{ __('City or province') }}</label>
                 <input
                     id="q"
                     name="q"
                     type="search"
                     maxlength="100"
                     value="{{ $filters['q'] ?? '' }}"
-                    class="w-full rounded-lg border border-zinc-700 bg-brand-800 px-3 py-2 text-sm text-white placeholder:text-zinc-400"
+                    class="w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 placeholder:text-zinc-500"
                 >
             </div>
 
             <div>
-                <label for="type" class="mb-1 block text-sm text-zinc-300">{{ __('Type') }}</label>
-                <select id="type" name="type" class="w-full rounded-lg border border-zinc-700 bg-brand-800 px-3 py-2 text-sm text-white">
+                <label for="type" class="mb-1 block text-sm text-zinc-700">{{ __('Type') }}</label>
+                <select id="type" name="type" class="w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900">
                     <option value="">{{ __('Any') }}</option>
                     @foreach (\App\Enums\PropertyType::cases() as $type)
                         <option value="{{ $type->value }}" @selected(($filters['type'] ?? null) === $type->value)>{{ $type->label() }}</option>
@@ -27,7 +27,7 @@
             </div>
 
             <div>
-                <label for="max_price" class="mb-1 block text-sm text-zinc-300">{{ __('Max price per month') }}</label>
+                <label for="max_price" class="mb-1 block text-sm text-zinc-700">{{ __('Max price per month') }}</label>
                 <input
                     id="max_price"
                     name="max_price"
@@ -35,33 +35,33 @@
                     min="0"
                     step="100"
                     value="{{ $filters['max_price'] ?? '' }}"
-                    class="w-full rounded-lg border border-zinc-700 bg-brand-800 px-3 py-2 text-sm text-white placeholder:text-zinc-400"
+                    class="w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 placeholder:text-zinc-500"
                 >
             </div>
 
             @php($selectedAmenities = array_map('intval', $filters['amenities'] ?? []))
 
-            <details class="rounded-lg border border-zinc-700 bg-brand-800 px-4 py-3 sm:col-span-4" @if ($selectedAmenities !== []) open @endif>
-                <summary class="cursor-pointer text-sm text-zinc-300">
+            <details class="rounded-lg border border-zinc-300 bg-white px-4 py-3 sm:col-span-4" @if ($selectedAmenities !== []) open @endif>
+                <summary class="cursor-pointer text-sm text-zinc-700">
                     {{ __('Amenities') }}
                     @if ($selectedAmenities !== [])
-                        <span class="text-zinc-400">({{ count($selectedAmenities) }})</span>
+                        <span class="text-zinc-600">({{ count($selectedAmenities) }})</span>
                     @endif
                 </summary>
 
                 <div class="mt-3 grid gap-4 sm:grid-cols-3">
                     @foreach ($amenityFilters as $category => $amenities)
                         <fieldset>
-                            <legend class="text-xs font-medium uppercase tracking-wide text-zinc-400">{{ $category }}</legend>
+                            <legend class="text-xs font-medium uppercase tracking-wide text-zinc-600">{{ $category }}</legend>
                             <div class="mt-2 space-y-1">
                                 @foreach ($amenities as $amenity)
-                                    <label class="flex items-center gap-2 text-sm text-zinc-200">
+                                    <label class="flex items-center gap-2 text-sm text-zinc-800">
                                         <input
                                             type="checkbox"
                                             name="amenities[]"
                                             value="{{ $amenity->id }}"
                                             @checked(in_array($amenity->id, $selectedAmenities, true))
-                                            class="rounded border-zinc-600 bg-brand-900"
+                                            class="rounded border-zinc-400 bg-brand-50"
                                         >
                                         {{ $amenity->name }}
                                     </label>
@@ -77,7 +77,7 @@
                     {{ __('Search') }}
                 </button>
                 @if (! empty($filters))
-                    <a href="{{ route('listings.index') }}" class="rounded-lg border border-zinc-700 px-5 py-2 text-sm font-medium text-zinc-300 transition-colors hover:border-zinc-500 hover:text-white">
+                    <a href="{{ route('listings.index') }}" class="rounded-lg border border-zinc-300 px-5 py-2 text-sm font-medium text-zinc-700 transition-colors hover:border-zinc-500 hover:text-zinc-900">
                         {{ __('Clear') }}
                     </a>
                 @endif
@@ -85,9 +85,9 @@
         </form>
 
         @if ($listings->isEmpty())
-            <div class="mt-10 rounded-xl border border-zinc-800 bg-brand-800 p-10 text-center">
-                <h2 class="font-semibold text-white">{{ __('No listings match') }}</h2>
-                <p class="mt-2 text-sm text-zinc-400">
+            <div class="mt-10 rounded-xl border border-sand bg-white p-10 text-center">
+                <h2 class="font-semibold text-zinc-900">{{ __('No listings match') }}</h2>
+                <p class="mt-2 text-sm text-zinc-600">
                     {{ empty($filters) ? __('There are no listings with room available right now. Check back soon.') : __('Try a different place, type or price.') }}
                 </p>
             </div>
@@ -100,7 +100,7 @@
 
                     <a
                         href="{{ route('listings.show', $listing) }}"
-                        class="flex flex-col overflow-hidden rounded-xl border border-zinc-800 bg-brand-800 transition-colors hover:border-brand-500"
+                        class="flex flex-col overflow-hidden rounded-xl border border-sand bg-white transition-colors hover:border-brand-500"
                     >
                         @if ($listing->photos->first())
                             <img
@@ -112,14 +112,14 @@
                                 class="aspect-video w-full object-cover"
                             >
                         @else
-                            <div class="aspect-video w-full bg-zinc-900"></div>
+                            <div class="aspect-video w-full bg-zinc-100"></div>
                         @endif
 
                         <div class="flex flex-1 flex-col gap-1 p-4">
-                            <h2 class="font-semibold text-white">{{ $property->name }}</h2>
-                            <p class="text-sm text-zinc-400">{{ $property->type->label() }} &middot; {{ $property->city }}, {{ $property->province }}</p>
-                            <p class="mt-2 text-lg font-semibold text-white">&#8369;{{ number_format((float) $unit->price, 2) }}<span class="text-sm font-normal text-zinc-400"> / {{ __('month') }}</span></p>
-                            <p class="text-sm text-zinc-400">{{ trans_choice(':count slot available|:count slots available', $slots) }}</p>
+                            <h2 class="font-semibold text-zinc-900">{{ $property->name }}</h2>
+                            <p class="text-sm text-zinc-600">{{ $property->type->label() }} &middot; {{ $property->city }}, {{ $property->province }}</p>
+                            <p class="mt-2 text-lg font-semibold text-zinc-900">&#8369;{{ number_format((float) $unit->price, 2) }}<span class="text-sm font-normal text-zinc-600"> / {{ __('month') }}</span></p>
+                            <p class="text-sm text-zinc-600">{{ trans_choice(':count slot available|:count slots available', $slots) }}</p>
                         </div>
                     </a>
                 @endforeach

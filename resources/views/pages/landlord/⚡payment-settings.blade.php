@@ -187,7 +187,7 @@ new #[Title('Payment settings')] class extends Component
     @endif
 
     @if (! $this->canManage)
-        <flux:text class="text-zinc-400">{{ __('You can view these settings. Ask your landlord or a manager to change them.') }}</flux:text>
+        <flux:text class="text-zinc-500">{{ __('You can view these settings. Ask your landlord or a manager to change them.') }}</flux:text>
     @endif
 
     <div class="grid gap-4 md:grid-cols-2">
@@ -213,10 +213,10 @@ new #[Title('Payment settings')] class extends Component
                     </div>
                     <flux:text class="truncate">{{ $channel->account_name }}</flux:text>
                     @if ($channel->bank_name)
-                        <flux:text class="text-zinc-400">{{ $channel->bank_name }}</flux:text>
+                        <flux:text class="text-zinc-500">{{ $channel->bank_name }}</flux:text>
                     @endif
                     @if ($channel->account_number)
-                        <flux:text class="text-zinc-400">{{ $channel->account_number }}</flux:text>
+                        <flux:text class="text-zinc-500">{{ $channel->account_number }}</flux:text>
                     @endif
 
                     @if ($this->canManage)
@@ -230,7 +230,7 @@ new #[Title('Payment settings')] class extends Component
                 </div>
             </div>
         @empty
-            <flux:text class="text-zinc-400">{{ __('No payment channels yet.') }}</flux:text>
+            <flux:text class="text-zinc-500">{{ __('No payment channels yet.') }}</flux:text>
         @endforelse
     </div>
 
@@ -260,9 +260,9 @@ new #[Title('Payment settings')] class extends Component
                     accept="image/jpeg,image/png,image/webp"
                     :label="$method === 'bank_transfer' ? __('QR code (optional)') : __('GCash QR code')"
                 />
-                <flux:text class="text-zinc-400">{{ __('JPG, PNG or WebP, up to 2 MB. Use the "Receive money" QR from your GCash app.') }}</flux:text>
+                <flux:text class="text-zinc-500">{{ __('JPG, PNG or WebP, up to 2 MB. Use the "Receive money" QR from your GCash app.') }}</flux:text>
                 @if ($this->editingChannel?->qrUrl())
-                    <flux:text class="text-zinc-400">{{ __('Leave empty to keep the current QR code.') }}</flux:text>
+                    <flux:text class="text-zinc-500">{{ __('Leave empty to keep the current QR code.') }}</flux:text>
                 @endif
             </div>
 

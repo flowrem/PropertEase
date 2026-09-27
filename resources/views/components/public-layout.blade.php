@@ -3,21 +3,21 @@
 ])
 
 <!DOCTYPE html>
-<html lang="{{ str_replace('_', '-', app()->getLocale()) }}" class="dark">
+<html lang="{{ str_replace('_', '-', app()->getLocale()) }}">
     <head>
         @include('partials.head', ['title' => $title])
     </head>
-    <body class="min-h-screen bg-brand-900 font-sans antialiased">
+    <body class="min-h-screen bg-brand-50 font-sans antialiased">
         <header class="mx-auto flex w-full max-w-5xl items-center justify-between gap-4 px-6 py-6 sm:px-8">
             <a href="{{ route('home') }}" class="flex items-center gap-2" wire:navigate>
                 <x-app-logo-icon class="size-9 object-contain" />
-                <span class="text-sm font-semibold tracking-tight text-white">{{ config('app.name') }}</span>
+                <span class="text-sm font-semibold tracking-tight text-zinc-900">{{ config('app.name') }}</span>
             </a>
 
             <nav class="flex items-center gap-1 sm:gap-2">
                 <a
                     href="{{ route('listings.index') }}"
-                    class="rounded-lg px-3 py-2 text-sm font-medium text-zinc-300 transition-colors hover:text-white sm:px-4"
+                    class="rounded-lg px-3 py-2 text-sm font-medium text-zinc-700 transition-colors hover:text-zinc-900 sm:px-4"
                 >
                     {{ __('Find a place') }}
                 </a>
@@ -44,14 +44,13 @@
             {{ $slot }}
         </main>
 
-        <footer class="mx-auto w-full max-w-5xl px-6 py-10 text-center text-sm text-zinc-400 sm:px-8">
+        <footer class="mx-auto w-full max-w-5xl px-6 py-10 text-center text-sm text-zinc-600 sm:px-8">
             &copy; {{ date('Y') }} {{ config('app.name') }}
             @guest
                 &middot;
-                <a href="{{ route('login') }}" class="underline transition-colors hover:text-white">{{ __('Landlord or tenant log in') }}</a>
+                <a href="{{ route('login') }}" class="underline transition-colors hover:text-zinc-900">{{ __('Landlord or tenant log in') }}</a>
             @endguest
         </footer>
 
-        @fluxAppearance
     </body>
 </html>

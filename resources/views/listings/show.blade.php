@@ -7,10 +7,10 @@
 
 <x-public-layout :title="$listing->title">
     <article class="mx-auto w-full max-w-5xl px-6 pb-16 sm:px-8">
-        <a href="{{ route('listings.index') }}" class="text-sm text-zinc-400 transition-colors hover:text-white">&larr; {{ __('All listings') }}</a>
+        <a href="{{ route('listings.index') }}" class="text-sm text-zinc-600 transition-colors hover:text-zinc-900">&larr; {{ __('All listings') }}</a>
 
-        <h1 class="mt-4 text-3xl font-semibold tracking-tight text-white">{{ $listing->title }}</h1>
-        <p class="mt-1 text-zinc-400">
+        <h1 class="mt-4 text-3xl font-semibold tracking-tight text-zinc-900">{{ $listing->title }}</h1>
+        <p class="mt-1 text-zinc-600">
             {{ $property->name }} &middot; {{ $property->type->label() }} &middot; {{ __('Unit :number', ['number' => $unit->unit_number]) }}
         </p>
 
@@ -31,21 +31,21 @@
 
         <div class="mt-8 grid gap-8 lg:grid-cols-3">
             <div class="lg:col-span-2">
-                <h2 class="font-semibold text-white">{{ __('About this place') }}</h2>
-                <p class="mt-2 whitespace-pre-line text-zinc-300">{{ $listing->description }}</p>
+                <h2 class="font-semibold text-zinc-900">{{ __('About this place') }}</h2>
+                <p class="mt-2 whitespace-pre-line text-zinc-700">{{ $listing->description }}</p>
 
                 @if ($unit->amenities->isNotEmpty())
-                    <h2 class="mt-8 font-semibold text-white">{{ __("What's included") }}</h2>
+                    <h2 class="mt-8 font-semibold text-zinc-900">{{ __("What's included") }}</h2>
                     <div class="mt-2 grid gap-4 sm:grid-cols-2">
                         @foreach (\App\Models\Amenity::groupByCategory($unit->amenities) as $category => $amenities)
                             <div>
-                                <h3 class="text-xs font-medium uppercase tracking-wide text-zinc-400">{{ $category }}</h3>
-                                <ul class="mt-1 space-y-1 text-zinc-300">
+                                <h3 class="text-xs font-medium uppercase tracking-wide text-zinc-600">{{ $category }}</h3>
+                                <ul class="mt-1 space-y-1 text-zinc-700">
                                     @foreach ($amenities as $amenity)
                                         <li>
                                             {{ $amenity->name }}
                                             @if ($amenity->pivot->quantity > 1)
-                                                <span class="text-zinc-400">&times; {{ $amenity->pivot->quantity }}</span>
+                                                <span class="text-zinc-600">&times; {{ $amenity->pivot->quantity }}</span>
                                             @endif
                                         </li>
                                     @endforeach
@@ -55,8 +55,8 @@
                     </div>
                 @endif
 
-                <h2 class="mt-8 font-semibold text-white">{{ __('Location') }}</h2>
-                <p class="mt-2 text-zinc-300">
+                <h2 class="mt-8 font-semibold text-zinc-900">{{ __('Location') }}</h2>
+                <p class="mt-2 text-zinc-700">
                     {{ $property->address_line }}, {{ $property->city }}, {{ $property->province }} {{ $property->postal_code }}
                 </p>
                 @if ($property->map_url)
@@ -66,18 +66,18 @@
                 @endif
             </div>
 
-            <aside class="flex flex-col gap-5 rounded-xl border border-zinc-800 bg-brand-800 p-6">
+            <aside class="flex flex-col gap-5 rounded-xl border border-sand bg-white p-6">
                 <div>
-                    <p class="text-2xl font-semibold text-white">&#8369;{{ number_format((float) $unit->price, 2) }}<span class="text-sm font-normal text-zinc-400"> / {{ __('month') }}</span></p>
+                    <p class="text-2xl font-semibold text-zinc-900">&#8369;{{ number_format((float) $unit->price, 2) }}<span class="text-sm font-normal text-zinc-600"> / {{ __('month') }}</span></p>
                     @if ($isShared)
-                        <p class="mt-1 text-sm text-zinc-400">{{ __('Shared unit: the rent is split equally among its tenants.') }}</p>
+                        <p class="mt-1 text-sm text-zinc-600">{{ __('Shared unit: the rent is split equally among its tenants.') }}</p>
                     @endif
                 </div>
 
                 <dl class="flex flex-col gap-3 text-sm">
                     <div>
-                        <dt class="text-zinc-400">{{ __('Availability') }}</dt>
-                        <dd class="text-white">
+                        <dt class="text-zinc-600">{{ __('Availability') }}</dt>
+                        <dd class="text-zinc-900">
                             {{ trans_choice(':count slot available|:count slots available', $slots) }}
                             @if ($isShared)
                                 ({{ __('up to :count tenants', ['count' => $unit->capacity()]) }})
@@ -86,21 +86,21 @@
                     </div>
 
                     <div>
-                        <dt class="text-zinc-400">{{ __('Downpayment to reserve') }}</dt>
-                        <dd class="text-white">
+                        <dt class="text-zinc-600">{{ __('Downpayment to reserve') }}</dt>
+                        <dd class="text-zinc-900">
                             {{ $listing->downpayment_amount !== null ? '₱'.number_format((float) $listing->downpayment_amount, 2) : __('Ask the landlord') }}
                         </dd>
                     </div>
 
                     <div>
-                        <dt class="text-zinc-400">{{ __('Accepted payment methods') }}</dt>
-                        <dd class="text-white">{{ $paymentMethods->isNotEmpty() ? $paymentMethods->implode(', ') : __('Not accepting online reservations right now') }}</dd>
+                        <dt class="text-zinc-600">{{ __('Accepted payment methods') }}</dt>
+                        <dd class="text-zinc-900">{{ $paymentMethods->isNotEmpty() ? $paymentMethods->implode(', ') : __('Not accepting online reservations right now') }}</dd>
                     </div>
                 </dl>
 
-                <div class="border-t border-zinc-700 pt-4 text-sm">
-                    <p class="text-zinc-400">{{ __('Landlord contact') }}</p>
-                    <p class="mt-1 text-white">{{ $listing->contact_name }}</p>
+                <div class="border-t border-zinc-300 pt-4 text-sm">
+                    <p class="text-zinc-600">{{ __('Landlord contact') }}</p>
+                    <p class="mt-1 text-zinc-900">{{ $listing->contact_name }}</p>
                     <p><a href="tel:{{ $listing->contact_phone }}" class="text-brand-500 underline">{{ $listing->contact_phone }}</a></p>
                     <p><a href="mailto:{{ $listing->contact_email }}" class="break-all text-brand-500 underline">{{ $listing->contact_email }}</a></p>
                 </div>

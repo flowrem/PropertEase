@@ -115,7 +115,7 @@ new #[Title('Landlords')] class extends Component
                         <flux:text class="text-zinc-500 dark:text-zinc-400">
                             {{ $owner?->name }} &middot; {{ $owner?->email }}
                         </flux:text>
-                        <flux:text class="text-xs text-zinc-400 dark:text-zinc-500">
+                        <flux:text class="text-xs text-zinc-500 dark:text-zinc-500">
                             {{ __('Submitted :time', ['time' => $team->verification_submitted_at?->diffForHumans()]) }}
                         </flux:text>
                     </div>
@@ -146,7 +146,7 @@ new #[Title('Landlords')] class extends Component
                 @endif
             </div>
         @empty
-            <flux:text class="text-zinc-400">{{ __('No landlords are waiting for review.') }}</flux:text>
+            <flux:text class="text-zinc-500">{{ __('No landlords are waiting for review.') }}</flux:text>
         @endforelse
     </div>
 
@@ -170,7 +170,7 @@ new #[Title('Landlords')] class extends Component
 
                 <div class="flex flex-col items-end gap-1">
                     <flux:badge color="zinc">{{ $team->properties_count }} {{ Str::plural('property', $team->properties_count) }}</flux:badge>
-                    <flux:text class="text-xs text-zinc-400 dark:text-zinc-500">
+                    <flux:text class="text-xs text-zinc-500 dark:text-zinc-500">
                         {{ __('Joined :date', ['date' => $team->created_at->format('M j, Y')]) }}
                     </flux:text>
                 </div>

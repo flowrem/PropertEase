@@ -225,31 +225,31 @@ new #[Layout('layouts::public'), Title('Reserve this unit')] class extends Compo
     @php($unit = $this->listing->unit)
     @php($property = $unit->property)
 
-    <a href="{{ route('listings.show', $this->listing) }}" class="text-sm text-zinc-400 transition-colors hover:text-white">&larr; {{ __('Back to the listing') }}</a>
+    <a href="{{ route('listings.show', $this->listing) }}" class="text-sm text-zinc-600 transition-colors hover:text-zinc-900">&larr; {{ __('Back to the listing') }}</a>
 
-    <h1 class="mt-4 text-3xl font-semibold tracking-tight text-white">{{ __('Reserve this unit') }}</h1>
-    <p class="mt-1 text-zinc-400">
+    <h1 class="mt-4 text-3xl font-semibold tracking-tight text-zinc-900">{{ __('Reserve this unit') }}</h1>
+    <p class="mt-1 text-zinc-600">
         {{ $this->listing->title }} &middot; {{ $property->name }} &middot; {{ __('Unit :number', ['number' => $unit->unit_number]) }}
     </p>
 
     @if ($submittedCode)
-        <div class="mt-8 rounded-xl border border-zinc-800 bg-brand-800 p-8 text-center">
-            <h2 class="text-xl font-semibold text-white">{{ __('Reservation sent') }}</h2>
-            <p class="mt-2 text-zinc-300">{{ __('Keep this reference code:') }}</p>
-            <p class="mt-3 font-mono text-3xl tracking-widest text-white">{{ $submittedCode }}</p>
-            <p class="mx-auto mt-4 max-w-md text-sm text-zinc-400">
+        <div class="mt-8 rounded-xl border border-sand bg-white p-8 text-center">
+            <h2 class="text-xl font-semibold text-zinc-900">{{ __('Reservation sent') }}</h2>
+            <p class="mt-2 text-zinc-700">{{ __('Keep this reference code:') }}</p>
+            <p class="mt-3 font-mono text-3xl tracking-widest text-zinc-900">{{ $submittedCode }}</p>
+            <p class="mx-auto mt-4 max-w-md text-sm text-zinc-600">
                 {{ __('The landlord will review your details and payment. If approved, your login details will be sent to the email you gave. Nothing is confirmed until then.') }}
             </p>
         </div>
     @elseif ($this->channels->isEmpty())
-        <div class="mt-8 rounded-xl border border-zinc-800 bg-brand-800 p-8 text-center">
-            <h2 class="font-semibold text-white">{{ __('Reservations are closed for now') }}</h2>
-            <p class="mt-2 text-sm text-zinc-400">{{ __('This landlord is not accepting online reservations right now.') }}</p>
+        <div class="mt-8 rounded-xl border border-sand bg-white p-8 text-center">
+            <h2 class="font-semibold text-zinc-900">{{ __('Reservations are closed for now') }}</h2>
+            <p class="mt-2 text-sm text-zinc-600">{{ __('This landlord is not accepting online reservations right now.') }}</p>
         </div>
     @else
         <form wire:submit="submit" class="mt-8 flex flex-col gap-8" novalidate>
             @error('form')
-                <p class="rounded-lg border border-red-400/40 p-3 text-sm text-red-400">{{ $message }}</p>
+                <p class="rounded-lg border border-red-300 p-3 text-sm text-red-700">{{ $message }}</p>
             @enderror
 
             <div class="hidden" aria-hidden="true">
@@ -257,25 +257,25 @@ new #[Layout('layouts::public'), Title('Reserve this unit')] class extends Compo
                 <input id="website" type="text" wire:model="website" tabindex="-1" autocomplete="off">
             </div>
 
-            <fieldset class="rounded-xl border border-zinc-800 bg-brand-800 p-6">
-                <legend class="px-2 text-lg font-semibold text-white">{{ __('1. Pay the downpayment') }}</legend>
+            <fieldset class="rounded-xl border border-sand bg-white p-6">
+                <legend class="px-2 text-lg font-semibold text-zinc-900">{{ __('1. Pay the downpayment') }}</legend>
 
-                <p class="text-zinc-300">
+                <p class="text-zinc-700">
                     @if ($this->listing->downpayment_amount !== null)
                         {{ __('Downpayment requested:') }}
-                        <span class="font-semibold text-white">&#8369;{{ number_format((float) $this->listing->downpayment_amount, 2) }}</span>
+                        <span class="font-semibold text-zinc-900">&#8369;{{ number_format((float) $this->listing->downpayment_amount, 2) }}</span>
                     @else
                         {{ __('The landlord did not set an amount. Ask them, then pay it below.') }}
                     @endif
                 </p>
-                <p class="mt-1 text-sm text-amber-300">{{ __('Check that the account name matches the landlord before paying.') }}</p>
+                <p class="mt-1 text-sm text-amber-800">{{ __('Check that the account name matches the landlord before paying.') }}</p>
 
                 <div class="mt-5 grid gap-4 sm:grid-cols-2">
                     @foreach ($this->channels as $channel)
-                        <label wire:key="channel-{{ $channel->id }}" class="flex cursor-pointer flex-col gap-3 rounded-lg border border-zinc-700 p-4 has-[:checked]:border-brand-500">
+                        <label wire:key="channel-{{ $channel->id }}" class="flex cursor-pointer flex-col gap-3 rounded-lg border border-zinc-300 p-4 has-[:checked]:border-brand-500">
                             <span class="flex items-center gap-2">
                                 <input type="radio" wire:model="payment_channel_id" value="{{ $channel->id }}" class="size-4">
-                                <span class="font-semibold text-white">{{ $channel->method->label() }}</span>
+                                <span class="font-semibold text-zinc-900">{{ $channel->method->label() }}</span>
                             </span>
 
                             @if ($channel->qrUrl())
@@ -288,7 +288,7 @@ new #[Layout('layouts::public'), Title('Reserve this unit')] class extends Compo
                                 >
                             @endif
 
-                            <span class="text-sm text-zinc-300">
+                            <span class="text-sm text-zinc-700">
                                 {{ $channel->account_name }}
                                 @if ($channel->bank_name)
                                     <br>{{ $channel->bank_name }}
@@ -300,93 +300,93 @@ new #[Layout('layouts::public'), Title('Reserve this unit')] class extends Compo
                         </label>
                     @endforeach
                 </div>
-                @error('payment_channel_id') <p class="mt-2 text-sm text-red-400">{{ $message }}</p> @enderror
+                @error('payment_channel_id') <p class="mt-2 text-sm text-red-700">{{ $message }}</p> @enderror
             </fieldset>
 
-            <fieldset class="rounded-xl border border-zinc-800 bg-brand-800 p-6">
-                <legend class="px-2 text-lg font-semibold text-white">{{ __('2. Your payment') }}</legend>
+            <fieldset class="rounded-xl border border-sand bg-white p-6">
+                <legend class="px-2 text-lg font-semibold text-zinc-900">{{ __('2. Your payment') }}</legend>
 
                 <div class="grid gap-4 sm:grid-cols-2">
                     <div>
-                        <label for="downpayment_amount" class="mb-1 block text-sm text-zinc-300">{{ __('Amount you paid (PHP)') }}</label>
-                        <input id="downpayment_amount" type="number" step="0.01" min="0" wire:model="downpayment_amount" class="w-full rounded-lg border border-zinc-700 bg-brand-900 px-3 py-2 text-sm text-white">
-                        @error('downpayment_amount') <p class="mt-1 text-sm text-red-400">{{ $message }}</p> @enderror
+                        <label for="downpayment_amount" class="mb-1 block text-sm text-zinc-700">{{ __('Amount you paid (PHP)') }}</label>
+                        <input id="downpayment_amount" type="number" step="0.01" min="0" wire:model="downpayment_amount" class="w-full rounded-lg border border-zinc-300 bg-brand-50 px-3 py-2 text-sm text-zinc-900">
+                        @error('downpayment_amount') <p class="mt-1 text-sm text-red-700">{{ $message }}</p> @enderror
                     </div>
 
                     <div>
-                        <label for="downpayment_reference" class="mb-1 block text-sm text-zinc-300">{{ __('Reference number') }}</label>
-                        <input id="downpayment_reference" type="text" maxlength="50" wire:model="downpayment_reference" class="w-full rounded-lg border border-zinc-700 bg-brand-900 px-3 py-2 text-sm text-white">
-                        @error('downpayment_reference') <p class="mt-1 text-sm text-red-400">{{ $message }}</p> @enderror
+                        <label for="downpayment_reference" class="mb-1 block text-sm text-zinc-700">{{ __('Reference number') }}</label>
+                        <input id="downpayment_reference" type="text" maxlength="50" wire:model="downpayment_reference" class="w-full rounded-lg border border-zinc-300 bg-brand-50 px-3 py-2 text-sm text-zinc-900">
+                        @error('downpayment_reference') <p class="mt-1 text-sm text-red-700">{{ $message }}</p> @enderror
                     </div>
 
                     <div class="sm:col-span-2">
-                        <label for="proof" class="mb-1 block text-sm text-zinc-300">{{ __('Proof of payment (screenshot or photo of the receipt)') }}</label>
-                        <input id="proof" type="file" accept="image/jpeg,image/png,image/webp" wire:model="proof" class="w-full text-sm text-zinc-300">
-                        <p class="mt-1 text-xs text-zinc-400">{{ __('JPG, PNG or WebP, up to 5 MB. Only the landlord can see this.') }}</p>
-                        @error('proof') <p class="mt-1 text-sm text-red-400">{{ $message }}</p> @enderror
+                        <label for="proof" class="mb-1 block text-sm text-zinc-700">{{ __('Proof of payment (screenshot or photo of the receipt)') }}</label>
+                        <input id="proof" type="file" accept="image/jpeg,image/png,image/webp" wire:model="proof" class="w-full text-sm text-zinc-700">
+                        <p class="mt-1 text-xs text-zinc-600">{{ __('JPG, PNG or WebP, up to 5 MB. Only the landlord can see this.') }}</p>
+                        @error('proof') <p class="mt-1 text-sm text-red-700">{{ $message }}</p> @enderror
                     </div>
                 </div>
             </fieldset>
 
-            <fieldset class="rounded-xl border border-zinc-800 bg-brand-800 p-6">
-                <legend class="px-2 text-lg font-semibold text-white">{{ __('3. About you') }}</legend>
+            <fieldset class="rounded-xl border border-sand bg-white p-6">
+                <legend class="px-2 text-lg font-semibold text-zinc-900">{{ __('3. About you') }}</legend>
 
                 <div class="grid gap-4 sm:grid-cols-2">
                     <div>
-                        <label for="first_name" class="mb-1 block text-sm text-zinc-300">{{ __('First name') }}</label>
-                        <input id="first_name" type="text" maxlength="100" wire:model="first_name" autocomplete="given-name" class="w-full rounded-lg border border-zinc-700 bg-brand-900 px-3 py-2 text-sm text-white">
-                        @error('first_name') <p class="mt-1 text-sm text-red-400">{{ $message }}</p> @enderror
+                        <label for="first_name" class="mb-1 block text-sm text-zinc-700">{{ __('First name') }}</label>
+                        <input id="first_name" type="text" maxlength="100" wire:model="first_name" autocomplete="given-name" class="w-full rounded-lg border border-zinc-300 bg-brand-50 px-3 py-2 text-sm text-zinc-900">
+                        @error('first_name') <p class="mt-1 text-sm text-red-700">{{ $message }}</p> @enderror
                     </div>
 
                     <div>
-                        <label for="last_name" class="mb-1 block text-sm text-zinc-300">{{ __('Last name') }}</label>
-                        <input id="last_name" type="text" maxlength="100" wire:model="last_name" autocomplete="family-name" class="w-full rounded-lg border border-zinc-700 bg-brand-900 px-3 py-2 text-sm text-white">
-                        @error('last_name') <p class="mt-1 text-sm text-red-400">{{ $message }}</p> @enderror
+                        <label for="last_name" class="mb-1 block text-sm text-zinc-700">{{ __('Last name') }}</label>
+                        <input id="last_name" type="text" maxlength="100" wire:model="last_name" autocomplete="family-name" class="w-full rounded-lg border border-zinc-300 bg-brand-50 px-3 py-2 text-sm text-zinc-900">
+                        @error('last_name') <p class="mt-1 text-sm text-red-700">{{ $message }}</p> @enderror
                     </div>
 
                     <div>
-                        <label for="age" class="mb-1 block text-sm text-zinc-300">{{ __('Age') }}</label>
-                        <input id="age" type="number" min="0" max="120" wire:model="age" class="w-full rounded-lg border border-zinc-700 bg-brand-900 px-3 py-2 text-sm text-white">
-                        @error('age') <p class="mt-1 text-sm text-red-400">{{ $message }}</p> @enderror
+                        <label for="age" class="mb-1 block text-sm text-zinc-700">{{ __('Age') }}</label>
+                        <input id="age" type="number" min="0" max="120" wire:model="age" class="w-full rounded-lg border border-zinc-300 bg-brand-50 px-3 py-2 text-sm text-zinc-900">
+                        @error('age') <p class="mt-1 text-sm text-red-700">{{ $message }}</p> @enderror
                     </div>
 
                     <div>
-                        <label for="email" class="mb-1 block text-sm text-zinc-300">{{ __('Email') }}</label>
-                        <input id="email" type="email" maxlength="255" wire:model="email" autocomplete="email" class="w-full rounded-lg border border-zinc-700 bg-brand-900 px-3 py-2 text-sm text-white">
-                        <p class="mt-1 text-xs text-zinc-400">{{ __('Your login details are sent here if you are approved.') }}</p>
-                        @error('email') <p class="mt-1 text-sm text-red-400">{{ $message }}</p> @enderror
+                        <label for="email" class="mb-1 block text-sm text-zinc-700">{{ __('Email') }}</label>
+                        <input id="email" type="email" maxlength="255" wire:model="email" autocomplete="email" class="w-full rounded-lg border border-zinc-300 bg-brand-50 px-3 py-2 text-sm text-zinc-900">
+                        <p class="mt-1 text-xs text-zinc-600">{{ __('Your login details are sent here if you are approved.') }}</p>
+                        @error('email') <p class="mt-1 text-sm text-red-700">{{ $message }}</p> @enderror
                     </div>
 
                     <div class="sm:col-span-2">
-                        <label for="address" class="mb-1 block text-sm text-zinc-300">{{ __('Home address') }}</label>
-                        <input id="address" type="text" maxlength="500" wire:model="address" autocomplete="street-address" class="w-full rounded-lg border border-zinc-700 bg-brand-900 px-3 py-2 text-sm text-white">
-                        @error('address') <p class="mt-1 text-sm text-red-400">{{ $message }}</p> @enderror
+                        <label for="address" class="mb-1 block text-sm text-zinc-700">{{ __('Home address') }}</label>
+                        <input id="address" type="text" maxlength="500" wire:model="address" autocomplete="street-address" class="w-full rounded-lg border border-zinc-300 bg-brand-50 px-3 py-2 text-sm text-zinc-900">
+                        @error('address') <p class="mt-1 text-sm text-red-700">{{ $message }}</p> @enderror
                     </div>
 
                     <div class="sm:col-span-2">
-                        <label for="desired_username" class="mb-1 block text-sm text-zinc-300">{{ __('Username you want to log in with') }}</label>
-                        <input id="desired_username" type="text" maxlength="30" wire:model="desired_username" autocomplete="off" autocapitalize="none" class="w-full rounded-lg border border-zinc-700 bg-brand-900 px-3 py-2 text-sm text-white">
-                        <p class="mt-1 text-xs text-zinc-400">{{ __('4 to 30 lowercase letters, numbers, dots or underscores.') }}</p>
-                        @error('desired_username') <p class="mt-1 text-sm text-red-400">{{ $message }}</p> @enderror
+                        <label for="desired_username" class="mb-1 block text-sm text-zinc-700">{{ __('Username you want to log in with') }}</label>
+                        <input id="desired_username" type="text" maxlength="30" wire:model="desired_username" autocomplete="off" autocapitalize="none" class="w-full rounded-lg border border-zinc-300 bg-brand-50 px-3 py-2 text-sm text-zinc-900">
+                        <p class="mt-1 text-xs text-zinc-600">{{ __('4 to 30 lowercase letters, numbers, dots or underscores.') }}</p>
+                        @error('desired_username') <p class="mt-1 text-sm text-red-700">{{ $message }}</p> @enderror
                     </div>
 
                     <div class="sm:col-span-2">
-                        <label for="valid_id" class="mb-1 block text-sm text-zinc-300">{{ __('Valid ID (photo or scan)') }}</label>
-                        <input id="valid_id" type="file" accept="image/jpeg,image/png,application/pdf" wire:model="valid_id" class="w-full text-sm text-zinc-300">
-                        <p class="mt-1 text-xs text-zinc-400">{{ __('JPG, PNG or PDF, up to 5 MB. Only the landlord can see this.') }}</p>
-                        @error('valid_id') <p class="mt-1 text-sm text-red-400">{{ $message }}</p> @enderror
+                        <label for="valid_id" class="mb-1 block text-sm text-zinc-700">{{ __('Valid ID (photo or scan)') }}</label>
+                        <input id="valid_id" type="file" accept="image/jpeg,image/png,application/pdf" wire:model="valid_id" class="w-full text-sm text-zinc-700">
+                        <p class="mt-1 text-xs text-zinc-600">{{ __('JPG, PNG or PDF, up to 5 MB. Only the landlord can see this.') }}</p>
+                        @error('valid_id') <p class="mt-1 text-sm text-red-700">{{ $message }}</p> @enderror
                     </div>
                 </div>
             </fieldset>
 
             <div>
-                <label class="flex items-start gap-3 text-sm text-zinc-300">
+                <label class="flex items-start gap-3 text-sm text-zinc-700">
                     <input type="checkbox" wire:model="consent" class="mt-1 size-4">
                     <span>
                         {{ __('I agree that my ID, payment proof and personal details will be shared with this landlord so they can screen my application. They are used for that purpose only, in line with the Data Privacy Act.') }}
                     </span>
                 </label>
-                @error('consent') <p class="mt-1 text-sm text-red-400">{{ $message }}</p> @enderror
+                @error('consent') <p class="mt-1 text-sm text-red-700">{{ $message }}</p> @enderror
             </div>
 
             <div>

@@ -348,7 +348,7 @@ new #[Title('Listings')] class extends Component
     @endif
 
     @if (! $this->canManage)
-        <flux:text class="text-zinc-400">{{ __('You can view listings. Ask your landlord or a manager to change them.') }}</flux:text>
+        <flux:text class="text-zinc-500">{{ __('You can view listings. Ask your landlord or a manager to change them.') }}</flux:text>
     @endif
 
     <div class="grid gap-4 lg:grid-cols-2">
@@ -371,7 +371,7 @@ new #[Title('Listings')] class extends Component
                         <flux:badge size="sm" :color="$listing->status->color()">{{ $listing->status->label() }}</flux:badge>
                     </div>
 
-                    <flux:text class="text-zinc-400">
+                    <flux:text class="text-zinc-500">
                         {{ $listing->unit->property->name }} &middot; {{ __('Unit :number', ['number' => $listing->unit->unit_number]) }}
                         &middot; {{ $listing->photos->count() }} {{ __('photo(s)') }}
                     </flux:text>
@@ -406,7 +406,7 @@ new #[Title('Listings')] class extends Component
                 </div>
             </div>
         @empty
-            <flux:text class="text-zinc-400">
+            <flux:text class="text-zinc-500">
                 {{ __('No listings yet.') }}
                 @if ($this->unitsWithoutListing->isEmpty())
                     {{ __('Add a unit under Properties first.') }}
@@ -429,7 +429,7 @@ new #[Title('Listings')] class extends Component
             @endif
 
             @if ($this->editingListing)
-                <flux:text class="text-zinc-400">
+                <flux:text class="text-zinc-500">
                     {{ $this->editingListing->unit->property->name }} &middot; {{ __('Unit :number', ['number' => $this->editingListing->unit->unit_number]) }}
                 </flux:text>
             @else
@@ -472,7 +472,7 @@ new #[Title('Listings')] class extends Component
                 @endif
 
                 <flux:input wire:model="newPhotos" type="file" multiple accept="image/jpeg,image/png,image/webp" :label="__('Add photos')" />
-                <flux:text class="text-zinc-400">
+                <flux:text class="text-zinc-500">
                     {{ __('Up to :max photos, JPG, PNG or WebP, 4 MB each. The first photo is the cover.', ['max' => 8]) }}
                 </flux:text>
                 @error('newPhotos') <flux:text class="text-red-400">{{ $message }}</flux:text> @enderror

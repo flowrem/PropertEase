@@ -374,7 +374,7 @@ new #[Title('Tenants')] class extends Component
                     <flux:text class="text-zinc-500 dark:text-zinc-400">{{ $lease->unit->property->name }}</flux:text>
                     <flux:badge color="blue" class="justify-center text-center">{{ __('Unit :number', ['number' => $lease->unit->unit_number]) }}</flux:badge>
                     @if ($lease->currentRent)
-                        <flux:text class="text-right text-xs text-zinc-400 dark:text-zinc-500">
+                        <flux:text class="text-right text-xs text-zinc-500 dark:text-zinc-500">
                             &#8369;{{ number_format((float) $lease->currentRent->amount, 2) }}/mo
                         </flux:text>
                     @endif
@@ -425,7 +425,7 @@ new #[Title('Tenants')] class extends Component
                             &mdash; {{ __('Unit :number', ['number' => $currentLease->unit->unit_number]) }}
                         </flux:heading>
                         @if ($currentLease->currentRent)
-                            <flux:text class="text-xs text-zinc-400 dark:text-zinc-500">
+                            <flux:text class="text-xs text-zinc-500 dark:text-zinc-500">
                                 &#8369;{{ number_format((float) $currentLease->currentRent->amount, 2) }}/mo
                             </flux:text>
                         @endif
