@@ -6,6 +6,7 @@ use App\Enums\LeaseStatus;
 use App\Enums\PropertyType;
 use App\Enums\ReservationStatus;
 use App\Enums\UnitStatus;
+use Closure;
 use Database\Factories\UnitFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Builder;
@@ -152,8 +153,8 @@ class Unit extends Model
     }
 
     /**
-     * The most tenants this unit's floor area allows, or null for an older
-     * unit whose floor area has not been entered yet.
+     * The most tenants this unit's floor area and bedrooms allow, or null
+     * for an older unit whose floor area has not been entered yet.
      */
     public function maxCapacity(): ?int
     {
@@ -161,45 +162,57 @@ class Unit extends Model
             return null;
         }
 
-        return self::maxCapacityFor((float) $this->floor_area_sqm, $this->property->type);
+        return self::maxCapacityFor((float) $this->floor_area_sqm, $this->property->type, $this->bedrooms);
     }
 
     /**
-     * The most tenants a unit of the given floor area and property type can hold.
+     * The most tenants a unit of the given floor area, property type and
+     * bedroom count can hold. A unit with bedrooms fits as many tenants as
+     * its bedrooms sleep, so a 1-bedroom unit never claims room for four
+     * just because its floor area is large. A studio or bedspace (0
+     * bedrooms) has no rooms to count, so only its floor area decides.
      */
-    public static function maxCapacityFor(float $floorArea, PropertyType $type): int
+    public static function maxCapacityFor(float $floorArea, PropertyType $type, int $bedrooms): int
     {
         $tenantsThatFit = (int) floor($floorArea / $type->areaPerTenant() + 1e-9);
+
+        if ($bedrooms > 0) {
+            $tenantsThatFit = min($tenantsThatFit, $bedrooms * $type->tenantsPerBedroom());
+        }
 
         return max(1, min((int) config('occuplace.units.max_capacity'), $tenantsThatFit));
     }
 
     /**
      * The smallest floor area that fits the given rooms. Always accounts for
-     * at least one bathroom, even when "bathrooms" is 0 (shared), to match
+     * at least one bathroom, even when "bathrooms" is 0 (shared), and for a
+     * common kitchen and living area once the unit has bedrooms, to match
      * maxBedroomsFor(): bedrooms alone should never be allowed to claim a
-     * floor area that leaves no room for a bathroom anywhere.
+     * floor area that leaves no room for a bathroom or a kitchen.
      */
     public static function minimumFloorAreaFor(int $bedrooms, int $bathrooms): float
     {
         return max(
             (float) config('occuplace.units.floor_area.min'),
             $bedrooms * (float) config('occuplace.units.minimum_bedroom_area')
-                + max($bathrooms, 1) * (float) config('occuplace.units.minimum_bathroom_area'),
+                + max($bathrooms, 1) * (float) config('occuplace.units.minimum_bathroom_area')
+                + self::commonAreaFor($bedrooms),
         );
     }
 
     /**
      * The most bedrooms a unit of the given floor area can have, once the
-     * given number of bathrooms is accounted for. Always reserves room for
-     * at least one bathroom, even when "bathrooms" is 0 (shared), so
-     * bedrooms alone can never claim the entire floor area and leave a unit
-     * that supposedly fits several tenants with nowhere to put a bathroom.
+     * given number of bathrooms and the common area are accounted for.
+     * Always reserves room for at least one bathroom, even when "bathrooms"
+     * is 0 (shared), so bedrooms alone can never claim the entire floor area
+     * and leave a unit with nowhere to put a bathroom or a kitchen.
      */
     public static function maxBedroomsFor(float $floorArea, int $bathrooms): int
     {
         return self::roomsThatFit(
-            $floorArea - max($bathrooms, 1) * (float) config('occuplace.units.minimum_bathroom_area'),
+            $floorArea
+                - max($bathrooms, 1) * (float) config('occuplace.units.minimum_bathroom_area')
+                - (float) config('occuplace.units.common_area'),
             (float) config('occuplace.units.minimum_bedroom_area'),
             (int) config('occuplace.units.bedrooms.max'),
         );
@@ -207,19 +220,31 @@ class Unit extends Model
 
     /**
      * The most bathrooms a unit of the given floor area can have, once the
-     * given number of bedrooms is accounted for. Never more than one
-     * bathroom per bedroom plus a shared one, since a unit's leftover floor
-     * area alone would otherwise "fit" far more bathrooms than any real
-     * rental has: a bathroom only needs a small minimum area, so a modest
-     * unit with few bedrooms would appear to have room for several of them.
+     * given number of bedrooms and the common area are accounted for. Never
+     * more than one bathroom per bedroom plus a shared one, since a unit's
+     * leftover floor area alone would otherwise "fit" far more bathrooms
+     * than any real rental has: a bathroom only needs a small minimum area,
+     * so a modest unit with few bedrooms would appear to have room for
+     * several of them.
      */
     public static function maxBathroomsFor(float $floorArea, int $bedrooms): int
     {
         return self::roomsThatFit(
-            $floorArea - $bedrooms * (float) config('occuplace.units.minimum_bedroom_area'),
+            $floorArea
+                - $bedrooms * (float) config('occuplace.units.minimum_bedroom_area')
+                - self::commonAreaFor($bedrooms),
             (float) config('occuplace.units.minimum_bathroom_area'),
             min($bedrooms + 1, (int) config('occuplace.units.bathrooms.max')),
         );
+    }
+
+    /**
+     * The floor area kept for a kitchen and living space. A studio (0
+     * bedrooms) is one open room, so it needs none set aside.
+     */
+    private static function commonAreaFor(int $bedrooms): float
+    {
+        return $bedrooms > 0 ? (float) config('occuplace.units.common_area') : 0.0;
     }
 
     /**
@@ -316,7 +341,8 @@ class Unit extends Model
      *
      * The floor-area cap is written as "area >= (taken + 1) * area per tenant"
      * instead of floor(area / area per tenant), so it reads the same on SQLite
-     * and Postgres.
+     * and Postgres. The bedroom cap only applies to units with bedrooms, as
+     * in maxCapacityFor().
      *
      * @param  Builder<Unit>  $query
      */
@@ -326,15 +352,12 @@ class Unit extends Model
             .' + (select count(*) from reservations where reservations.unit_id = units.id and reservations.status = ?))';
         $takenBindings = [LeaseStatus::Active->value, ReservationStatus::Approved->value];
 
-        $areaPerTenant = '(case (select properties.type from properties where properties.id = units.property_id)';
-        $areaPerTenantBindings = [];
-
-        foreach (PropertyType::cases() as $type) {
-            $areaPerTenant .= ' when ? then cast(? as decimal(6, 2))';
-            array_push($areaPerTenantBindings, $type->value, $type->areaPerTenant());
-        }
-
-        $areaPerTenant .= ' end)';
+        [$areaPerTenant, $areaPerTenantBindings] = self::perPropertyTypeSql(
+            fn (PropertyType $type): float => $type->areaPerTenant(),
+        );
+        [$tenantsPerBedroom, $tenantsPerBedroomBindings] = self::perPropertyTypeSql(
+            fn (PropertyType $type): int => $type->tenantsPerBedroom(),
+        );
 
         $query
             ->where(fn (Builder $room) => $room
@@ -351,9 +374,34 @@ class Unit extends Model
                 ->whereNull('units.floor_area_sqm')
                 ->orWhereRaw("{$taken} < 1", $takenBindings)
                 ->orWhereRaw(
-                    "{$taken} < ? and units.floor_area_sqm >= ({$taken} + 1) * {$areaPerTenant}",
-                    [...$takenBindings, (int) config('occuplace.units.max_capacity'), ...$takenBindings, ...$areaPerTenantBindings],
+                    "{$taken} < ? and units.floor_area_sqm >= ({$taken} + 1) * {$areaPerTenant}"
+                    ." and (units.bedrooms = 0 or units.bedrooms * {$tenantsPerBedroom} > {$taken})",
+                    [
+                        ...$takenBindings, (int) config('occuplace.units.max_capacity'),
+                        ...$takenBindings, ...$areaPerTenantBindings,
+                        ...$tenantsPerBedroomBindings, ...$takenBindings,
+                    ],
                 ));
+    }
+
+    /**
+     * Build a SQL expression that picks a per-property-type value for the
+     * unit's property, with its bindings.
+     *
+     * @param  Closure(PropertyType): (int|float)  $valueFor
+     * @return array{0: string, 1: array<int, int|float|string>}
+     */
+    private static function perPropertyTypeSql(Closure $valueFor): array
+    {
+        $sql = '(case (select properties.type from properties where properties.id = units.property_id)';
+        $bindings = [];
+
+        foreach (PropertyType::cases() as $type) {
+            $sql .= ' when ? then cast(? as decimal(6, 2))';
+            array_push($bindings, $type->value, $valueFor($type));
+        }
+
+        return [$sql.' end)', $bindings];
     }
 
     /**

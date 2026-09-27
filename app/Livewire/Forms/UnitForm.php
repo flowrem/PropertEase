@@ -52,8 +52,8 @@ class UnitForm extends Form
 
     /**
      * The most tenants the unit on the form can hold: from its saved floor
-     * area once locked, otherwise from the area typed in, or null while that
-     * is missing or out of range.
+     * area and bedrooms once locked, otherwise from the ones typed in, or
+     * null while the area is missing or out of range.
      */
     public function maxCapacity(PropertyType $type, ?Unit $unit = null): ?int
     {
@@ -65,7 +65,7 @@ class UnitForm extends Form
             return null;
         }
 
-        return Unit::maxCapacityFor((float) $this->floor_area_sqm, $type);
+        return Unit::maxCapacityFor((float) $this->floor_area_sqm, $type, (int) $this->bedrooms);
     }
 
     /**

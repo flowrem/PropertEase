@@ -349,14 +349,16 @@ test('bathrooms never exceed the configured ceiling, even with enough bedrooms a
     $user = User::factory()->create();
     $property = Property::factory()->for($user->currentTeam)->create(['type' => PropertyType::Apartment]);
 
+    config(['occuplace.units.bathrooms.max' => 3]);
+
     $this->actingAs($user);
 
     Livewire::test('pages::landlord.properties')
         ->call('startAddingUnit', $property->id)
         ->set('form.floor_area_sqm', (string) config('occuplace.units.floor_area.max'))
-        ->set('form.bedrooms', 9)
+        ->set('form.bedrooms', 4)
         ->set('form.bathrooms', 50)
-        ->assertSet('form.bathrooms', (string) config('occuplace.units.bathrooms.max'));
+        ->assertSet('form.bathrooms', '3');
 });
 
 test('a bedroom count too large for PHP\'s integer type is clamped instead of crashing', function () {
@@ -385,7 +387,7 @@ test('a bathroom count too large for PHP\'s integer type is clamped instead of c
         ->assertSet('form.bathrooms', (string) Unit::maxBathroomsFor(70, bedrooms: 1));
 });
 
-test('a shared unit cannot hold more tenants than its floor area allows', function () {
+test('a shared studio cannot hold more tenants than its floor area allows', function () {
     $user = User::factory()->create();
     $property = Property::factory()->for($user->currentTeam)->create(['type' => PropertyType::Apartment]);
 
@@ -397,7 +399,7 @@ test('a shared unit cannot hold more tenants than its floor area allows', functi
             'form.unit_number' => '101',
             'form.floor_level' => 'Ground floor',
             'form.floor_area_sqm' => '18',
-            'form.bedrooms' => 1,
+            'form.bedrooms' => 0,
             'form.bathrooms' => 1,
             'form.price' => '6000',
             'form.occupancy' => 'multiple',
@@ -406,6 +408,31 @@ test('a shared unit cannot hold more tenants than its floor area allows', functi
 
     $component->set('form.tenant_limit', 4)
         ->assertSet('form.tenant_limit', '3')
+        ->call('addUnit')
+        ->assertHasNoErrors();
+});
+
+test('a shared unit cannot hold more tenants than its bedrooms sleep, however big its floor area', function () {
+    $user = User::factory()->create();
+    $property = Property::factory()->for($user->currentTeam)->create(['type' => PropertyType::Apartment]);
+
+    $this->actingAs($user);
+
+    $component = Livewire::test('pages::landlord.properties')
+        ->call('startAddingUnit', $property->id)
+        ->set([
+            'form.unit_number' => '101',
+            'form.floor_level' => 'Ground floor',
+            'form.floor_area_sqm' => '24',
+            'form.bedrooms' => 1,
+            'form.bathrooms' => 1,
+            'form.price' => '6000',
+            'form.occupancy' => 'multiple',
+        ])
+        ->assertSee('1 bedroom fits up to 2 tenants.');
+
+    $component->set('form.tenant_limit', 4)
+        ->assertSet('form.tenant_limit', '2')
         ->call('addUnit')
         ->assertHasNoErrors();
 });
@@ -434,7 +461,7 @@ test('a tenant limit too large for PHP\'s integer type is clamped instead of cra
         ->set('form.floor_area_sqm', '24')
         ->set('form.occupancy', 'multiple')
         ->set('form.tenant_limit', '99999999999999999999999999999999999999999999999')
-        ->assertSet('form.tenant_limit', (string) Unit::maxCapacityFor(24, PropertyType::Apartment));
+        ->assertSet('form.tenant_limit', (string) Unit::maxCapacityFor(24, PropertyType::Apartment, bedrooms: 1));
 });
 
 test('a unit too small for two tenants cannot be shared', function () {
@@ -468,6 +495,7 @@ test('dormitories fit more tenants in the same floor area', function () {
     Livewire::test('pages::landlord.properties')
         ->call('startAddingUnit', $property->id)
         ->set('form.floor_area_sqm', '18')
+        ->set('form.bedrooms', 0)
         ->set('form.occupancy', 'multiple')
         ->assertSee('This floor area fits up to 4 tenants.');
 });

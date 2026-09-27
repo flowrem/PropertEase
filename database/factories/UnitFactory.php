@@ -23,7 +23,7 @@ class UnitFactory extends Factory
             'property_id' => Property::factory(),
             'unit_number' => (string) fake()->unique()->numberBetween(100, 999),
             'floor_level' => fake()->randomElement(array_slice(Unit::floorLevelOptions(), 1, 10)),
-            'bedrooms' => fake()->numberBetween(0, 4),
+            'bedrooms' => fake()->numberBetween(2, 4),
             'bathrooms' => fake()->numberBetween(1, 3),
             'floor_area_sqm' => 60,
             'status' => fake()->randomElement(UnitStatus::cases()),

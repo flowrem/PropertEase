@@ -1,5 +1,6 @@
 @props([
     'occupancy',
+    'bedrooms' => 0,
     'maxCapacity' => null,
     'maxBedrooms' => null,
     'maxBathrooms' => null,
@@ -92,7 +93,9 @@
 
     @if ($maxBedrooms !== null)
         <flux:text class="text-zinc-500 dark:text-zinc-400">
-            {{ __('This floor area fits up to :bedrooms bedrooms and :bathrooms bathrooms.', ['bedrooms' => $maxBedrooms, 'bathrooms' => $maxBathrooms]) }}
+            {{ $maxBedrooms === 0
+                ? __('This floor area only fits a studio or bedspace.')
+                : trans_choice('This floor area fits up to :count bedroom, keeping :area m² for a kitchen and living area.|This floor area fits up to :count bedrooms, keeping :area m² for a kitchen and living area.', $maxBedrooms, ['area' => $limits['common_area']]) }}
         </flux:text>
     @endif
 
@@ -119,10 +122,22 @@
 </flux:radio.group>
 
 @if ($maxCapacity !== null)
+    @php
+        $bedroomCount = $lockedUnit ? $lockedUnit->bedrooms : (int) $bedrooms;
+    @endphp
+
     <flux:text class="text-zinc-500 dark:text-zinc-400">
-        {{ $maxCapacity === 1
-            ? __('This floor area fits 1 tenant.')
-            : __('This floor area fits up to :max tenants.', ['max' => $maxCapacity]) }}
+        @if ($occupancy !== 'multiple')
+            {{ $maxCapacity > 1
+                ? __('Choose multiple tenants to let up to :max people share this unit.', ['max' => $maxCapacity])
+                : __('This unit fits 1 tenant.') }}
+        @elseif ($bedroomCount > 0)
+            {{ trans_choice(':count bedroom fits up to :max tenants.|:count bedrooms fit up to :max tenants.', $bedroomCount, ['max' => $maxCapacity]) }}
+        @else
+            {{ $maxCapacity === 1
+                ? __('This floor area fits 1 tenant.')
+                : __('This floor area fits up to :max tenants.', ['max' => $maxCapacity]) }}
+        @endif
     </flux:text>
 @endif
 

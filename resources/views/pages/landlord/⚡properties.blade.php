@@ -402,6 +402,7 @@ new #[Title('Properties')] class extends Component
 
                                     <x-unit-form-fields
                                         :occupancy="$form->occupancy"
+                                        :bedrooms="$form->bedrooms"
                                         :max-capacity="$this->formMaxCapacityPreview"
                                         :max-bedrooms="$this->formMaxBedroomsPreview"
                                         :max-bathrooms="$this->formMaxBathroomsPreview"
@@ -497,6 +498,7 @@ new #[Title('Properties')] class extends Component
                         <form wire:submit="reviewNewUnit" class="flex flex-col gap-4">
                             <x-unit-form-fields
                                 :occupancy="$form->occupancy"
+                                :bedrooms="$form->bedrooms"
                                 :max-capacity="$this->formMaxCapacityPreview"
                                 :max-bedrooms="$this->formMaxBedroomsPreview"
                                 :max-bathrooms="$this->formMaxBathroomsPreview"

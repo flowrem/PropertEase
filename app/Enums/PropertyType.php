@@ -28,4 +28,12 @@ enum PropertyType: string
     {
         return (float) config("occuplace.units.area_per_tenant.{$this->value}");
     }
+
+    /**
+     * How many tenants can share one bedroom in a unit of this type.
+     */
+    public function tenantsPerBedroom(): int
+    {
+        return (int) config("occuplace.units.tenants_per_bedroom.{$this->value}");
+    }
 }

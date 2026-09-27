@@ -109,7 +109,7 @@ test('typing more tenants than the floor area fits snaps the value back down', f
         ->set('form.floor_area_sqm', '18')
         ->set('form.occupancy', 'multiple')
         ->set('form.tenant_limit', 67)
-        ->assertSet('form.tenant_limit', (string) Unit::maxCapacityFor(18, PropertyType::Apartment));
+        ->assertSet('form.tenant_limit', (string) Unit::maxCapacityFor(18, PropertyType::Apartment, bedrooms: 1));
 });
 
 test('a landlord can invite a tenant in step three', function () {
