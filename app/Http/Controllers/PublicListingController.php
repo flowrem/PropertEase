@@ -4,7 +4,10 @@ namespace App\Http\Controllers;
 
 use App\Http\Requests\BrowseListingsRequest;
 use App\Models\Amenity;
+use App\Models\City;
 use App\Models\PaymentChannel;
+use App\Models\Property;
+use App\Models\Region;
 use App\Models\UnitListing;
 use Illuminate\Contracts\View\View;
 use Illuminate\Database\Eloquent\Builder;
@@ -20,6 +23,13 @@ class PublicListingController extends Controller
     {
         $filters = $request->validated();
         $search = trim((string) ($filters['q'] ?? ''));
+        $regionCode = $filters['region'] ?? null;
+        $cityCode = $regionCode ? ($filters['city'] ?? null) : null;
+
+        // A city from another region (the region changed) is dropped.
+        if ($cityCode && ! City::query()->whereKey($cityCode)->where('region_code', $regionCode)->exists()) {
+            $cityCode = null;
+        }
 
         $listings = UnitListing::query()
             ->publiclyVisible()
@@ -30,10 +40,15 @@ class PublicListingController extends Controller
             ->when($search !== '', function (Builder $query) use ($search) {
                 $term = '%'.addcslashes($search, '\\%_').'%';
 
-                $query->whereHas('unit.property', fn (Builder $property) => $property
+                $query->whereHas('unit.property', fn (Builder $property) => $property->where(fn (Builder $place) => $place
                     ->where('city', 'like', $term)
-                    ->orWhere('province', 'like', $term));
+                    ->orWhere('province', 'like', $term)
+                    ->orWhere('address_line', 'like', $term)));
             })
+            ->when($regionCode, fn (Builder $query, string $code) => $query
+                ->whereHas('unit.property', fn (Builder $property) => $property->where('region_code', $code)))
+            ->when($cityCode, fn (Builder $query, string $code) => $query
+                ->whereHas('unit.property', fn (Builder $property) => $property->where('city_code', $code)))
             ->when($filters['type'] ?? null, fn (Builder $query, string $type) => $query
                 ->whereHas('unit.property', fn (Builder $property) => $property->where('type', $type)))
             ->when($filters['max_price'] ?? null, fn (Builder $query, $maxPrice) => $query
@@ -51,7 +66,29 @@ class PublicListingController extends Controller
             'listings' => $listings,
             'filters' => $filters,
             'amenityFilters' => $this->amenityFilters(),
+            'regions' => Region::query()->orderBy('code')->get(),
+            'regionCode' => $regionCode,
+            'cityCode' => $cityCode,
+            'cityOptions' => $regionCode ? $this->citiesWithListings($regionCode) : new EloquentCollection,
         ]);
+    }
+
+    /**
+     * The region's cities and municipalities that have a listing someone
+     * could reserve right now, so the City filter never leads nowhere.
+     *
+     * @return EloquentCollection<int, City>
+     */
+    private function citiesWithListings(string $regionCode): EloquentCollection
+    {
+        return City::query()
+            ->whereIn('code', Property::query()
+                ->where('region_code', $regionCode)
+                ->whereNotNull('city_code')
+                ->whereHas('units.listing', fn (Builder $listing) => $listing->publiclyVisible())
+                ->select('city_code'))
+            ->orderBy('name')
+            ->get();
     }
 
     /**

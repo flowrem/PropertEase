@@ -21,14 +21,20 @@ use Illuminate\Support\Carbon;
  * @property string $province
  * @property string $postal_code
  * @property string|null $map_url
+ * @property string|null $region_code
+ * @property string|null $province_code
+ * @property string|null $city_code
  * @property PropertyType $type
  * @property Carbon|null $created_at
  * @property Carbon|null $updated_at
  * @property-read Team $team
  * @property-read Collection<int, Unit> $units
  * @property-read Collection<int, Announcement> $announcements
+ * @property-read Region|null $psgcRegion
+ * @property-read Province|null $psgcProvince
+ * @property-read City|null $psgcCity
  */
-#[Fillable(['team_id', 'name', 'address_line', 'city', 'province', 'postal_code', 'map_url', 'type'])]
+#[Fillable(['team_id', 'name', 'address_line', 'city', 'province', 'region_code', 'province_code', 'city_code', 'postal_code', 'map_url', 'type'])]
 class Property extends Model
 {
     /** @use HasFactory<PropertyFactory> */
@@ -59,6 +65,33 @@ class Property extends Model
     public function announcements(): HasMany
     {
         return $this->hasMany(Announcement::class);
+    }
+
+    /**
+     * The PSGC region picked for the address. Named apart from the typed
+     * `city` and `province` columns, which stay for display.
+     *
+     * @return BelongsTo<Region, $this>
+     */
+    public function psgcRegion(): BelongsTo
+    {
+        return $this->belongsTo(Region::class, 'region_code');
+    }
+
+    /**
+     * @return BelongsTo<Province, $this>
+     */
+    public function psgcProvince(): BelongsTo
+    {
+        return $this->belongsTo(Province::class, 'province_code');
+    }
+
+    /**
+     * @return BelongsTo<City, $this>
+     */
+    public function psgcCity(): BelongsTo
+    {
+        return $this->belongsTo(City::class, 'city_code');
     }
 
     /**

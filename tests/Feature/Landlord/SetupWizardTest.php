@@ -2,6 +2,8 @@
 
 use App\Enums\PropertyType;
 use App\Enums\TeamRole;
+use App\Livewire\Forms\LocationForm;
+use App\Models\City;
 use App\Models\Property;
 use App\Models\Unit;
 use App\Models\User;
@@ -28,17 +30,19 @@ test('tenants cannot access the setup wizard', function () {
     $response->assertForbidden();
 });
 
-test('a landlord can create a property in step one', function () {
+test('a landlord can create a property in step one, picking its city from the list', function () {
     $user = User::factory()->create();
+    $quezonCity = City::query()->where('name', 'Quezon City')->firstOrFail();
 
     $this->actingAs($user);
 
     Livewire::test('pages::landlord.setup')
         ->set('name', 'Sunrise Apartments')
         ->set('type', 'apartment')
-        ->set('address_line', '123 Main St')
-        ->set('city', 'Quezon City')
-        ->set('province', 'Metro Manila')
+        ->set('address_line', '123 Main St, Barangay Bagumbayan')
+        ->set('location.region_code', $quezonCity->region_code)
+        ->set('location.province_code', LocationForm::NO_PROVINCE)
+        ->set('location.city_code', $quezonCity->code)
         ->set('postal_code', '1100')
         ->call('createProperty')
         ->assertHasNoErrors()
@@ -47,6 +51,11 @@ test('a landlord can create a property in step one', function () {
     $this->assertDatabaseHas('properties', [
         'team_id' => $user->currentTeam->id,
         'name' => 'Sunrise Apartments',
+        'region_code' => $quezonCity->region_code,
+        'province_code' => null,
+        'city_code' => $quezonCity->code,
+        'city' => 'Quezon City',
+        'province' => 'Metro Manila',
     ]);
 });
 

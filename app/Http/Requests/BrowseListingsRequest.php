@@ -24,6 +24,8 @@ class BrowseListingsRequest extends FormRequest
     {
         return [
             'q' => ['nullable', 'string', 'max:100'],
+            'region' => ['nullable', 'string', Rule::exists('regions', 'code')],
+            'city' => ['nullable', 'string', Rule::exists('cities', 'code')],
             'type' => ['nullable', Rule::enum(PropertyType::class)],
             'max_price' => ['nullable', 'numeric', 'min:0', 'max:99999999'],
             'amenities' => ['nullable', 'array', 'max:10'],

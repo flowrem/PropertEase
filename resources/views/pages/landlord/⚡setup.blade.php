@@ -3,6 +3,7 @@
 use App\Enums\PropertyType;
 use App\Enums\TeamRole;
 use App\Enums\UnitStatus;
+use App\Livewire\Forms\LocationForm;
 use App\Livewire\Forms\UnitForm;
 use App\Models\Amenity;
 use App\Models\Property;
@@ -37,9 +38,7 @@ new #[Title('Add a property')] class extends Component
 
     public string $address_line = '';
 
-    public string $city = '';
-
-    public string $province = '';
+    public LocationForm $location;
 
     public string $postal_code = '';
 
@@ -75,13 +74,11 @@ new #[Title('Add a property')] class extends Component
         $validated = $this->validate([
             'name' => ['required', 'string', 'max:255'],
             'address_line' => ['required', 'string', 'max:255'],
-            'city' => ['required', 'string', 'max:255'],
-            'province' => ['required', 'string', 'max:255'],
             'postal_code' => ['required', 'string', 'max:20'],
             'type' => ['required', Rule::enum(PropertyType::class)],
         ]);
 
-        $property = $this->team->properties()->create($validated);
+        $property = $this->team->properties()->create([...$validated, ...$this->location->validatedAttributes()]);
 
         $this->propertyId = $property->id;
         $this->step = 2;
@@ -151,6 +148,10 @@ new #[Title('Add a property')] class extends Component
      */
     public function updated(string $property): void
     {
+        if (Str::startsWith($property, 'location.')) {
+            $this->location->cascade(Str::after($property, 'location.'));
+        }
+
         if (Str::startsWith($property, 'form.amenityQuantities.') && $this->property) {
             $this->form->clampAmenityQuantity(Str::after($property, 'form.amenityQuantities.'), $this->property->type);
         }
@@ -283,12 +284,15 @@ new #[Title('Add a property')] class extends Component
                 @endforeach
             </flux:select>
 
-            <flux:input wire:model="address_line" :label="__('Street address')" required />
+            <x-location-fields
+                :regions="$location->regions()"
+                :province-options="$location->provinceOptions()"
+                :cities="$location->cities()"
+                :region-code="$location->region_code"
+                :province-code="$location->province_code"
+            />
 
-            <div class="grid gap-4 sm:grid-cols-2">
-                <flux:input wire:model="city" :label="__('City')" required />
-                <flux:input wire:model="province" :label="__('Province')" required />
-            </div>
+            <flux:input wire:model="address_line" :label="__('Street address')" :description="__('House or building number, street and barangay.')" required />
 
             <flux:input wire:model="postal_code" :label="__('Postal code')" required />
 

@@ -4,16 +4,25 @@
         <p class="mt-2 text-zinc-600">{{ __('Approved listings with room available right now.') }}</p>
 
         <form method="GET" action="{{ route('listings.index') }}" class="mt-6 grid gap-3 sm:grid-cols-4">
-            <div class="sm:col-span-2">
-                <label for="q" class="mb-1 block text-sm text-zinc-700">{{ __('City or province') }}</label>
-                <input
-                    id="q"
-                    name="q"
-                    type="search"
-                    maxlength="100"
-                    value="{{ $filters['q'] ?? '' }}"
-                    class="w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 placeholder:text-zinc-500"
-                >
+            <div>
+                <label for="region" class="mb-1 block text-sm text-zinc-700">{{ __('Region') }}</label>
+                {{-- Choosing a region reloads the page so the City list shows that region's cities; without JavaScript, Search does the same. --}}
+                <select id="region" name="region" onchange="this.form.city.value = ''; this.form.submit()" class="w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900">
+                    <option value="">{{ __('Anywhere') }}</option>
+                    @foreach ($regions as $region)
+                        <option value="{{ $region->code }}" @selected($regionCode === $region->code)>{{ $region->name }}</option>
+                    @endforeach
+                </select>
+            </div>
+
+            <div>
+                <label for="city" class="mb-1 block text-sm text-zinc-700">{{ __('City or municipality') }}</label>
+                <select id="city" name="city" @disabled(! $regionCode) class="w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 disabled:bg-zinc-100 disabled:text-zinc-500">
+                    <option value="">{{ $regionCode ? __('Any in this region') : __('Choose a region first') }}</option>
+                    @foreach ($cityOptions as $city)
+                        <option value="{{ $city->code }}" @selected($cityCode === $city->code)>{{ $city->name }}</option>
+                    @endforeach
+                </select>
             </div>
 
             <div>
@@ -35,6 +44,19 @@
                     min="0"
                     step="100"
                     value="{{ $filters['max_price'] ?? '' }}"
+                    class="w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 placeholder:text-zinc-500"
+                >
+            </div>
+
+            <div class="sm:col-span-4">
+                <label for="q" class="mb-1 block text-sm text-zinc-700">{{ __('Or search a place name') }}</label>
+                <input
+                    id="q"
+                    name="q"
+                    type="search"
+                    maxlength="100"
+                    value="{{ $filters['q'] ?? '' }}"
+                    placeholder="{{ __('Barangay, city or province') }}"
                     class="w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 placeholder:text-zinc-500"
                 >
             </div>

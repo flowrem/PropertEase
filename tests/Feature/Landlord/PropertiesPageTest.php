@@ -8,6 +8,7 @@ use App\Enums\PropertyType;
 use App\Enums\ReservationStatus;
 use App\Enums\TeamRole;
 use App\Enums\UnitStatus;
+use App\Models\City;
 use App\Models\Concern;
 use App\Models\Invoice;
 use App\Models\Lease;
@@ -637,10 +638,15 @@ test('changing a property\'s address sends its approved listings back to review'
 
     $this->actingAs($user);
 
+    $lipa = City::query()->where('name', 'City of Lipa')->firstOrFail();
+
     Livewire::test('pages::landlord.properties')
         ->call('startEditingProperty', $property->id)
-        ->set('city', 'Lipa')
-        ->call('updateProperty');
+        ->set('location.region_code', $lipa->region_code)
+        ->set('location.province_code', $lipa->province_code)
+        ->set('location.city_code', $lipa->code)
+        ->call('updateProperty')
+        ->assertHasNoErrors();
 
     expect($approved->refresh()->status)->toBe(ListingStatus::PendingReview)
         ->and($draft->refresh()->status)->toBe(ListingStatus::Draft);
