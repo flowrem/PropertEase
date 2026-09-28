@@ -49,7 +49,7 @@
                         </flux:sidebar.item>
 
                         @if ($isLandlord)
-                            <flux:sidebar.item icon="building-office-2" :href="route('properties')" :current="request()->routeIs('properties', 'units.inventory')" wire:navigate>
+                            <flux:sidebar.item icon="building-office-2" :href="route('properties')" :current="request()->routeIs('properties', 'units.*')" wire:navigate>
                                 {{ __('Properties') }}
                             </flux:sidebar.item>
                             <flux:sidebar.item icon="sparkles" :href="route('amenities')" :current="request()->routeIs('amenities')" wire:navigate>
@@ -75,6 +75,9 @@
                             </flux:sidebar.item>
                             <flux:sidebar.item icon="qr-code" :href="route('payment-settings')" :current="request()->routeIs('payment-settings')" wire:navigate>
                                 {{ __('Payment settings') }}
+                            </flux:sidebar.item>
+                            <flux:sidebar.item icon="document-text" :href="route('contract-terms')" :current="request()->routeIs('contract-terms', 'leases.contract')" wire:navigate>
+                                {{ __('Contract terms') }}
                             </flux:sidebar.item>
                             <flux:sidebar.item icon="wrench-screwdriver" :href="route('landlord.maintenance')" :current="request()->routeIs('landlord.maintenance', 'issue-types')" wire:navigate>
                                 {{ __('Maintenance') }}

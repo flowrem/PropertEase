@@ -11,6 +11,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Support\Carbon;
 
@@ -35,6 +36,7 @@ use Illuminate\Support\Carbon;
  * @property-read Collection<int, PaymentChannel> $paymentChannels
  * @property-read Collection<int, Reservation> $reservations
  * @property-read Collection<int, User> $members
+ * @property-read ContractTemplate|null $contractTemplate
  */
 #[Fillable(['name', 'slug', 'is_personal'])]
 class Team extends Model
@@ -167,6 +169,23 @@ class Team extends Model
     public function paymentChannels(): HasMany
     {
         return $this->hasMany(PaymentChannel::class);
+    }
+
+    /**
+     * @return HasOne<ContractTemplate, $this>
+     */
+    public function contractTemplate(): HasOne
+    {
+        return $this->hasOne(ContractTemplate::class);
+    }
+
+    /**
+     * The team's contract terms, or the defaults (not yet saved) when the
+     * landlord has never changed them.
+     */
+    public function contractTerms(): ContractTemplate
+    {
+        return $this->contractTemplate ?? $this->contractTemplate()->make();
     }
 
     /**

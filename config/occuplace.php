@@ -53,6 +53,34 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Contract Terms
+    |--------------------------------------------------------------------------
+    |
+    | Bounds on each landlord's contract terms. Advance and deposit are in
+    | months of rent; the minimum stays are in months per stay type.
+    |
+    */
+
+    'contracts' => [
+
+        'advance_months' => ['min' => 0, 'max' => 3],
+
+        'deposit_months' => ['min' => 0, 'max' => 3],
+
+        'minimum_stay_months_short' => ['min' => 1, 'max' => 12],
+
+        'minimum_stay_months_long' => ['min' => 1, 'max' => 36],
+
+        'notice_days' => ['min' => 0, 'max' => 90],
+
+        'late_fee_max' => 100000,
+
+        'text_max_length' => 5000,
+
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
     | Display Timezone
     |--------------------------------------------------------------------------
     |
