@@ -424,6 +424,34 @@ test('a quantity typed past the limit snaps back to it and the form shows the li
         ->assertSee('Up to 3');
 });
 
+test('each quantity limit says why, and per-tenant items follow the beds ticked', function () {
+    $user = User::factory()->create();
+    $property = Property::factory()->for($user->currentTeam)->create(['type' => PropertyType::Apartment]);
+    $chair = defaultAmenity('Chair');
+    $singleBed = defaultAmenity('Single bed');
+
+    $component = Livewire::actingAs($user)
+        ->test('pages::landlord.properties')
+        ->call('startAddingUnit', $property->id)
+        ->set([
+            'form.floor_area_sqm' => '35',
+            'form.bedrooms' => 3,
+            'form.bathrooms' => 2,
+        ])
+        ->set('form.amenityIds', [(string) $chair->id])
+        ->assertSee('Up to 10')
+        ->assertSee('2 per tenant, 5 tenants the 35 m² fits')
+        ->set('form.amenityIds', [(string) $chair->id, (string) $singleBed->id])
+        ->assertSee('Up to 2')
+        ->assertSee('2 per tenant, 1 tenant from the beds ticked')
+        ->assertSee('Up to 5')
+        ->assertSee('35 m² fits 5 people');
+
+    $component->set("form.amenityQuantities.{$singleBed->id}", '3')
+        ->assertSee('Up to 6')
+        ->assertSee('2 per tenant, 3 tenants from the beds ticked');
+});
+
 test('unticking an amenity clears its quantity error', function () {
     $user = User::factory()->create();
     $doubleDeck = defaultAmenity('Double deck');

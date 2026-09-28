@@ -174,6 +174,17 @@ new #[Title('Add a property')] class extends Component
     }
 
     /**
+     * Why each ticked amenity is limited to its number.
+     *
+     * @return array<int, string>
+     */
+    #[Computed]
+    public function formAmenityLimitReasons(): array
+    {
+        return $this->property ? $this->form->amenityLimitReasons($this->property->type) : [];
+    }
+
+    /**
      * Validate the new unit, then ask the landlord to confirm the details
      * that will be locked once it is saved.
      */
@@ -314,6 +325,7 @@ new #[Title('Add a property')] class extends Component
                     :amenity-groups="$this->formAmenityGroups"
                     :selected-amenities="$form->amenityIds"
                     :amenity-limits="$this->formAmenityLimits"
+                    :amenity-limit-reasons="$this->formAmenityLimitReasons"
                     :amenity-quantities="$form->amenityQuantities"
                     :bed-spaces="$this->formBedSpacesPreview"
                     :bed-summary="$form->bedSummary()"

@@ -112,6 +112,19 @@ new #[Title('Properties')] class extends Component
             : [];
     }
 
+    /**
+     * Why each ticked amenity is limited to its number.
+     *
+     * @return array<int, string>
+     */
+    #[Computed]
+    public function formAmenityLimitReasons(): array
+    {
+        return $this->formProperty
+            ? $this->form->amenityLimitReasons($this->formProperty->type)
+            : [];
+    }
+
     #[Computed]
     public function formBedSpacesPreview(): int
     {
@@ -425,6 +438,7 @@ new #[Title('Properties')] class extends Component
                                 :amenity-groups="$this->formAmenityGroups"
                                 :selected-amenities="$form->amenityIds"
                                 :amenity-limits="$this->formAmenityLimits"
+                                :amenity-limit-reasons="$this->formAmenityLimitReasons"
                                 :amenity-quantities="$form->amenityQuantities"
                                 :bed-spaces="$this->formBedSpacesPreview"
                                 :bed-summary="$form->bedSummary()"

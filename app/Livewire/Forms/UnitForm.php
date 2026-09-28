@@ -2,6 +2,7 @@
 
 namespace App\Livewire\Forms;
 
+use App\Enums\AmenityQuantityBasis;
 use App\Enums\PropertyType;
 use App\Models\Amenity;
 use App\Models\Property;
@@ -144,13 +145,35 @@ class UnitForm extends Form
      */
     public function amenityQuantityLimits(PropertyType $type, ?Unit $unit = null): array
     {
+        return array_map(fn (array $rule): int => $rule['limit'], $this->amenityQuantityRules($type, $unit));
+    }
+
+    /**
+     * Why each ticked amenity is limited to its number, in a few words for
+     * the form ("2 per tenant, 1 tenant from the beds ticked"), keyed by
+     * amenity ID. Empty until the floor area is usable.
+     *
+     * @return array<int, string>
+     */
+    public function amenityLimitReasons(PropertyType $type, ?Unit $unit = null): array
+    {
+        return array_filter(array_map(fn (array $rule): ?string => $rule['reason'], $this->amenityQuantityRules($type, $unit)));
+    }
+
+    /**
+     * The limit of each ticked amenity and the reason for it.
+     *
+     * @return array<int, array{limit: int, reason: string|null}>
+     */
+    private function amenityQuantityRules(PropertyType $type, ?Unit $unit): array
+    {
         $ceiling = (int) config('occuplace.units.amenity_quantity.max');
         $ticked = $this->tickedAmenities();
         $dimensions = $this->dimensions($unit);
 
         if ($dimensions === null) {
             return $ticked->mapWithKeys(fn (Amenity $amenity): array => [
-                $amenity->id => $amenity->isSingle() ? 1 : $ceiling,
+                $amenity->id => ['limit' => $amenity->isSingle() ? 1 : $ceiling, 'reason' => null],
             ])->all();
         }
 
@@ -158,26 +181,88 @@ class UnitForm extends Form
         $bedFloorSpace = Unit::bedFloorSpaceFor($dimensions['floorArea'], $dimensions['bedrooms'], $dimensions['bathrooms']);
         $tenantsThatFit = Unit::tenantsThatFitIn($dimensions['floorArea'], $type);
         $maxCapacity = Unit::maxCapacityFor($dimensions['floorArea'], $type, $dimensions['bedrooms'], $this->bedSpaces());
+        $floorArea = Unit::formatFloorArea($dimensions['floorArea']);
 
-        return $ticked->mapWithKeys(function (Amenity $amenity) use ($beds, $bedFloorSpace, $tenantsThatFit, $maxCapacity, $dimensions, $ceiling): array {
+        return $ticked->mapWithKeys(function (Amenity $amenity) use ($beds, $bedFloorSpace, $tenantsThatFit, $maxCapacity, $dimensions, $ceiling, $type, $floorArea): array {
             if (! $amenity->isBed()) {
-                $limit = $amenity->quantity_basis->maxQuantity($amenity->quantity_per, $dimensions['bedrooms'], $dimensions['bathrooms'], $maxCapacity);
+                $limit = min($ceiling, $amenity->quantity_basis->maxQuantity($amenity->quantity_per, $dimensions['bedrooms'], $dimensions['bathrooms'], $maxCapacity));
 
-                return [$amenity->id => min($ceiling, $limit)];
+                return [$amenity->id => [
+                    'limit' => $limit,
+                    'reason' => $this->basisReason($amenity, $dimensions, $maxCapacity, $tenantsThatFit, $type, $floorArea),
+                ]];
             }
 
             $otherBeds = $beds->reject(fn (array $bed): bool => $bed['amenity']->id === $amenity->id);
             $floorSpaceLeft = $bedFloorSpace - $otherBeds->sum(fn (array $bed): float => (float) $bed['amenity']->footprint_sqm * $bed['quantity']);
             $tenantsLeft = $tenantsThatFit - $otherBeds->sum(fn (array $bed): int => $bed['amenity']->sleeps * $bed['quantity']);
 
-            $limit = (int) floor($tenantsLeft / $amenity->sleeps + 1e-9);
+            $byTenants = (int) floor($tenantsLeft / $amenity->sleeps + 1e-9);
+            $byFloorSpace = (float) $amenity->footprint_sqm > 0
+                ? (int) floor($floorSpaceLeft / (float) $amenity->footprint_sqm + 1e-9)
+                : null;
 
-            if ((float) $amenity->footprint_sqm > 0) {
-                $limit = min($limit, (int) floor($floorSpaceLeft / (float) $amenity->footprint_sqm + 1e-9));
+            $limit = max(0, min($ceiling, $byTenants, $byFloorSpace ?? $byTenants));
+
+            $reason = match (true) {
+                $byFloorSpace !== null && $byFloorSpace < $byTenants => $otherBeds->isEmpty()
+                    ? trans_choice('floor space for :count bed this size|floor space for :count beds this size', max(0, $byFloorSpace))
+                    : trans_choice('floor space left for :count after the other beds|floor space left for :count after the other beds', max(0, $byFloorSpace)),
+                $otherBeds->isEmpty() => trans_choice(':area m² fits :count person|:area m² fits :count people', $tenantsThatFit, ['area' => $floorArea]),
+                default => trans_choice(':count more person fits after the other beds|:count more people fit after the other beds', max(0, $tenantsLeft)),
+            };
+
+            if ($amenity->sleeps > 1) {
+                $reason .= ', '.trans_choice(':count per :bed|:count per :bed', $amenity->sleeps, ['bed' => Str::lower($amenity->name)]);
             }
 
-            return [$amenity->id => max(0, min($ceiling, $limit))];
+            return [$amenity->id => ['limit' => $limit, 'reason' => $reason]];
         })->all();
+    }
+
+    /**
+     * The reason for a limit that follows the unit's rooms, bathrooms or
+     * tenants. Per-tenant items name where the tenant count comes from,
+     * because ticking beds changes it.
+     *
+     * @param  array{floorArea: float, bedrooms: int, bathrooms: int}  $dimensions
+     */
+    private function basisReason(Amenity $amenity, array $dimensions, int $maxCapacity, int $tenantsThatFit, PropertyType $type, string $floorArea): ?string
+    {
+        $per = $amenity->quantity_per;
+
+        return match ($amenity->quantity_basis) {
+            AmenityQuantityBasis::Single => null,
+            AmenityQuantityBasis::PerUnit, AmenityQuantityBasis::FloorSpace => trans_choice(':count per unit|:count per unit', $per),
+            AmenityQuantityBasis::PerRoom => $dimensions['bedrooms'] === 0
+                ? trans_choice(':count for the one room|:count for the one room', $per)
+                : trans_choice(':per per room: :count bedroom and the living area|:per per room: :count bedrooms and the living area', $dimensions['bedrooms'], ['per' => $per]),
+            AmenityQuantityBasis::PerBathroom => $dimensions['bathrooms'] === 0
+                ? trans_choice(':count for the shared bathroom|:count for the shared bathroom', $per)
+                : trans_choice(':per per bathroom, :count bathroom|:per per bathroom, :count bathrooms', $dimensions['bathrooms'], ['per' => $per]),
+            AmenityQuantityBasis::PerTenant => trans_choice(':count per tenant|:count per tenant', $per).', '.$this->tenantCountSource($dimensions, $maxCapacity, $tenantsThatFit, $type, $floorArea),
+        };
+    }
+
+    /**
+     * Where the unit's tenant count comes from: the beds ticked, the
+     * bedrooms (no beds ticked) or, when that is smaller, the floor area.
+     *
+     * @param  array{floorArea: float, bedrooms: int, bathrooms: int}  $dimensions
+     */
+    private function tenantCountSource(array $dimensions, int $maxCapacity, int $tenantsThatFit, PropertyType $type, string $floorArea): string
+    {
+        $bedSpaces = $this->bedSpaces();
+
+        if ($bedSpaces > 0 && $bedSpaces <= $tenantsThatFit) {
+            return trans_choice(':count tenant from the beds ticked|:count tenants from the beds ticked', $maxCapacity);
+        }
+
+        if ($bedSpaces === 0 && $dimensions['bedrooms'] > 0 && $tenantsThatFit >= $dimensions['bedrooms'] * $type->tenantsPerBedroom()) {
+            return trans_choice(':count tenant for the bedrooms (no beds ticked)|:count tenants for the bedrooms (no beds ticked)', $maxCapacity);
+        }
+
+        return trans_choice(':count tenant the :area m² fits|:count tenants the :area m² fits', $maxCapacity, ['area' => $floorArea]);
     }
 
     /**

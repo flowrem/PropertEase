@@ -6,6 +6,7 @@
     'amenityGroups' => collect(),
     'selectedAmenities' => [],
     'amenityLimits' => [],
+    'amenityLimitReasons' => [],
     'amenityQuantities' => [],
     'bedSpaces' => 0,
     'bedSummary' => null,
@@ -147,6 +148,7 @@
     <flux:fieldset>
         <flux:legend>{{ __('Amenities') }}</flux:legend>
         <flux:description>{{ __('Tick what comes with this unit, and how many of each, up to what its floor area and rooms allow. The beds decide how many tenants it fits; leave them unticked if tenants bring their own.') }}</flux:description>
+        <flux:description>{{ __('Beds are limited by what the floor area fits. Items per tenant, like chairs and cabinets, follow the tenants the ticked beds sleep, so they go up as you add beds.') }}</flux:description>
 
         <flux:checkbox.group wire:model.live="form.amenityIds" class="mt-4 space-y-5">
             @foreach ($amenityGroups as $category => $amenities)
@@ -184,6 +186,10 @@
                                         </div>
                                     @endif
                                 </div>
+
+                                @if ($asksQuantity && isset($amenityLimitReasons[$amenity->id]))
+                                    <flux:text class="text-right text-xs text-zinc-500">{{ $amenityLimitReasons[$amenity->id] }}</flux:text>
+                                @endif
 
                                 @if ($isTicked)
                                     <flux:error name="form.amenityQuantities.{{ $amenity->id }}" />
