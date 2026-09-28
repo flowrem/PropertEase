@@ -253,7 +253,7 @@ class Reservation extends Model
     }
 
     /**
-     * The tenant account created when this reservation was approved.
+     * The tenant account created when this reservation was confirmed.
      *
      * @return BelongsTo<User, $this>
      */

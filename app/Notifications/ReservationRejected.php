@@ -27,7 +27,7 @@ class ReservationRejected extends Notification implements ShouldQueue
         return (new MailMessage)
             ->subject(__('Update on your reservation :code', ['code' => $this->reservation->code]))
             ->greeting(__('Hello :name,', ['name' => $this->reservation->first_name]))
-            ->line(__('Your reservation :code with :team was not approved.', [
+            ->line(__('Your reservation :code with :team was not accepted.', [
                 'code' => $this->reservation->code,
                 'team' => $this->reservation->team->name,
             ]))

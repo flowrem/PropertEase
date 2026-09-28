@@ -16,6 +16,9 @@ use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Facades\Storage;
 use Livewire\Livewire;
 
+// Deadlines are compared to the second, so the clock must not tick mid-test.
+beforeEach(fn () => $this->freezeTime());
+
 /**
  * @return array{0: User, 1: Reservation}
  */

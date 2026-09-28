@@ -26,6 +26,9 @@ use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\ValidationException;
 
+// Deadlines are compared to the second, so the clock must not tick mid-test.
+beforeEach(fn () => $this->freezeTime());
+
 /**
  * @return array{0: User, 1: Reservation}
  */

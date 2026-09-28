@@ -172,7 +172,7 @@ new #[Title('Tenants')] class extends Component
     {
         $units = $this->vacantUnits;
 
-        $heldReservation = $tenant ? $this->approvedReservationFor($tenant) : null;
+        $heldReservation = $tenant ? $this->confirmedReservationFor($tenant) : null;
 
         if ($heldReservation && $units->doesntContain('id', $heldReservation->unit_id)) {
             $units = $units->push(
@@ -186,9 +186,9 @@ new #[Title('Tenants')] class extends Component
     }
 
     /**
-     * The approved reservation on this team that is holding a slot for the tenant, if any.
+     * The confirmed reservation on this team that is holding a slot for the tenant, if any.
      */
-    protected function approvedReservationFor(User $tenant): ?Reservation
+    protected function confirmedReservationFor(User $tenant): ?Reservation
     {
         return Reservation::query()
             ->where('team_id', $this->team->id)
@@ -219,7 +219,7 @@ new #[Title('Tenants')] class extends Component
         $this->showManageModal = true;
 
         $lease = $this->managingTenant?->leases->first();
-        $heldReservation = $this->managingTenant ? $this->approvedReservationFor($this->managingTenant) : null;
+        $heldReservation = $this->managingTenant ? $this->confirmedReservationFor($this->managingTenant) : null;
 
         $this->unit_id = $heldReservation && $heldReservation->unit_id !== $lease?->unit_id ? $heldReservation->unit_id : null;
         $this->due_day = $lease?->due_day ?? 1;
@@ -234,7 +234,7 @@ new #[Title('Tenants')] class extends Component
     #[Computed]
     public function reservedUnitId(): ?int
     {
-        return $this->managingTenant ? $this->approvedReservationFor($this->managingTenant)?->unit_id : null;
+        return $this->managingTenant ? $this->confirmedReservationFor($this->managingTenant)?->unit_id : null;
     }
 
     /**
@@ -302,7 +302,7 @@ new #[Title('Tenants')] class extends Component
 
         abort_unless($unit->property->team_id === $this->team->id, 403);
 
-        $heldReservation = $this->approvedReservationFor($tenant);
+        $heldReservation = $this->confirmedReservationFor($tenant);
         $holdsThisUnit = $heldReservation?->unit_id === $unit->id;
 
         abort_unless($unit->hasRoomForAnotherTenant(excludingOwnHold: $holdsThisUnit), 403);
