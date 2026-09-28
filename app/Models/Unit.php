@@ -23,6 +23,7 @@ use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Database\Eloquent\Relations\Pivot;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Storage;
 
 /**
  * @property int $id
@@ -36,6 +37,7 @@ use Illuminate\Support\Facades\DB;
  * @property bool $allows_multiple_tenants
  * @property int|null $tenant_limit
  * @property string|null $price
+ * @property string|null $photo_path
  * @property Carbon|null $created_at
  * @property Carbon|null $updated_at
  * @property-read Property $property
@@ -80,6 +82,16 @@ class Unit extends Model
     public function listing(): HasOne
     {
         return $this->hasOne(UnitListing::class);
+    }
+
+    /**
+     * The landlord's photo of the unit, or null to show the placeholder.
+     */
+    public function photoUrl(): ?string
+    {
+        return $this->photo_path
+            ? Storage::disk(config('filesystems.media_disk'))->url($this->photo_path)
+            : null;
     }
 
     /**
