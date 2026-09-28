@@ -178,7 +178,7 @@ new #[Title('Unit')] class extends Component
             <div class="rounded-xl border border-zinc-200 p-4 dark:border-zinc-700">
                 <flux:heading size="sm" class="mb-2">{{ __('What\'s included') }}</flux:heading>
                 @if ($unit->amenities->isEmpty())
-                    <flux:text class="text-zinc-500">{{ __('No amenities ticked yet.') }}</flux:text>
+                    <flux:text class="text-zinc-500">{{ __('No amenities checked yet.') }}</flux:text>
                 @else
                     <ul class="flex flex-wrap gap-2">
                         @foreach ($unit->amenities as $amenity)

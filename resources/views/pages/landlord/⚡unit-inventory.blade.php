@@ -277,7 +277,7 @@ new #[Title('Unit inventory')] class extends Component
         $quantities = $this->unit->amenities()->pluck('amenity_unit.quantity', 'amenities.id');
 
         if ($quantities->isEmpty()) {
-            Flux::toast(variant: 'warning', text: __('This unit has no amenities ticked yet. Tick them on the Properties page first.'));
+            Flux::toast(variant: 'warning', text: __('This unit has no amenities checked yet. Check them on the unit\'s Details tab first.'));
 
             return;
         }

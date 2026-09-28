@@ -149,8 +149,8 @@ class UnitForm extends Form
     }
 
     /**
-     * Why each ticked amenity is limited to its number, in a few words for
-     * the form ("2 per tenant, 1 tenant from the beds ticked"), keyed by
+     * Why each ticked amenity is limited to its number, as a sentence for the
+     * form ("2 for each tenant. The beds you checked sleep 1 person."), keyed by
      * amenity ID. Empty until the floor area is usable.
      *
      * @return array<int, string>
@@ -206,14 +206,14 @@ class UnitForm extends Form
 
             $reason = match (true) {
                 $byFloorSpace !== null && $byFloorSpace < $byTenants => $otherBeds->isEmpty()
-                    ? trans_choice('floor space for :count bed this size|floor space for :count beds this size', max(0, $byFloorSpace))
-                    : trans_choice('floor space left for :count after the other beds|floor space left for :count after the other beds', max(0, $byFloorSpace)),
-                $otherBeds->isEmpty() => trans_choice(':area m² fits :count person|:area m² fits :count people', $tenantsThatFit, ['area' => $floorArea]),
-                default => trans_choice(':count more person fits after the other beds|:count more people fit after the other beds', max(0, $tenantsLeft)),
+                    ? trans_choice('Only :count bed this size fits on the floor.|Only :count beds this size fit on the floor.', max(0, $byFloorSpace))
+                    : trans_choice('The other beds leave floor space for :count more.|The other beds leave floor space for :count more.', max(0, $byFloorSpace)),
+                $otherBeds->isEmpty() => trans_choice('This :area m² unit fits :count person.|This :area m² unit fits :count people.', $tenantsThatFit, ['area' => $floorArea]),
+                default => trans_choice('After the other beds, :count more person fits.|After the other beds, :count more people fit.', max(0, $tenantsLeft)),
             };
 
             if ($amenity->sleeps > 1) {
-                $reason .= ', '.trans_choice(':count per :bed|:count per :bed', $amenity->sleeps, ['bed' => Str::lower($amenity->name)]);
+                $reason .= ' '.trans_choice('Each :bed sleeps :count.|Each :bed sleeps :count.', $amenity->sleeps, ['bed' => Str::lower($amenity->name)]);
             }
 
             return [$amenity->id => ['limit' => $limit, 'reason' => $reason]];
@@ -222,31 +222,33 @@ class UnitForm extends Form
 
     /**
      * The reason for a limit that follows the unit's rooms, bathrooms or
-     * tenants. Per-tenant items name where the tenant count comes from,
-     * because ticking beds changes it.
+     * tenants, as a plain sentence. Per-tenant items say where the tenant
+     * count comes from, because checking beds changes it.
      *
      * @param  array{floorArea: float, bedrooms: int, bathrooms: int}  $dimensions
      */
     private function basisReason(Amenity $amenity, array $dimensions, int $maxCapacity, int $tenantsThatFit, PropertyType $type, string $floorArea): ?string
     {
-        $per = $amenity->quantity_per;
+        $per = $amenity->quantity_per === 1 ? __('One') : (string) $amenity->quantity_per;
 
         return match ($amenity->quantity_basis) {
             AmenityQuantityBasis::Single => null,
-            AmenityQuantityBasis::PerUnit, AmenityQuantityBasis::FloorSpace => trans_choice(':count per unit|:count per unit', $per),
+            AmenityQuantityBasis::PerUnit, AmenityQuantityBasis::FloorSpace => trans_choice(':per for the whole unit.|:per for the whole unit.', $amenity->quantity_per, ['per' => $per]),
             AmenityQuantityBasis::PerRoom => $dimensions['bedrooms'] === 0
-                ? trans_choice(':count for the one room|:count for the one room', $per)
-                : trans_choice(':per per room: :count bedroom and the living area|:per per room: :count bedrooms and the living area', $dimensions['bedrooms'], ['per' => $per]),
+                ? trans_choice(':per for the one room.|:per for the one room.', $amenity->quantity_per, ['per' => $per])
+                : trans_choice(':per for each room: the :count bedroom and the living area.|:per for each room: the :count bedrooms and the living area.', $dimensions['bedrooms'], ['per' => $per]),
             AmenityQuantityBasis::PerBathroom => $dimensions['bathrooms'] === 0
-                ? trans_choice(':count for the shared bathroom|:count for the shared bathroom', $per)
-                : trans_choice(':per per bathroom, :count bathroom|:per per bathroom, :count bathrooms', $dimensions['bathrooms'], ['per' => $per]),
-            AmenityQuantityBasis::PerTenant => trans_choice(':count per tenant|:count per tenant', $per).', '.$this->tenantCountSource($dimensions, $maxCapacity, $tenantsThatFit, $type, $floorArea),
+                ? trans_choice(':per for the shared bathroom.|:per for the shared bathroom.', $amenity->quantity_per, ['per' => $per])
+                : trans_choice(':per for each bathroom (:count bathroom).|:per for each bathroom (:count bathrooms).', $dimensions['bathrooms'], ['per' => $per]),
+            AmenityQuantityBasis::PerTenant => trans_choice(':per for each tenant.|:per for each tenant.', $amenity->quantity_per, ['per' => $per])
+                .' '.$this->tenantCountSource($dimensions, $maxCapacity, $tenantsThatFit, $type, $floorArea),
         };
     }
 
     /**
-     * Where the unit's tenant count comes from: the beds ticked, the
-     * bedrooms (no beds ticked) or, when that is smaller, the floor area.
+     * Where the unit's tenant count comes from, as a sentence: the beds
+     * checked, the bedrooms (no beds checked) or, when that is smaller, the
+     * floor area.
      *
      * @param  array{floorArea: float, bedrooms: int, bathrooms: int}  $dimensions
      */
@@ -255,14 +257,14 @@ class UnitForm extends Form
         $bedSpaces = $this->bedSpaces();
 
         if ($bedSpaces > 0 && $bedSpaces <= $tenantsThatFit) {
-            return trans_choice(':count tenant from the beds ticked|:count tenants from the beds ticked', $maxCapacity);
+            return trans_choice('The beds you checked sleep :count person.|The beds you checked sleep :count people.', $maxCapacity);
         }
 
         if ($bedSpaces === 0 && $dimensions['bedrooms'] > 0 && $tenantsThatFit >= $dimensions['bedrooms'] * $type->tenantsPerBedroom()) {
-            return trans_choice(':count tenant for the bedrooms (no beds ticked)|:count tenants for the bedrooms (no beds ticked)', $maxCapacity);
+            return trans_choice('With no beds checked, the bedrooms fit :count person.|With no beds checked, the bedrooms fit :count people.', $maxCapacity);
         }
 
-        return trans_choice(':count tenant the :area m² fits|:count tenants the :area m² fits', $maxCapacity, ['area' => $floorArea]);
+        return trans_choice('This :area m² unit fits :count person.|This :area m² unit fits :count people.', $maxCapacity, ['area' => $floorArea]);
     }
 
     /**
@@ -669,7 +671,7 @@ class UnitForm extends Form
                 'required', 'integer', 'min:'.($this->isStudio ? 0 : 1), 'max:'.$limits['bedrooms']['max'],
                 function (string $attribute, mixed $value, Closure $fail) use ($maxBedrooms): void {
                     if ($maxBedrooms === 0 && $value > 0) {
-                        $fail(__('This floor area is too small for a separate bedroom. Tick "Studio or bedspace" instead.'));
+                        $fail(__('This floor area is too small for a separate bedroom. Check "Studio or bedspace" instead.'));
                     } elseif ($maxBedrooms !== null && $value > $maxBedrooms) {
                         $fail(__('This floor area fits at most :max bedrooms.', ['max' => $maxBedrooms]));
                     }
@@ -679,7 +681,7 @@ class UnitForm extends Form
                 'required', 'integer', 'min:'.($this->hasSharedBathroom ? 0 : 1), 'max:'.$limits['bathrooms']['max'],
                 function (string $attribute, mixed $value, Closure $fail) use ($maxBathrooms): void {
                     if ($maxBathrooms === 0 && $value > 0) {
-                        $fail(__('This floor area is too small for a bathroom of its own. Tick "Shared bathroom" instead.'));
+                        $fail(__('This floor area is too small for a bathroom of its own. Check "Shared bathroom" instead.'));
                     } elseif ($maxBathrooms !== null && $value > $maxBathrooms) {
                         $fail(__('This floor area fits at most :max bathrooms.', ['max' => $maxBathrooms]));
                     }
@@ -753,9 +755,9 @@ class UnitForm extends Form
                             'rule' => $amenity->quantity_basis->describe($amenity->quantity_per),
                         ]));
                     } elseif ($limit === 0) {
-                        $fail(__('No room for this bed with the other beds ticked.'));
+                        $fail(__('No room for this bed with the other beds you checked.'));
                     } else {
-                        $fail(__('Room for at most :max with the other beds ticked.', ['max' => $limit]));
+                        $fail(__('Room for at most :max with the other beds you checked.', ['max' => $limit]));
                     }
                 },
             ];

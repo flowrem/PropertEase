@@ -100,7 +100,7 @@ new #[Title('Amenities')] class extends Component
 <section class="flex w-full flex-col gap-6">
     <div>
         <flux:heading size="xl" level="1">{{ __('Amenities') }}</flux:heading>
-        <flux:subheading>{{ __('What your units can come with. Tick them on each unit from the Properties page.') }}</flux:subheading>
+        <flux:subheading>{{ __('What your units can come with. Check them when you add a unit on the Properties page, or on a unit\'s Details tab.') }}</flux:subheading>
     </div>
 
     @if (! $this->canManage)
@@ -110,7 +110,7 @@ new #[Title('Amenities')] class extends Component
     <div class="space-y-4">
         <div>
             <flux:heading size="lg" level="2">{{ __('Your own amenities') }}</flux:heading>
-            <flux:text>{{ __('Add anything the list below is missing. A unit can have up to one of each per tenant it fits. A deactivated amenity stays on the units that have it but cannot be ticked on new ones.') }}</flux:text>
+            <flux:text>{{ __('Add anything the list below is missing. A unit can have up to one of each per tenant it fits. A deactivated amenity stays on the units that have it but cannot be checked on new ones.') }}</flux:text>
         </div>
 
         @if ($this->canManage)

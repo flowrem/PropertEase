@@ -122,7 +122,7 @@
     @if ($maxBedrooms !== null && ! $isStudio)
         <flux:text class="text-zinc-500 dark:text-zinc-400">
             {{ $maxBedrooms === 0
-                ? __('This floor area is too small for a separate bedroom. Tick "Studio or bedspace".')
+                ? __('This floor area is too small for a separate bedroom. Check "Studio or bedspace".')
                 : trans_choice('This floor area fits up to :count bedroom, keeping :area m² for a kitchen and living area.|This floor area fits up to :count bedrooms, keeping :area m² for a kitchen and living area.', $maxBedrooms, ['area' => $limits['common_area']]) }}
         </flux:text>
     @endif
@@ -147,8 +147,8 @@
 @if ($amenityGroups->isNotEmpty())
     <flux:fieldset>
         <flux:legend>{{ __('Amenities') }}</flux:legend>
-        <flux:description>{{ __('Tick what comes with this unit, and how many of each, up to what its floor area and rooms allow. The beds decide how many tenants it fits; leave them unticked if tenants bring their own.') }}</flux:description>
-        <flux:description>{{ __('Beds are limited by what the floor area fits. Items per tenant, like chairs and cabinets, follow the tenants the ticked beds sleep, so they go up as you add beds.') }}</flux:description>
+        <flux:description>{{ __('Check what comes with this unit and how many of each. The beds decide how many tenants the unit fits. Leave beds unchecked if tenants bring their own.') }}</flux:description>
+        <flux:description>{{ __('How many you can add depends on the unit: beds on how many people the floor area fits, and items for each tenant, like chairs and cabinets, on how many people the checked beds sleep. Check more beds and those limits go up.') }}</flux:description>
 
         <flux:checkbox.group wire:model.live="form.amenityIds" class="mt-4 space-y-5">
             @foreach ($amenityGroups as $category => $amenities)
@@ -188,7 +188,7 @@
                                 </div>
 
                                 @if ($asksQuantity && isset($amenityLimitReasons[$amenity->id]))
-                                    <flux:text class="text-right text-xs text-zinc-500">{{ $amenityLimitReasons[$amenity->id] }}</flux:text>
+                                    <p class="mt-0.5 ps-7 text-sm leading-snug text-zinc-700">{{ $amenityLimitReasons[$amenity->id] }}</p>
                                 @endif
 
                                 @if ($isTicked)
@@ -204,7 +204,7 @@
         @if ($bedSummary)
             <flux:callout icon="information-circle" class="mt-4">
                 <flux:callout.text>
-                    {{ trans_choice('Counting only the ticked beds: :beds sleep :count person. Tick every bed in the unit, or none if tenants bring their own.|Counting only the ticked beds: :beds sleep :count people. Tick every bed in the unit, or none if tenants bring their own.', $bedSpaces, ['beds' => $bedSummary]) }}
+                    {{ trans_choice('Counting only the beds you checked: :beds sleep :count person. Check every bed in the unit, or none if tenants bring their own.|Counting only the beds you checked: :beds sleep :count people. Check every bed in the unit, or none if tenants bring their own.', $bedSpaces, ['beds' => $bedSummary]) }}
                 </flux:callout.text>
             </flux:callout>
         @endif
