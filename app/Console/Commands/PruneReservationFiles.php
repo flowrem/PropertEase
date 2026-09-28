@@ -10,7 +10,7 @@ use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Storage;
 
 #[Signature('reservations:prune-files')]
-#[Description('Delete valid ID and payment proof files from rejected or cancelled reservations older than 30 days')]
+#[Description('Delete valid ID and payment proof files from rejected, cancelled or expired reservations older than 30 days')]
 class PruneReservationFiles extends Command
 {
     private const RETENTION_DAYS = 30;
@@ -25,9 +25,9 @@ class PruneReservationFiles extends Command
         $pruned = 0;
 
         Reservation::query()
-            ->whereIn('status', [ReservationStatus::Rejected->value, ReservationStatus::Cancelled->value])
+            ->whereIn('status', [ReservationStatus::Rejected->value, ReservationStatus::Cancelled->value, ReservationStatus::Expired->value])
             ->whereNull('files_pruned_at')
-            ->whereRaw('coalesce(cancelled_at, reviewed_at) < ?', [$cutoff])
+            ->whereRaw('coalesce(cancelled_at, expired_at, reviewed_at) < ?', [$cutoff])
             ->each(function (Reservation $reservation) use ($disk, &$pruned) {
                 $disk->delete(array_filter([$reservation->valid_id_path, $reservation->downpayment_proof_path]));
 

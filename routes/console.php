@@ -15,3 +15,7 @@ Schedule::command('invoices:generate')->daily();
 Schedule::command('reservations:prune-files')->daily();
 
 Schedule::command('landlord-ids:prune')->daily();
+
+// Reservations stop holding their unit the moment the deadline passes even if
+// this is missed while the server sleeps; this records it and emails them.
+Schedule::command('reservations:expire')->hourly();
