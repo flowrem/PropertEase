@@ -67,6 +67,24 @@ test('a reservation shows the applicant\'s mobile number as a call link and thei
         ->assertSee('Short-term');
 });
 
+test('an approved reservation links to moving the tenant in, a pending one does not', function () {
+    [$landlord, $reservation] = landlordWithReservation();
+    $this->actingAs($landlord);
+
+    Livewire::test('pages::landlord.reservations')
+        ->call('open', $reservation->id)
+        ->assertDontSee('Move in');
+
+    $tenant = User::factory()->create();
+    $reservation->forceFill(['status' => ReservationStatus::Approved, 'tenant_user_id' => $tenant->id])->save();
+    $landlord->switchTeam($landlord->currentTeam);
+
+    Livewire::test('pages::landlord.reservations')
+        ->call('open', $reservation->id)
+        ->assertSee('Move in')
+        ->assertSeeHtml('href="'.route('tenants', ['tenant' => $tenant->id]).'"');
+});
+
 test('a landlord can approve a reservation with the downpayment confirmed', function () {
     Notification::fake();
     [$landlord, $reservation] = landlordWithReservation();

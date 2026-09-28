@@ -383,6 +383,17 @@ new #[Title('Reservations')] class extends Component
                     @endif
                 @endif
 
+                @if ($reservation->status === ReservationStatus::Approved && $reservation->tenant_user_id)
+                    <div class="flex items-center justify-between gap-3 rounded-lg border border-zinc-200 p-4 dark:border-zinc-700">
+                        <flux:text class="text-zinc-500">
+                            {{ __('The unit is held for this tenant. Move them in when they arrive to start their lease and rent.') }}
+                        </flux:text>
+                        <flux:button variant="primary" icon="home" :href="route('tenants', ['tenant' => $reservation->tenant_user_id])" wire:navigate>
+                            {{ __('Move in') }}
+                        </flux:button>
+                    </div>
+                @endif
+
                 @if ($this->canReview && $reservation->status === ReservationStatus::Approved)
                     @if ($cancelling)
                         <div class="space-y-3">
