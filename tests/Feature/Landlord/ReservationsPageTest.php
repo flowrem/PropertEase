@@ -2,6 +2,7 @@
 
 use App\Actions\Reservations\ApproveReservation;
 use App\Enums\ReservationStatus;
+use App\Enums\StayType;
 use App\Enums\TeamRole;
 use App\Enums\UnitStatus;
 use App\Models\Property;
@@ -52,6 +53,18 @@ test('a landlord sees pending reservations and the pending badge', function () {
         ->assertOk()
         ->assertSee($reservation->fullName())
         ->assertSee($reservation->code);
+});
+
+test('a reservation shows the applicant\'s mobile number as a call link and their stay type', function () {
+    [$landlord, $reservation] = landlordWithReservation();
+    $reservation->update(['contact_number' => '+639171234567', 'stay_type' => StayType::ShortTerm]);
+    $this->actingAs($landlord);
+
+    Livewire::test('pages::landlord.reservations')
+        ->call('open', $reservation->id)
+        ->assertSeeHtml('href="tel:+639171234567"')
+        ->assertSee('0917 123 4567')
+        ->assertSee('Short-term');
 });
 
 test('a landlord can approve a reservation with the downpayment confirmed', function () {

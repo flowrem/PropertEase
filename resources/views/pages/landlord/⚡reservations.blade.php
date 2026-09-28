@@ -7,6 +7,7 @@ use App\Actions\Reservations\ResendLoginDetails;
 use App\Enums\ReservationStatus;
 use App\Models\Reservation;
 use App\Models\Team;
+use App\Rules\PhilippineMobileNumber;
 use Flux\Flux;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Auth;
@@ -268,6 +269,20 @@ new #[Title('Reservations')] class extends Component
                     <div>
                         <dt class="text-zinc-500">{{ __('Email') }}</dt>
                         <dd>{{ $reservation->email }}</dd>
+                    </div>
+                    <div>
+                        <dt class="text-zinc-500">{{ __('Mobile number') }}</dt>
+                        <dd>
+                            @if ($reservation->contact_number)
+                                <flux:link href="tel:{{ $reservation->contact_number }}">{{ PhilippineMobileNumber::forDisplay($reservation->contact_number) }}</flux:link>
+                            @else
+                                {{ __('Not given') }}
+                            @endif
+                        </dd>
+                    </div>
+                    <div>
+                        <dt class="text-zinc-500">{{ __('Stay') }}</dt>
+                        <dd>{{ $reservation->stay_type ? __($reservation->stay_type->label()) : __('Not given') }}</dd>
                     </div>
                     <div>
                         <dt class="text-zinc-500">{{ __('Requested username') }}</dt>

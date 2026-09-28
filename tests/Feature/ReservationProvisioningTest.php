@@ -48,7 +48,7 @@ test('approval is blocked without the downpayment confirmation', function () {
 
 test('approving creates exactly one tenant account, membership and hold', function () {
     Notification::fake();
-    [$landlord, $reservation] = pendingReservation(['desired_username' => 'Juana_DC']);
+    [$landlord, $reservation] = pendingReservation(['desired_username' => 'Juana_DC', 'contact_number' => '+639171234567']);
 
     $tenant = app(ApproveReservation::class)->handle($reservation, $landlord, true);
 
@@ -62,6 +62,7 @@ test('approving creates exactly one tenant account, membership and hold', functi
 
     $tenant->refresh();
     expect($tenant->username)->toBe('juana_dc')
+        ->and($tenant->contact_number)->toBe('+639171234567')
         ->and($tenant->must_change_password)->toBeTrue()
         ->and($tenant->temporary_password_expires_at->isFuture())->toBeTrue()
         ->and($tenant->current_team_id)->toBe($reservation->team_id)

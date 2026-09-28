@@ -48,6 +48,7 @@ class ApproveReservation
             $tenant = (new User)->forceFill([
                 'name' => $locked->fullName(),
                 'email' => $locked->email,
+                'contact_number' => $locked->contact_number,
                 'username' => $locked->desired_username,
                 'password' => $temporaryPassword,
                 'must_change_password' => true,
