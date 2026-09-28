@@ -4,6 +4,7 @@ namespace App\Models;
 
 use App\Enums\PaymentMethod;
 use App\Enums\ReservationStatus;
+use App\Enums\StayType;
 use Database\Factories\ReservationFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Builder;
@@ -23,8 +24,10 @@ use Illuminate\Support\Str;
  * @property string $email
  * @property string $first_name
  * @property string $last_name
+ * @property string|null $contact_number
  * @property int $age
  * @property string $address
+ * @property StayType|null $stay_type
  * @property string $valid_id_path
  * @property string $downpayment_amount
  * @property int|null $payment_channel_id
@@ -51,8 +54,8 @@ use Illuminate\Support\Str;
  */
 #[Fillable([
     'code', 'unit_listing_id', 'unit_id', 'team_id', 'desired_username', 'email', 'first_name', 'last_name',
-    'age', 'address', 'valid_id_path', 'downpayment_amount', 'payment_channel_id', 'downpayment_method',
-    'downpayment_reference', 'downpayment_proof_path', 'consented_at',
+    'contact_number', 'age', 'address', 'stay_type', 'valid_id_path', 'downpayment_amount', 'payment_channel_id',
+    'downpayment_method', 'downpayment_reference', 'downpayment_proof_path', 'consented_at',
 ])]
 class Reservation extends Model
 {
@@ -79,6 +82,7 @@ class Reservation extends Model
         return [
             'status' => ReservationStatus::class,
             'downpayment_method' => PaymentMethod::class,
+            'stay_type' => StayType::class,
             'reviewed_at' => 'datetime',
             'consented_at' => 'datetime',
             'downpayment_confirmed_at' => 'datetime',

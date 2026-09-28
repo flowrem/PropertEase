@@ -4,6 +4,7 @@ namespace Database\Factories;
 
 use App\Enums\PaymentMethod;
 use App\Enums\ReservationStatus;
+use App\Enums\StayType;
 use App\Models\PaymentChannel;
 use App\Models\Reservation;
 use App\Models\Unit;
@@ -31,7 +32,9 @@ class ReservationFactory extends Factory
             'first_name' => fake()->firstName(),
             'last_name' => fake()->lastName(),
             'age' => fake()->numberBetween(18, 40),
+            'contact_number' => '+639'.fake()->numerify('#########'),
             'address' => fake()->address(),
+            'stay_type' => StayType::LongTerm,
             'valid_id_path' => 'reservations/'.fake()->uuid().'.jpg',
             'downpayment_amount' => fake()->numberBetween(1000, 5000),
             'payment_channel_id' => fn (array $attributes) => PaymentChannel::factory()->for(Unit::query()->whereKey($attributes['unit_id'])->firstOrFail()->property->team),

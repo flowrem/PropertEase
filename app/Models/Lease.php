@@ -5,6 +5,7 @@ namespace App\Models;
 use App\Enums\BillingTiming;
 use App\Enums\ConditionCheckKind;
 use App\Enums\LeaseStatus;
+use App\Enums\StayType;
 use Carbon\CarbonImmutable;
 use Carbon\CarbonInterface;
 use Database\Factories\LeaseFactory;
@@ -26,6 +27,7 @@ use Illuminate\Support\Carbon;
  * @property Carbon|null $end_date
  * @property int $due_day
  * @property BillingTiming $billing_timing
+ * @property StayType|null $stay_type
  * @property LeaseStatus $status
  * @property string|null $move_in_override_reason
  * @property Carbon|null $created_at
@@ -41,7 +43,7 @@ use Illuminate\Support\Carbon;
  * @property-read Collection<int, Concern> $concerns
  * @property-read ConditionCheck|null $moveInCheck
  */
-#[Fillable(['unit_id', 'tenant_id', 'start_date', 'end_date', 'due_day', 'billing_timing', 'status', 'move_in_override_reason'])]
+#[Fillable(['unit_id', 'tenant_id', 'start_date', 'end_date', 'due_day', 'billing_timing', 'stay_type', 'status', 'move_in_override_reason'])]
 class Lease extends Model
 {
     /** @use HasFactory<LeaseFactory> */
@@ -197,6 +199,7 @@ class Lease extends Model
             'start_date' => 'date',
             'end_date' => 'date',
             'billing_timing' => BillingTiming::class,
+            'stay_type' => StayType::class,
             'status' => LeaseStatus::class,
         ];
     }
