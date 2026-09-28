@@ -1,6 +1,6 @@
 <?php
 
-use App\Actions\Contracts\GenerateLeaseContract;
+use App\Actions\Leases\MoveTenantIntoUnit;
 use App\Enums\BillingTiming;
 use App\Enums\LeaseStatus;
 use App\Enums\ReservationStatus;
@@ -287,7 +287,7 @@ new #[Title('Tenants')] class extends Component
      * affected unit(s) is re-split among whoever remains afterward, and the
      * new lease gets its contract from the landlord's current terms.
      */
-    public function saveUnitAssignment(GenerateLeaseContract $generateLeaseContract): void
+    public function saveUnitAssignment(MoveTenantIntoUnit $moveTenantIntoUnit): void
     {
         $tenant = $this->managingTenant;
 
@@ -331,30 +331,16 @@ new #[Title('Tenants')] class extends Component
 
         $currentLease = $tenant->leases->first();
 
-        if ($currentLease) {
-            $currentLease->end(LeaseStatus::Ended);
-        }
-
-        // The reservation is done once the tenant moves in anywhere on this
-        // team, so a move into a different unit also releases the held slot.
-        $heldReservation?->forceFill(['status' => ReservationStatus::Fulfilled])->save();
-
-        $lease = $unit->leases()->create([
-            'tenant_id' => $tenant->id,
-            'start_date' => now(),
-            'due_day' => $validated['due_day'],
-            'billing_timing' => BillingTiming::from($validated['billing_timing']),
-            'stay_type' => StayType::tryFrom((string) $validated['stay_type']),
-            'status' => LeaseStatus::Active,
-            'move_in_override_reason' => $moveInCheckPasses ? null : trim($this->overrideReason),
-        ]);
-
-        $moveInCheck?->claimFor($lease);
-
-        $unit->update(['status' => UnitStatus::Occupied]);
-        $unit->splitRentAmongActiveTenants();
-
-        $generateLeaseContract->handle($lease->fresh(), Auth::user());
+        $moveTenantIntoUnit->handle(
+            $tenant,
+            $unit,
+            (int) $validated['due_day'],
+            BillingTiming::from($validated['billing_timing']),
+            StayType::tryFrom((string) $validated['stay_type']),
+            Auth::user(),
+            overrideReason: $moveInCheckPasses ? null : $this->overrideReason,
+            holdsSlotOnUnit: $holdsThisUnit,
+        );
 
         $this->closeManageModal();
 
