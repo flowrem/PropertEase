@@ -85,7 +85,8 @@ class StoreUnitPhoto
             return $image;
         }
 
-        $orientation = @exif_read_data($photo->getRealPath())['Orientation'] ?? 1;
+        $exif = @exif_read_data($photo->getRealPath());
+        $orientation = is_array($exif) ? ($exif['Orientation'] ?? 1) : 1;
 
         $rotated = match ($orientation) {
             3 => imagerotate($image, 180, 0),
