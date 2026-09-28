@@ -18,8 +18,9 @@ project's design system. Read it before changing anything non-trivial.
 
 - **Super Admin** reviews landlord IDs and listings, and sees platform-wide counts.
   It does not see inside a landlord's tenant data.
-- **Landlord** and **Manager** can change listings, payment settings and reservations.
-  **Staff** can view them but not change them.
+- **Landlord** and **Manager** can change listings, payment settings, contract terms,
+  reservations and transfers, and reply to reports. **Staff** can view them, record unit
+  checks and log repairs, but not decide.
 
 ## Creating a Super Admin
 
@@ -50,14 +51,29 @@ Render's Shell is not available on the free plan, so in production use one of th
   to 5 MB). The landlord sees only a review page until a Super Admin approves the ID.
   A rejected landlord sees the reason and can upload a new ID. IDs are deleted 30 days
   after a decision.
+- **Properties and units:** addresses are picked from the official PSGC list (region,
+  province, city or municipality). A unit's type, floor, rooms and floor area are fixed
+  once saved; its capacity comes from its floor area and the beds it lists. Each unit has
+  a page with a photo, its details, and its inventory and condition checks.
 - **Listings:** a landlord adds a payment channel, then submits a unit listing with photos.
   A Super Admin approves or rejects it. Only approved listings with room left appear at
-  `/find-a-place`.
-- **Reservations:** an applicant fills the public form (ID, downpayment proof, chosen
-  payment channel). The landlord confirms the downpayment arrived and approves. That
-  creates the tenant account and emails a temporary password (valid 72 hours). The
-  tenant must choose a new password on first login. An approved reservation holds a
-  unit slot until the tenant is assigned or the landlord cancels it.
+  `/find-a-place`, which filters by region, city, type, price and amenities.
+- **Reservations:** reserving is free. An applicant sends their details and ID. When the
+  landlord accepts, the unit is held for the team's hold days (default 3) and the
+  applicant is emailed a link to their reservation page (`/reservation`), where they pay
+  and send proof of the downpayment. The landlord confirms it, which creates the tenant
+  account and emails a temporary password (valid 72 hours). With nothing sent by the
+  deadline, the unit is released at once and `reservations:expire` (hourly) marks it
+  expired.
+- **Moving in:** the landlord moves a tenant in from the reservation or the Tenants page,
+  after a clean move-in check (or with a reason). This starts the lease and makes the
+  tenant's contract from the landlord's contract terms; the tenant reads it and clicks
+  "I agree". Contracts are snapshots and print cleanly for a signed copy.
+- **Transfers:** a tenant asks to move to another unit of the same landlord and sees
+  the rent change. An approved transfer holds the new unit; the landlord completes the
+  move on the day after a move-out check, which starts a new lease and contract.
+- **Maintenance:** tenants report problems (optionally about an inventory item, with a
+  photo); landlords reply and resolve them, and each item keeps its repair history.
 - **Billing:** invoices are generated per lease by `invoices:generate`. Payments are
   recorded by the landlord. There is no payment gateway.
 
@@ -81,6 +97,26 @@ php artisan migrate
 - Tests: `php artisan test --compact`. Static analysis: `vendor/bin/phpstan analyse`.
   Formatting: `vendor/bin/pint`.
 
+### Demo data
+
+```
+php artisan db:seed --class=DemoSeeder
+```
+
+Adds one complete landlord account next to your existing data: a Lipa dorm with four
+units, two public listings, a settled tenant (contract agreed, invoices, repair history),
+a tenant with a pending transfer, and one reservation in each state. It prints the
+logins; every account's password is `password` and every email ends in
+`@demo.occuplace.test`. Emails go to the log. It refuses to run in production, and
+running it again does nothing.
+
+### PSGC data
+
+`database/data/psgc.json` holds the regions, provinces and cities/municipalities, taken
+from the Philippine Statistics Authority's PSGC Publication Datafile (2Q 2026, as of
+30 June 2026). A migration loads it. Acknowledge the PSA as the source wherever the
+list is shown or cited.
+
 ## Production
 
 Live at https://occuplace.org (the custom domain of the Render service
@@ -92,10 +128,17 @@ to Render (the Blueprint was disconnected), so editing it does not change the de
 - **Database:** Supabase Postgres, through the **Session pooler** (port 5432). Set `DB_URL`
   by hand in Render and set `DB_SSLMODE=require`.
 - **File storage:** Supabase Storage over its S3 API. `occuplace-media` is public (listing
-  photos, payment QR codes) and `occuplace-sensitive` is private (IDs, payment proofs).
-  Render's own disk is wiped on every deploy, so nothing important may be stored there.
+  photos, unit photos, payment QR codes) and `occuplace-sensitive` is private (IDs,
+  payment proofs, report photos). Unit photos are saved as WebP, so the media bucket must
+  allow `image/webp`. Render's own disk is wiped on every deploy, so nothing important
+  may be stored there.
 - **Queue and scheduler:** the container runs `queue:work` and `schedule:work` in the
-  background, because Render's free plan has no cron or worker service.
+  background, because Render's free plan has no cron or worker service. Scheduled:
+  `invoices:generate`, `reservations:prune-files`, `landlord-ids:prune` (daily) and
+  `reservations:expire` (hourly). A missed run is harmless: they can be run by hand.
+- **PHP extensions:** the Docker image installs `pdo_pgsql`, `mbstring`, `zip`, `gd`
+  (JPEG and WebP, for shrinking unit photos) and `exif`. It has no `intl`, so never use
+  Laravel's `Number` helper.
 - **Assets:** built locally and committed. After any CSS or JS change run `npm run build`
   and commit `public/build/`, or production serves stale styles.
 - **Email:** Resend's HTTP API, sending as `no-reply@occuplace.org` from the verified
