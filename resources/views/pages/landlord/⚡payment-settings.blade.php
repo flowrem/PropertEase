@@ -32,6 +32,13 @@ new #[Title('Payment settings')] class extends Component
 
     public $qr = null;
 
+    public string $reservationHoldDays = '';
+
+    public function mount(): void
+    {
+        $this->reservationHoldDays = (string) $this->team->reservation_hold_days;
+    }
+
     #[Computed]
     public function team(): Team
     {
@@ -158,6 +165,26 @@ new #[Title('Payment settings')] class extends Component
         unset($this->channels);
     }
 
+    /**
+     * How many days an accepted reservation holds the unit while the
+     * applicant pays. Applies to reservations accepted from now on.
+     */
+    public function saveReservationHoldDays(): void
+    {
+        abort_unless($this->canManage, 403);
+
+        $limits = config('occuplace.reservations.hold_days');
+
+        $validated = $this->validate(
+            ['reservationHoldDays' => ['required', 'integer', 'min:'.$limits['min'], 'max:'.$limits['max']]],
+            attributes: ['reservationHoldDays' => __('hold days')],
+        );
+
+        $this->team->forceFill(['reservation_hold_days' => (int) $validated['reservationHoldDays']])->save();
+
+        Flux::toast(variant: 'success', text: __('Reservation hold saved. It applies to reservations you accept from now on.'));
+    }
+
     protected function resetForm(): void
     {
         $this->reset('editingChannelId', 'method', 'account_name', 'account_number', 'bank_name', 'qr');
@@ -170,7 +197,7 @@ new #[Title('Payment settings')] class extends Component
     <div class="flex flex-wrap items-start justify-between gap-3">
         <div>
             <flux:heading size="xl" level="1">{{ __('Payment settings') }}</flux:heading>
-            <flux:subheading>{{ __('Where applicants send the reservation downpayment. Shown on every one of your listings.') }}</flux:subheading>
+            <flux:subheading>{{ __('Where applicants send the downpayment once you accept their reservation, and how long you hold the unit for them.') }}</flux:subheading>
         </div>
 
         @if ($this->canManage)
@@ -189,6 +216,29 @@ new #[Title('Payment settings')] class extends Component
     @if (! $this->canManage)
         <flux:text class="text-zinc-500">{{ __('You can view these settings. Ask your landlord or a manager to change them.') }}</flux:text>
     @endif
+
+    <div class="rounded-xl border border-zinc-200 p-4 dark:border-zinc-700">
+        <flux:heading size="sm">{{ __('Reservation hold') }}</flux:heading>
+        <flux:text class="mt-1 text-zinc-500">
+            {{ __('When you accept a reservation, the unit is held for the applicant for this many days while they pay the downpayment. If nothing arrives by then, the reservation ends and the unit opens to others.') }}
+        </flux:text>
+
+        @if ($this->canManage)
+            <form wire:submit="saveReservationHoldDays" class="mt-3 flex flex-wrap items-end gap-2">
+                <flux:input
+                    wire:model="reservationHoldDays"
+                    type="number"
+                    min="{{ config('occuplace.reservations.hold_days.min') }}"
+                    max="{{ config('occuplace.reservations.hold_days.max') }}"
+                    :label="__('Days (:min to :max)', config('occuplace.reservations.hold_days'))"
+                    class="max-w-40"
+                />
+                <flux:button type="submit">{{ __('Save') }}</flux:button>
+            </form>
+        @else
+            <flux:text class="mt-3 font-medium">{{ trans_choice(':count day|:count days', $this->team->reservation_hold_days) }}</flux:text>
+        @endif
+    </div>
 
     <div class="grid gap-4 md:grid-cols-2">
         @forelse ($this->channels as $channel)

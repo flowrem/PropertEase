@@ -218,3 +218,43 @@ test('the page warns when there is no active channel', function () {
 
     Livewire::test('pages::landlord.payment-settings')->assertSee('no active payment channel');
 });
+
+test('a landlord or manager sets how many days an accepted reservation holds the unit', function (TeamRole $role) {
+    $landlord = User::factory()->create();
+    $user = $role === TeamRole::Owner ? $landlord : teamMemberWithRole($landlord, $role);
+
+    Livewire::actingAs($user)
+        ->test('pages::landlord.payment-settings')
+        ->assertSet('reservationHoldDays', '3')
+        ->set('reservationHoldDays', '7')
+        ->call('saveReservationHoldDays')
+        ->assertHasNoErrors();
+
+    expect($landlord->currentTeam->fresh()->reservation_hold_days)->toBe(7);
+})->with([TeamRole::Owner, TeamRole::Admin]);
+
+test('the reservation hold must be 1 to 14 days', function (string $days) {
+    $landlord = User::factory()->create();
+
+    Livewire::actingAs($landlord)
+        ->test('pages::landlord.payment-settings')
+        ->set('reservationHoldDays', $days)
+        ->call('saveReservationHoldDays')
+        ->assertHasErrors(['reservationHoldDays']);
+
+    expect($landlord->currentTeam->fresh()->reservation_hold_days)->toBe(3);
+})->with(['0', '15', '', 'two']);
+
+test('staff see the reservation hold but cannot change it', function () {
+    $landlord = User::factory()->create();
+    $staff = teamMemberWithRole($landlord, TeamRole::Member);
+
+    Livewire::actingAs($staff)
+        ->test('pages::landlord.payment-settings')
+        ->assertSee('3 days')
+        ->set('reservationHoldDays', '7')
+        ->call('saveReservationHoldDays')
+        ->assertForbidden();
+
+    expect($landlord->currentTeam->fresh()->reservation_hold_days)->toBe(3);
+});
