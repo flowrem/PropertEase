@@ -12,6 +12,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\URL;
 use Illuminate\Support\Str;
 
 /**
@@ -71,6 +72,12 @@ class Reservation extends Model
     private const CODE_ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
 
     /**
+     * Session key listing the reservation codes this visitor has opened,
+     * with the emailed link or by giving the code and email.
+     */
+    public const STATUS_ACCESS_SESSION_KEY = 'reservation_status_access';
+
+    /**
      * @var array<string, mixed>
      */
     protected $attributes = [
@@ -99,9 +106,11 @@ class Reservation extends Model
 
     /**
      * Reservations holding a slot on their unit: confirmed ones, and reserved
-     * ones whose downpayment deadline has not passed. A reserved one stops
-     * holding the moment its deadline passes, even before the hourly job
-     * marks it expired, since that job can be missed while the server sleeps.
+     * ones that are within their downpayment deadline or whose applicant sent
+     * the downpayment in time (the landlord just hasn't checked it yet). A
+     * reserved one with nothing sent stops holding the moment its deadline
+     * passes, even before the hourly job marks it expired, since that job
+     * can be missed while the server sleeps.
      *
      * @param  Builder<Reservation>  $query
      */
@@ -121,9 +130,23 @@ class Reservation extends Model
     public static function holdingSlotSql(): array
     {
         return [
-            '(reservations.status = ? or (reservations.status = ? and reservations.expires_at > ?))',
+            '(reservations.status = ? or (reservations.status = ?'
+                .' and (reservations.expires_at > ? or reservations.downpayment_submitted_at is not null)))',
             [ReservationStatus::Confirmed->value, ReservationStatus::Reserved->value, now()],
         ];
+    }
+
+    /**
+     * Reserved reservations whose deadline passed with no downpayment sent:
+     * the ones the expiry job closes.
+     *
+     * @param  Builder<Reservation>  $query
+     */
+    public function scopeOverdue(Builder $query): void
+    {
+        $query->where('status', ReservationStatus::Reserved->value)
+            ->whereNull('downpayment_submitted_at')
+            ->where('expires_at', '<=', now());
     }
 
     /**
@@ -132,7 +155,39 @@ class Reservation extends Model
     public function holdsSlot(): bool
     {
         return $this->status === ReservationStatus::Confirmed
-            || ($this->status === ReservationStatus::Reserved && ! $this->isPastDeadline());
+            || ($this->status === ReservationStatus::Reserved && (! $this->isPastDeadline() || $this->hasDownpaymentSent()));
+    }
+
+    /**
+     * The downpayment deadline as people here read it, like
+     * "Sep 30, 2026, 5:00 PM", in the display timezone.
+     */
+    public function deadlineForDisplay(): ?string
+    {
+        return $this->expires_at?->timezone(config('occuplace.display_timezone'))->format('M j, Y, g:i A');
+    }
+
+    /**
+     * A link to the applicant's status page that opens it without asking for
+     * the code and email again. It never expires; the page itself only
+     * shows what the reservation's state allows.
+     */
+    public function statusUrl(): string
+    {
+        return URL::signedRoute('reservations.status', ['code' => $this->code]);
+    }
+
+    public function hasDownpaymentSent(): bool
+    {
+        return $this->downpayment_submitted_at !== null;
+    }
+
+    /**
+     * Whether the deadline passed with no downpayment sent (see scopeOverdue()).
+     */
+    public function isOverdue(): bool
+    {
+        return $this->isPastDeadline() && ! $this->hasDownpaymentSent();
     }
 
     /**

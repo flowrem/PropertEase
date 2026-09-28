@@ -22,6 +22,14 @@ Route::livewire('find-a-place/{listing}/reserve', 'pages::reserve')
     ->whereNumber('listing')
     ->name('listings.reserve');
 
+// An applicant's own reservation: the emailed link is signed, otherwise the
+// lookup asks for the code and the email used. Before the {current_team}
+// group for the same reason as admin.php.
+Route::livewire('reservation', 'pages::reservation-lookup')->name('reservations.lookup');
+Route::livewire('reservation/{code}', 'pages::reservation-status')
+    ->where('code', '[A-Za-z0-9]{4,12}')
+    ->name('reservations.status');
+
 Route::middleware('auth')->group(function () {
     Route::get('change-password', [ForcedPasswordChangeController::class, 'show'])->name('password.change');
     Route::post('change-password', [ForcedPasswordChangeController::class, 'store'])->name('password.change.store');

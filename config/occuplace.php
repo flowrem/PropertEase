@@ -51,6 +51,18 @@ return [
 
     ],
 
+    /*
+    |--------------------------------------------------------------------------
+    | Display Timezone
+    |--------------------------------------------------------------------------
+    |
+    | Times are stored in UTC (app.timezone). Deadlines people must act on,
+    | like a reservation's downpayment deadline, are shown in this timezone.
+    |
+    */
+
+    'display_timezone' => 'Asia/Manila',
+
     'units' => [
 
         'floor_area' => ['min' => 6, 'max' => 70],
