@@ -108,8 +108,7 @@ test('editing a unit replaces its amenities but keeps a deactivated one it alrea
     $aircon = defaultAmenity('Air conditioner');
 
     $component = Livewire::actingAs($user)
-        ->test('pages::landlord.properties')
-        ->call('startEditingUnit', $unit->id);
+        ->test('pages::landlord.unit-edit', ['unit' => $unit->id]);
 
     expect($component->get('form.amenityIds'))->toEqualCanonicalizing([(string) $retired->id, (string) $fan->id]);
 
@@ -250,8 +249,7 @@ test('removing beds is refused when fewer would not sleep the tenants already th
     $doubleDeck = defaultAmenity('Double deck');
 
     Livewire::actingAs($user)
-        ->test('pages::landlord.properties')
-        ->call('startEditingUnit', $unit->id)
+        ->test('pages::landlord.unit-edit', ['unit' => $unit->id])
         ->set("form.amenityQuantities.{$doubleDeck->id}", '1')
         ->set('form.tenant_limit', '3')
         ->call('updateUnit')
@@ -266,8 +264,7 @@ test('removing beds is allowed while the rest still sleep everyone there', funct
     $doubleDeck = defaultAmenity('Double deck');
 
     Livewire::actingAs($user)
-        ->test('pages::landlord.properties')
-        ->call('startEditingUnit', $unit->id)
+        ->test('pages::landlord.unit-edit', ['unit' => $unit->id])
         ->set("form.amenityQuantities.{$doubleDeck->id}", '1')
         ->set('form.tenant_limit', '2')
         ->call('updateUnit')

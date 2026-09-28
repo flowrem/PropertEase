@@ -51,6 +51,9 @@ Route::prefix('{current_team}')
             Route::livewire('units/{unit}', 'pages::landlord.unit')
                 ->whereNumber('unit')
                 ->name('units.show');
+            Route::livewire('units/{unit}/edit', 'pages::landlord.unit-edit')
+                ->whereNumber('unit')
+                ->name('units.edit');
             Route::livewire('units/{unit}/inventory', 'pages::landlord.unit-inventory')
                 ->whereNumber('unit')
                 ->name('units.inventory');

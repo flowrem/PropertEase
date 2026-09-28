@@ -18,6 +18,9 @@
         <flux:navbar.item :href="route('units.show', ['unit' => $unit])" :current="$current === 'overview'" wire:navigate>
             {{ __('Overview') }}
         </flux:navbar.item>
+        <flux:navbar.item :href="route('units.edit', ['unit' => $unit])" :current="$current === 'details'" wire:navigate>
+            {{ __('Details') }}
+        </flux:navbar.item>
         <flux:navbar.item :href="route('units.inventory', ['unit' => $unit])" :current="$current === 'inventory'" wire:navigate>
             {{ __('Inventory & checks') }}
         </flux:navbar.item>

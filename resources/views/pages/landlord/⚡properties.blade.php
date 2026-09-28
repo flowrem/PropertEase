@@ -14,7 +14,6 @@ use Illuminate\Database\Eloquent\Collection as EloquentCollection;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Livewire\Attributes\Computed;
 use Livewire\Attributes\Title;
@@ -34,12 +33,6 @@ new #[Title('Properties')] class extends Component
     public array $expanded = [];
 
     public ?int $addingUnitTo = null;
-
-    public ?int $editingUnitId = null;
-
-    public bool $showDeleteUnitModal = false;
-
-    public ?int $deletingUnitId = null;
 
     public bool $showPropertyModal = false;
 
@@ -81,27 +74,19 @@ new #[Title('Properties')] class extends Component
     }
 
     /**
-     * The property whose unit is on the form, when a unit is being added or edited.
+     * The property a unit is being added to.
      */
     #[Computed]
     public function formProperty(): ?Property
     {
-        $propertyId = $this->addingUnitTo ?? $this->editingUnit?->property_id;
-
-        return $propertyId ? $this->team->properties()->find($propertyId) : null;
-    }
-
-    #[Computed]
-    public function editingUnit(): ?Unit
-    {
-        return $this->editingUnitId ? $this->teamUnit($this->editingUnitId) : null;
+        return $this->addingUnitTo ? $this->team->properties()->find($this->addingUnitTo) : null;
     }
 
     #[Computed]
     public function formMaxCapacityPreview(): ?int
     {
         return $this->formProperty
-            ? $this->form->maxCapacity($this->formProperty->type, $this->editingUnit)
+            ? $this->form->maxCapacity($this->formProperty->type)
             : null;
     }
 
@@ -111,7 +96,7 @@ new #[Title('Properties')] class extends Component
     #[Computed]
     public function formAmenityGroups(): Collection
     {
-        return $this->form->amenityGroups($this->team, $this->editingUnit);
+        return $this->form->amenityGroups($this->team);
     }
 
     /**
@@ -123,7 +108,7 @@ new #[Title('Properties')] class extends Component
     public function formAmenityLimits(): array
     {
         return $this->formProperty
-            ? $this->form->amenityQuantityLimits($this->formProperty->type, $this->editingUnit)
+            ? $this->form->amenityQuantityLimits($this->formProperty->type)
             : [];
     }
 
@@ -151,7 +136,7 @@ new #[Title('Properties')] class extends Component
      */
     public function updatedFormTenantLimit(): void
     {
-        $this->form->clampTenantLimit($this->formMaxCapacityPreview, $this->editingUnit?->takenSlotCount() ?? 0);
+        $this->form->clampTenantLimit($this->formMaxCapacityPreview, takenSlots: 0);
     }
 
     /**
@@ -175,17 +160,13 @@ new #[Title('Properties')] class extends Component
     public function updated(string $property): void
     {
         if (Str::startsWith($property, 'form.amenityQuantities.') && $this->formProperty) {
-            $this->form->clampAmenityQuantity(Str::after($property, 'form.amenityQuantities.'), $this->formProperty->type, $this->editingUnit);
+            $this->form->clampAmenityQuantity(Str::after($property, 'form.amenityQuantities.'), $this->formProperty->type);
         }
 
         if (Str::startsWith($property, ['form.amenityIds', 'form.amenityQuantities'])) {
             unset($this->formMaxCapacityPreview, $this->formBedSpacesPreview);
 
-            $this->form->followMaxCapacity(
-                $this->maxCapacityBeforeBedsChanged,
-                $this->formMaxCapacityPreview,
-                $this->editingUnit?->takenSlotCount() ?? 0,
-            );
+            $this->form->followMaxCapacity($this->maxCapacityBeforeBedsChanged, $this->formMaxCapacityPreview, takenSlots: 0);
         }
     }
 
@@ -202,12 +183,11 @@ new #[Title('Properties')] class extends Component
     {
         $property = $this->team->properties()->findOrFail($propertyId);
 
-        $this->editingUnitId = null;
         $this->addingUnitTo = $property->id;
         $this->expanded[$property->id] = true;
         $this->form->reset();
         $this->resetValidation();
-        unset($this->formProperty, $this->editingUnit);
+        unset($this->formProperty);
     }
 
     public function cancelAddingUnit(): void
@@ -251,90 +231,6 @@ new #[Title('Properties')] class extends Component
         unset($this->properties);
 
         Flux::toast(variant: 'success', text: __('Unit added.'));
-    }
-
-    public function startEditingUnit(int $unitId): void
-    {
-        $unit = $this->teamUnit($unitId);
-
-        $this->addingUnitTo = null;
-        $this->editingUnitId = $unit->id;
-        $this->expanded[$unit->property_id] = true;
-        $this->resetValidation();
-        $this->form->fillFromUnit($unit);
-        unset($this->formProperty, $this->editingUnit);
-    }
-
-    public function cancelEditingUnit(): void
-    {
-        $this->editingUnitId = null;
-    }
-
-    public function updateUnit(): void
-    {
-        $unit = $this->teamUnit($this->editingUnitId);
-
-        $attributes = $this->form->validatedAttributes($unit->property->type, $unit->property_id, $unit);
-
-        $priceChanged = round((float) $unit->price, 2) !== round((float) $attributes['price'], 2);
-
-        DB::transaction(function () use ($unit, $attributes, $priceChanged): void {
-            $unit->update($attributes);
-            $this->form->syncAmenities($unit);
-
-            if ($priceChanged) {
-                $unit->splitRentAmongActiveTenants();
-            }
-        });
-
-        $this->editingUnitId = null;
-        unset($this->properties, $this->editingUnit);
-
-        Flux::toast(variant: 'success', text: __('Unit saved.'));
-    }
-
-    public function confirmDeleteUnit(int $unitId): void
-    {
-        $unit = $this->teamUnit($unitId);
-
-        if (! $unit->canBeDeleted()) {
-            Flux::toast(variant: 'danger', text: __('This unit has had a tenant, a reservation or a listing, so it cannot be deleted.'));
-
-            return;
-        }
-
-        $this->deletingUnitId = $unit->id;
-        $this->showDeleteUnitModal = true;
-    }
-
-    public function closeDeleteUnitModal(): void
-    {
-        $this->showDeleteUnitModal = false;
-        $this->deletingUnitId = null;
-    }
-
-    public function deleteUnit(): void
-    {
-        $unit = $this->teamUnit($this->deletingUnitId);
-
-        if (! $unit->canBeDeleted()) {
-            $this->closeDeleteUnitModal();
-            Flux::toast(variant: 'danger', text: __('This unit has had a tenant, a reservation or a listing, so it cannot be deleted.'));
-
-            return;
-        }
-
-        $photoPaths = $unit->listing?->photos()->pluck('path') ?? collect();
-
-        $unit->delete();
-
-        Storage::disk(config('filesystems.media_disk'))->delete($photoPaths->all());
-
-        $this->closeDeleteUnitModal();
-        $this->editingUnitId = null;
-        unset($this->properties, $this->editingUnit);
-
-        Flux::toast(variant: 'success', text: __('Unit deleted.'));
     }
 
     public function startEditingProperty(int $propertyId): void
@@ -404,15 +300,6 @@ new #[Title('Properties')] class extends Component
             : __('Property saved.'));
     }
 
-    /**
-     * Find a unit belonging to the current team, or fail with a 404.
-     */
-    protected function teamUnit(?int $unitId): Unit
-    {
-        return Unit::with('property')
-            ->whereHas('property', fn ($query) => $query->where('team_id', $this->team->id))
-            ->findOrFail($unitId);
-    }
 }; ?>
 
 <section class="flex w-full flex-col gap-6">
@@ -461,124 +348,68 @@ new #[Title('Properties')] class extends Component
             </div>
 
             @if (isset($expanded[$property->id]))
-                <div class="divide-y divide-zinc-200 border-t border-zinc-200 dark:divide-zinc-700 dark:border-zinc-700">
-                    @forelse ($property->units as $unit)
-                        <div wire:key="unit-{{ $unit->id }}" class="px-4 py-3 text-sm">
-                            @if ($editingUnitId === $unit->id)
-                                <form wire:submit="updateUnit" class="flex flex-col gap-4">
-                                    @unless ($unit->hasLockedDetails())
-                                        <flux:callout variant="warning" icon="exclamation-triangle">
-                                            <flux:callout.heading>{{ __('Add this unit\'s floor area and rooms') }}</flux:callout.heading>
-                                            <flux:callout.text>{{ __('Its tenant capacity is worked out from its floor area. Check these details carefully: once saved, they cannot be changed.') }}</flux:callout.text>
-                                        </flux:callout>
-                                    @endunless
+                <div class="border-t border-zinc-200 p-4 dark:border-zinc-700">
+                    <div class="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
+                        @foreach ($property->units as $unit)
+                            <a
+                                wire:key="unit-{{ $unit->id }}"
+                                href="{{ route('units.show', ['unit' => $unit]) }}"
+                                wire:navigate
+                                class="group flex flex-col overflow-hidden rounded-xl border border-zinc-200 bg-white transition hover:border-brand-500 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-500"
+                            >
+                                <div class="relative">
+                                    <x-unit-photo :unit="$unit" />
 
-                                    <x-unit-form-fields
-                                        :occupancy="$form->occupancy"
-                                        :bedrooms="$form->bedrooms"
-                                        :is-studio="$form->isStudio"
-                                        :has-shared-bathroom="$form->hasSharedBathroom"
-                                        :amenity-groups="$this->formAmenityGroups"
-                                        :selected-amenities="$form->amenityIds"
-                                        :amenity-limits="$this->formAmenityLimits"
-                                        :amenity-quantities="$form->amenityQuantities"
-                                        :bed-spaces="$this->formBedSpacesPreview"
-                                        :bed-summary="$form->bedSummary()"
-                                        :max-capacity="$this->formMaxCapacityPreview"
-                                        :max-bedrooms="$this->formMaxBedroomsPreview"
-                                        :max-bathrooms="$this->formMaxBathroomsPreview"
-                                        :locked-unit="$unit->hasLockedDetails() ? $unit : null"
-                                    />
-
-                                    <div class="flex flex-wrap items-center justify-between gap-2">
-                                        <flux:button variant="ghost" size="sm" icon="trash" wire:click="confirmDeleteUnit({{ $unit->id }})">
-                                            {{ __('Delete unit') }}
-                                        </flux:button>
-
-                                        <div class="flex gap-2">
-                                            <flux:button variant="filled" size="sm" wire:click="cancelEditingUnit">{{ __('Cancel') }}</flux:button>
-                                            <flux:button type="submit" variant="primary" size="sm">{{ __('Save unit') }}</flux:button>
-                                        </div>
-                                    </div>
-                                </form>
-                            @else
-                                <div class="flex items-center justify-between gap-4">
-                                    <div>
-                                        <span class="font-medium">{{ __('Unit :number', ['number' => $unit->unit_number]) }}</span>
-                                        <span class="text-zinc-500 dark:text-zinc-400">
-                                            @if ($unit->floor_level)
-                                                &middot; {{ $unit->floor_level }}
-                                            @endif
-                                            &middot; {{ $unit->bedrooms === 0 ? __('Studio') : $unit->bedrooms.' '.Str::plural('bed', $unit->bedrooms) }}
-                                            &middot; {{ $unit->bathrooms === 0 ? __('Shared bath') : $unit->bathrooms.' '.Str::plural('bath', $unit->bathrooms) }}
-                                            @if ($unit->hasLockedDetails())
-                                                &middot; {{ Unit::formatFloorArea((float) $unit->floor_area_sqm) }} m²
-                                            @endif
-                                            &middot; &#8369;{{ number_format((float) $unit->price, 2) }}/mo
-                                            @if ($unit->allows_multiple_tenants)
-                                                &middot; {{ __('Multiple tenants') }}
-                                                @if ($unit->tenant_limit !== null)
-                                                    ({{ $unit->activeLeases->count() }}/{{ $unit->capacity() }})
-                                                @endif
-                                            @endif
-                                        </span>
-
-                                        @if ($unit->activeLeases->isNotEmpty())
-                                            <flux:text class="block text-zinc-500 dark:text-zinc-400">
-                                                {{ $unit->activeLeases->pluck('tenant.name')->implode(', ') }}
-                                                @if ($unit->activeLeases->count() > 1)
-                                                    ({{ __('₱:amount each', ['amount' => number_format($unit->rentSharePerTenant(), 2)]) }})
-                                                @endif
-                                            </flux:text>
-                                        @endif
-
-                                        @if ($unit->takenSlotCount() > $unit->capacity())
-                                            <flux:text class="block text-amber-700 dark:text-amber-400">
-                                                {{ __('More tenants than its floor area and beds allow (:max). No new tenants until it fits.', ['max' => $unit->capacity()]) }}
-                                            </flux:text>
-                                        @endif
-                                    </div>
-
-                                    <div class="flex shrink-0 items-center gap-2">
-                                        @unless ($unit->hasLockedDetails())
-                                            <flux:badge color="amber" size="sm">{{ __('Details needed') }}</flux:badge>
-                                        @endunless
-
-                                        @if ($unit->activeLeases->count() === 1 && $unit->activeLeases->first()->currentInvoice)
-                                            @php($invoice = $unit->activeLeases->first()->currentInvoice)
-                                            <flux:badge :color="$invoice->status->color()" size="sm">
-                                                {{ $invoice->status->label() }}
-                                                &middot; {{ __('due') }} {{ $invoice->due_date->format('M j') }}
-                                            </flux:badge>
-                                        @endif
-
-                                        @if ($unit->open_concerns_count > 0)
-                                            <a href="{{ route('inbox') }}" wire:navigate>
+                                    <div class="absolute inset-x-2 top-2 flex flex-wrap items-start justify-between gap-1">
+                                        <div class="flex flex-wrap gap-1">
+                                            @unless ($unit->hasLockedDetails())
+                                                <flux:badge color="amber" size="sm">{{ __('Details needed') }}</flux:badge>
+                                            @endunless
+                                            @if ($unit->open_concerns_count > 0)
                                                 <flux:badge color="amber" size="sm">
-                                                    {{ $unit->open_concerns_count }} {{ Str::plural('open concern', $unit->open_concerns_count) }}
+                                                    {{ trans_choice(':count open report|:count open reports', $unit->open_concerns_count) }}
                                                 </flux:badge>
-                                            </a>
-                                        @endif
-
-                                        <flux:badge :color="$unit->status->color()" size="sm">
-                                            {{ $unit->status->label() }}
-                                        </flux:badge>
-
-                                        <flux:button variant="ghost" size="sm" icon="clipboard-document-check" :href="route('units.inventory', ['unit' => $unit])" wire:navigate :aria-label="__('Inventory and checks')" :tooltip="__('Inventory and checks')" />
-
-                                        <flux:button variant="ghost" size="sm" icon="pencil" :aria-label="__('Edit unit')" wire:click="startEditingUnit({{ $unit->id }})" />
+                                            @endif
+                                        </div>
+                                        <flux:badge :color="$unit->status->color()" size="sm">{{ $unit->status->label() }}</flux:badge>
                                     </div>
                                 </div>
-                            @endif
-                        </div>
-                    @empty
-                        <p class="px-4 py-3 text-sm text-zinc-500 dark:text-zinc-400">{{ __('No units added yet.') }}</p>
-                    @endforelse
-                </div>
 
-                <div class="border-t border-zinc-200 p-4 dark:border-zinc-700">
+                                <div class="flex flex-col gap-0.5 p-3 text-center">
+                                    <span class="font-medium text-zinc-900 group-hover:text-brand-600">{{ __('Unit :number', ['number' => $unit->unit_number]) }}</span>
+                                    <span class="truncate text-xs text-zinc-500">
+                                        @if ($unit->allows_multiple_tenants)
+                                            {{ __(':taken/:capacity tenants', ['taken' => $unit->activeLeases->count(), 'capacity' => $unit->capacity()]) }}
+                                        @elseif ($unit->activeLeases->isNotEmpty())
+                                            {{ $unit->activeLeases->first()->tenant->name }}
+                                        @else
+                                            {{ __('No tenant') }}
+                                        @endif
+                                        &middot; &#8369;{{ number_format((float) $unit->price) }}/mo
+                                    </span>
+                                    @if ($unit->takenSlotCount() > $unit->capacity())
+                                        <span class="text-xs text-amber-700">{{ __('Over capacity') }}</span>
+                                    @endif
+                                </div>
+                            </a>
+                        @endforeach
+
+                        @if ($addingUnitTo !== $property->id)
+                            <button
+                                type="button"
+                                wire:click="startAddingUnit({{ $property->id }})"
+                                class="flex min-h-40 flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed border-zinc-300 text-sm font-medium text-zinc-600 transition hover:border-brand-500 hover:text-brand-600"
+                            >
+                                <flux:icon.plus class="size-6" />
+                                {{ __('Add unit') }}
+                            </button>
+                        @endif
+                    </div>
+
                     @if ($addingUnitTo === $property->id)
-                        <form wire:submit="reviewNewUnit" class="flex flex-col gap-4">
+                        <form wire:submit="reviewNewUnit" class="mt-6 flex flex-col gap-4 border-t border-zinc-200 pt-6 dark:border-zinc-700">
+                            <flux:heading size="lg">{{ __('New unit in :property', ['property' => $property->name]) }}</flux:heading>
+
                             <x-unit-form-fields
                                 :occupancy="$form->occupancy"
                                 :bedrooms="$form->bedrooms"
@@ -601,10 +432,6 @@ new #[Title('Properties')] class extends Component
                                 <flux:button type="submit" variant="primary">{{ __('Add unit') }}</flux:button>
                             </div>
                         </form>
-                    @else
-                        <flux:button variant="filled" size="sm" icon="plus" wire:click="startAddingUnit({{ $property->id }})">
-                            {{ __('Add unit') }}
-                        </flux:button>
                     @endif
                 </div>
             @endif
@@ -620,20 +447,6 @@ new #[Title('Properties')] class extends Component
     @endforelse
 
     <x-confirm-unit-modal :floor-level="$form->floor_level" :floor-area="$form->floor_area_sqm" :bedrooms="$form->bedrooms" :bathrooms="$form->bathrooms" />
-
-    <flux:modal name="delete-unit-modal" class="max-w-md md:min-w-md" @close="closeDeleteUnitModal" wire:model="showDeleteUnitModal">
-        <div class="space-y-6">
-            <div class="space-y-2">
-                <flux:heading size="lg">{{ __('Delete unit') }}</flux:heading>
-                <flux:text>{{ __('This unit has never had a tenant, a reservation or a listing, so it can be removed. Any draft listing for it is deleted too.') }}</flux:text>
-            </div>
-
-            <div class="flex justify-end gap-3">
-                <flux:button variant="outline" wire:click="closeDeleteUnitModal">{{ __('Cancel') }}</flux:button>
-                <flux:button variant="danger" wire:click="deleteUnit">{{ __('Delete unit') }}</flux:button>
-            </div>
-        </div>
-    </flux:modal>
 
     <flux:modal name="edit-property-modal" class="max-w-lg md:min-w-lg" @close="closePropertyModal" wire:model="showPropertyModal">
         <form wire:submit="updateProperty" class="space-y-6">

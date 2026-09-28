@@ -132,3 +132,23 @@ test('a unit photo must be an image of at most 5 MB', function (UploadedFile $fi
     'a pdf' => fn () => UploadedFile::fake()->create('plan.pdf', 100, 'application/pdf'),
     'over 5 MB' => fn () => UploadedFile::fake()->image('huge.jpg')->size(5121),
 ]);
+
+test('the details tab opens from its address, and deleting the unit there removes its photo', function () {
+    $landlord = User::factory()->create();
+    $unit = Unit::factory()->for(Property::factory()->for($landlord->currentTeam))->create(['unit_number' => '101']);
+    app(StoreUnitPhoto::class)->handle($unit, UploadedFile::fake()->image('room.jpg'));
+    $path = $unit->fresh()->photo_path;
+
+    $this->actingAs($landlord)
+        ->get(route('units.edit', ['unit' => $unit]))
+        ->assertOk()
+        ->assertSee('Save unit');
+
+    Livewire::actingAs($landlord)
+        ->test('pages::landlord.unit-edit', ['unit' => $unit->id])
+        ->call('confirmDeleteUnit')
+        ->call('deleteUnit');
+
+    expect(Unit::find($unit->id))->toBeNull();
+    Storage::disk('media')->assertMissing($path);
+});

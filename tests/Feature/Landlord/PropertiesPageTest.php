@@ -17,6 +17,7 @@ use App\Models\Unit;
 use App\Models\UnitListing;
 use App\Models\User;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
+use Livewire\Features\SupportLockedProperties\CannotUpdateLockedPropertyException;
 use Livewire\Features\SupportTesting\Testable;
 use Livewire\Livewire;
 
@@ -80,7 +81,27 @@ test('a landlord can expand a property to reveal its units', function () {
         ->assertDontSee('Unit 101');
 });
 
-test('an expanded unit shows its tenant and current invoice status', function () {
+test('an expanded property shows each unit as a card linking to its unit page, with a photo or a placeholder', function () {
+    $user = User::factory()->create();
+    $property = Property::factory()->for($user->currentTeam)->create();
+    $withPhoto = Unit::factory()->for($property)->create(['unit_number' => '101', 'photo_path' => 'units/1/room.webp']);
+    $withoutPhoto = Unit::factory()->for($property)->create(['unit_number' => '102']);
+
+    $this->actingAs($user);
+
+    Livewire::test('pages::landlord.properties')
+        ->assertDontSee('Unit 101')
+        ->call('toggleProperty', $property->id)
+        ->assertSee('Unit 101')
+        ->assertSee('Unit 102')
+        ->assertSeeHtml('href="'.route('units.show', ['unit' => $withPhoto]).'"')
+        ->assertSeeHtml('href="'.route('units.show', ['unit' => $withoutPhoto]).'"')
+        ->assertSeeHtml($withPhoto->photoUrl())
+        ->assertSee('No photo of unit 102 yet')
+        ->assertSee('Add unit');
+});
+
+test('a unit card shows its tenant, and the unit page shows their current invoice status', function () {
     $user = User::factory()->create();
     $property = Property::factory()->for($user->currentTeam)->create();
     $unit = Unit::factory()->for($property)->create(['status' => UnitStatus::Occupied]);
@@ -96,11 +117,14 @@ test('an expanded unit shows its tenant and current invoice status', function ()
 
     Livewire::test('pages::landlord.properties')
         ->call('toggleProperty', $property->id)
+        ->assertSee('Juana Dela Cruz');
+
+    Livewire::test('pages::landlord.unit', ['unit' => $unit->id])
         ->assertSee('Juana Dela Cruz')
         ->assertSee('Overdue');
 });
 
-test('an expanded unit links to the inbox when it has open concerns', function () {
+test('a unit card flags open reports, and the unit page links to them', function () {
     $user = User::factory()->create();
     $property = Property::factory()->for($user->currentTeam)->create();
     $unit = Unit::factory()->for($property)->create(['status' => UnitStatus::Occupied]);
@@ -113,8 +137,10 @@ test('an expanded unit links to the inbox when it has open concerns', function (
 
     Livewire::test('pages::landlord.properties')
         ->call('toggleProperty', $property->id)
-        ->assertSee('1 open concern')
-        ->assertSee(route('inbox'));
+        ->assertSee('1 open report');
+
+    Livewire::test('pages::landlord.unit', ['unit' => $unit->id])
+        ->assertSeeHtml('href="'.route('landlord.maintenance').'"');
 });
 
 test('a landlord can add a unit to an existing property', function () {
@@ -220,8 +246,7 @@ test('editing a unit changes its name but never its locked details', function ()
 
     $this->actingAs($user);
 
-    Livewire::test('pages::landlord.properties')
-        ->call('startEditingUnit', $unit->id)
+    Livewire::test('pages::landlord.unit-edit', ['unit' => $unit->id])
         ->set('form.unit_number', 'Sampaguita 2A')
         ->set('form.floor_level', '5th floor')
         ->set('form.bedrooms', 3)
@@ -247,8 +272,7 @@ test('an older unit without a floor area can have its details completed once', f
 
     $this->actingAs($user);
 
-    Livewire::test('pages::landlord.properties')
-        ->call('startEditingUnit', $unit->id)
+    Livewire::test('pages::landlord.unit-edit', ['unit' => $unit->id])
         ->call('updateUnit')
         ->assertHasErrors(['form.floor_area_sqm' => 'required', 'form.floor_level'])
         ->set('form.floor_level', '2nd floor')
@@ -265,8 +289,7 @@ test('an older unit without a floor area can have its details completed once', f
         ->floor_area_sqm->toEqual('22.0')
         ->hasLockedDetails()->toBeTrue();
 
-    Livewire::test('pages::landlord.properties')
-        ->call('startEditingUnit', $unit->id)
+    Livewire::test('pages::landlord.unit-edit', ['unit' => $unit->id])
         ->set('form.floor_area_sqm', '90')
         ->call('updateUnit')
         ->assertHasNoErrors();
@@ -312,8 +335,7 @@ test('shrinking an existing unit\'s floor area below what its rooms need is reje
 
     $this->actingAs($user);
 
-    Livewire::test('pages::landlord.properties')
-        ->call('startEditingUnit', $unit->id)
+    Livewire::test('pages::landlord.unit-edit', ['unit' => $unit->id])
         ->set('form.floor_area_sqm', '10')
         ->call('updateUnit')
         ->assertHasErrors(['form.floor_area_sqm']);
@@ -515,8 +537,7 @@ test('a shared unit\'s limit snaps back up to the tenants and reservations alrea
 
     $this->actingAs($user);
 
-    Livewire::test('pages::landlord.properties')
-        ->call('startEditingUnit', $unit->id)
+    Livewire::test('pages::landlord.unit-edit', ['unit' => $unit->id])
         ->set('form.tenant_limit', 2)
         ->assertSet('form.tenant_limit', '3')
         ->set('form.occupancy', 'single')
@@ -537,10 +558,11 @@ test('a unit that was never used can be deleted', function () {
 
     $this->actingAs($user);
 
-    Livewire::test('pages::landlord.properties')
-        ->call('confirmDeleteUnit', $unit->id)
+    Livewire::test('pages::landlord.unit-edit', ['unit' => $unit->id])
+        ->call('confirmDeleteUnit')
         ->assertSet('showDeleteUnitModal', true)
-        ->call('deleteUnit');
+        ->call('deleteUnit')
+        ->assertRedirect(route('properties'));
 
     expect(Unit::find($unit->id))->toBeNull();
 });
@@ -558,10 +580,9 @@ test('a unit that was used cannot be deleted', function (string $use) {
 
     $this->actingAs($user);
 
-    Livewire::test('pages::landlord.properties')
-        ->call('confirmDeleteUnit', $unit->id)
+    Livewire::test('pages::landlord.unit-edit', ['unit' => $unit->id])
+        ->call('confirmDeleteUnit')
         ->assertSet('showDeleteUnitModal', false)
-        ->set('deletingUnitId', $unit->id)
         ->call('deleteUnit');
 
     expect(Unit::find($unit->id))->not->toBeNull();
@@ -577,10 +598,15 @@ test('a landlord cannot delete a unit belonging to another team', function () {
 
     $this->actingAs($user);
 
-    Livewire::test('pages::landlord.properties')
-        ->set('deletingUnitId', $otherUnit->id)
+    $ownUnit = Unit::factory()->for(Property::factory()->for($user->currentTeam))->create();
+
+    expect(fn () => Livewire::test('pages::landlord.unit-edit', ['unit' => $otherUnit->id]))
+        ->toThrow(ModelNotFoundException::class);
+
+    Livewire::test('pages::landlord.unit-edit', ['unit' => $ownUnit->id])
+        ->set('unitId', $otherUnit->id)
         ->call('deleteUnit');
-})->throws(ModelNotFoundException::class);
+})->throws(CannotUpdateLockedPropertyException::class);
 
 test('a landlord can edit a property\'s name and address', function () {
     $user = User::factory()->create();
@@ -652,8 +678,7 @@ test('a landlord can switch a unit to allow multiple tenants', function () {
 
     $this->actingAs($user);
 
-    Livewire::test('pages::landlord.properties')
-        ->call('startEditingUnit', $unit->id)
+    Livewire::test('pages::landlord.unit-edit', ['unit' => $unit->id])
         ->assertSet('form.occupancy', 'single')
         ->set('form.occupancy', 'multiple')
         ->set('form.tenant_limit', 3)
@@ -667,7 +692,7 @@ test('a landlord can switch a unit to allow multiple tenants', function () {
     ]);
 });
 
-test('an expanded unit lists every tenant when it allows multiple tenants', function () {
+test('the unit page lists every tenant when it allows multiple tenants', function () {
     $user = User::factory()->create();
     $property = Property::factory()->for($user->currentTeam)->create();
     $unit = Unit::factory()->for($property)->create([
@@ -682,8 +707,7 @@ test('an expanded unit lists every tenant when it allows multiple tenants', func
 
     $this->actingAs($user);
 
-    Livewire::test('pages::landlord.properties')
-        ->call('toggleProperty', $property->id)
+    Livewire::test('pages::landlord.unit', ['unit' => $unit->id])
         ->assertSee('Juana Dela Cruz')
         ->assertSee('Maria Santos');
 });
@@ -707,8 +731,7 @@ test('changing a unit\'s price schedules the new rent for next cycle without cha
 
     $this->actingAs($user);
 
-    Livewire::test('pages::landlord.properties')
-        ->call('startEditingUnit', $unit->id)
+    Livewire::test('pages::landlord.unit-edit', ['unit' => $unit->id])
         ->set('form.price', '4000')
         ->call('updateUnit')
         ->assertHasNoErrors();
@@ -733,12 +756,11 @@ test('a landlord cannot edit a unit belonging to another team', function () {
 
     $this->expectException(ModelNotFoundException::class);
 
-    Livewire::test('pages::landlord.properties')
-        ->call('startEditingUnit', $otherUnit->id);
+    Livewire::test('pages::landlord.unit-edit', ['unit' => $otherUnit->id]);
 });
 
 /**
- * The Properties page with a new 24 m² unit on the form, ready to save.
+ * The Properties page with a new 24 mÂ² unit on the form, ready to save.
  *
  * @param  array<string, mixed>  $rooms
  */
@@ -810,8 +832,7 @@ test('editing a studio with a shared bathroom starts with both boxes ticked', fu
     $unit = Unit::factory()->for(Property::factory()->for($user->currentTeam))->withoutFloorArea()->create(['bedrooms' => 0, 'bathrooms' => 0]);
 
     Livewire::actingAs($user)
-        ->test('pages::landlord.properties')
-        ->call('startEditingUnit', $unit->id)
+        ->test('pages::landlord.unit-edit', ['unit' => $unit->id])
         ->assertSet('form.isStudio', true)
         ->assertSet('form.hasSharedBathroom', true);
 });
