@@ -1,10 +1,15 @@
 <?php
 
 use App\Actions\Units\StoreUnitPhoto;
+use App\Enums\TeamRole;
+use App\Models\Property;
 use App\Models\Unit;
+use App\Models\User;
+use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\ValidationException;
+use Livewire\Livewire;
 
 beforeEach(function () {
     Storage::fake('media');
@@ -65,3 +70,65 @@ test('a file that is not really an image is refused', function () {
 
     expect($unit->fresh()->photo_path)->toBeNull();
 });
+
+test('a landlord opens a unit page from its address and sees the placeholder until a photo is added', function () {
+    $landlord = User::factory()->create();
+    $unit = Unit::factory()->for(Property::factory()->for($landlord->currentTeam))->create(['unit_number' => '101', 'price' => 5000]);
+
+    $this->actingAs($landlord)
+        ->get(route('units.show', ['unit' => $unit]))
+        ->assertOk()
+        ->assertSee('Unit 101')
+        ->assertSee('5,000.00')
+        ->assertSee('No photo of unit 101 yet');
+});
+
+test('tenants cannot open a unit page, and another team\'s unit is not found', function () {
+    $landlord = User::factory()->create();
+    $unit = Unit::factory()->for(Property::factory()->for($landlord->currentTeam))->create();
+
+    $tenant = User::factory()->create();
+    $landlord->currentTeam->members()->attach($tenant, ['role' => TeamRole::Tenant]);
+    $tenant->switchTeam($landlord->currentTeam);
+
+    $this->actingAs($tenant)->get(route('units.show', ['unit' => $unit]))->assertForbidden();
+
+    $otherLandlord = User::factory()->create();
+
+    expect(fn () => Livewire::actingAs($otherLandlord)->test('pages::landlord.unit', ['unit' => $unit->id]))
+        ->toThrow(ModelNotFoundException::class);
+});
+
+test('a landlord adds and removes a unit photo from the unit page', function () {
+    $landlord = User::factory()->create();
+    $unit = Unit::factory()->for(Property::factory()->for($landlord->currentTeam))->create();
+
+    $component = Livewire::actingAs($landlord)
+        ->test('pages::landlord.unit', ['unit' => $unit->id])
+        ->set('photo', UploadedFile::fake()->image('room.jpg', 1200, 900))
+        ->assertHasNoErrors();
+
+    $path = $unit->fresh()->photo_path;
+    Storage::disk('media')->assertExists($path);
+    $component->assertSeeHtml($unit->fresh()->photoUrl());
+
+    $component->call('removePhoto');
+
+    Storage::disk('media')->assertMissing($path);
+    expect($unit->fresh()->photo_path)->toBeNull();
+});
+
+test('a unit photo must be an image of at most 5 MB', function (UploadedFile $file) {
+    $landlord = User::factory()->create();
+    $unit = Unit::factory()->for(Property::factory()->for($landlord->currentTeam))->create();
+
+    Livewire::actingAs($landlord)
+        ->test('pages::landlord.unit', ['unit' => $unit->id])
+        ->set('photo', $file)
+        ->assertHasErrors(['photo']);
+
+    expect($unit->fresh()->photo_path)->toBeNull();
+})->with([
+    'a pdf' => fn () => UploadedFile::fake()->create('plan.pdf', 100, 'application/pdf'),
+    'over 5 MB' => fn () => UploadedFile::fake()->image('huge.jpg')->size(5121),
+]);

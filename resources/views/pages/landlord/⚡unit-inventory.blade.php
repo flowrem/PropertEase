@@ -466,13 +466,9 @@ new #[Title('Unit inventory')] class extends Component
 }; ?>
 
 <section class="flex w-full flex-col gap-6">
-    <div>
-        <flux:link :href="route('properties')" wire:navigate class="text-sm">&larr; {{ __('Properties') }}</flux:link>
-        <flux:heading size="xl" level="1" class="mt-2">
-            {{ $this->unit->property->name }} &mdash; {{ __('Unit :number', ['number' => $this->unit->unit_number]) }}
-        </flux:heading>
-        <flux:subheading>{{ __('What is in the unit, and the condition it was in at each check.') }}</flux:subheading>
-    </div>
+    <x-unit-header :unit="$this->unit" current="inventory" />
+
+    <flux:text class="text-zinc-500">{{ __('What is in the unit, and the condition it was in at each check.') }}</flux:text>
 
     @php($pendingCheck = $this->pendingMoveInCheck)
 
