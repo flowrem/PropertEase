@@ -15,6 +15,7 @@ use App\Models\Unit;
 use App\Models\UnitItem;
 use App\Models\User;
 use App\Notifications\ContractReady;
+use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Notification;
 use Illuminate\Validation\ValidationException;
 use Livewire\Livewire;
@@ -178,4 +179,84 @@ test('text the landlord writes is escaped in the contract', function () {
 
     expect($contract->body_html)->not->toContain('<script>')
         ->toContain('&lt;script&gt;');
+});
+
+test('a tenant reads their contract and agrees to it once, recording when and from where', function () {
+    Notification::fake();
+    [$landlord, $tenant, $unit] = contractSetup();
+    $contract = moveTenantIn($landlord, $tenant, $unit)->contract;
+    $tenant->switchTeam($landlord->currentTeam);
+
+    $this->actingAs($tenant)->get(route('dashboard'))->assertSee('Please read and agree');
+
+    $component = Livewire::actingAs($tenant)
+        ->test('pages::contract')
+        ->assertSee('Unit 101 of Sunrise Apartments')
+        ->assertSee('I agree')
+        ->call('accept')
+        ->assertHasErrors(['hasRead'])
+        ->set('hasRead', true)
+        ->call('accept')
+        ->assertHasNoErrors()
+        ->assertSee('You agreed to this contract on')
+        ->assertDontSee('I have read this contract and agree to its terms.');
+
+    $contract->refresh();
+    expect($contract->tenant_accepted_at)->not->toBeNull()
+        ->and($contract->tenant_accepted_ip)->toBe('127.0.0.1');
+
+    $component->set('hasRead', true)->call('accept')->assertForbidden();
+});
+
+test('only the lease\'s own tenant can agree to its contract', function () {
+    Notification::fake();
+    [$landlord, $tenant, $unit] = contractSetup();
+    $contract = moveTenantIn($landlord, $tenant, $unit)->contract;
+    $roommate = User::factory()->create();
+    $landlord->currentTeam->members()->attach($roommate, ['role' => TeamRole::Tenant]);
+
+    expect(Gate::forUser($tenant)->allows('accept', $contract))->toBeTrue()
+        ->and(Gate::forUser($landlord)->allows('accept', $contract))->toBeFalse()
+        ->and(Gate::forUser($roommate)->allows('accept', $contract))->toBeFalse();
+
+    $roommate->switchTeam($landlord->currentTeam);
+    Livewire::actingAs($roommate)->test('pages::contract')->assertSee('You don\'t have a unit with this landlord yet.');
+});
+
+test('a tenant without a contract yet is told it is coming', function () {
+    [$landlord, $tenant, $unit] = contractSetup();
+    Lease::factory()->for($unit)->for($tenant, 'tenant')->create(['status' => LeaseStatus::Active]);
+    $tenant->switchTeam($landlord->currentTeam);
+
+    Livewire::actingAs($tenant)->test('pages::contract')->assertSee('Your landlord hasn\'t made your contract yet.');
+});
+
+test('the print page opens for the tenant and the landlord\'s side only', function () {
+    Notification::fake();
+    [$landlord, $tenant, $unit] = contractSetup();
+    $contract = moveTenantIn($landlord, $tenant, $unit)->contract;
+    $staff = User::factory()->create();
+    $landlord->currentTeam->members()->attach($staff, ['role' => TeamRole::Member]);
+    $roommate = User::factory()->create();
+    $landlord->currentTeam->members()->attach($roommate, ['role' => TeamRole::Tenant]);
+
+    $landlord->switchTeam($landlord->currentTeam);
+    $url = route('contracts.print', ['contract' => $contract]);
+
+    foreach ([$landlord, $staff, $tenant] as $user) {
+        $user->switchTeam($landlord->currentTeam);
+        $this->actingAs($user)->get($url)->assertOk()->assertSee('Rental Agreement')->assertSee('has not agreed');
+    }
+
+    $roommate->switchTeam($landlord->currentTeam);
+    $this->actingAs($roommate)->get($url)->assertForbidden();
+
+    $outsider = User::factory()->create();
+    $outsider->switchTeam($outsider->currentTeam);
+    $this->actingAs($outsider)
+        ->get(route('contracts.print', ['contract' => $contract, 'current_team' => $outsider->currentTeam->slug]))
+        ->assertNotFound();
+
+    auth()->logout();
+    $this->get($url)->assertRedirect(route('login'));
 });

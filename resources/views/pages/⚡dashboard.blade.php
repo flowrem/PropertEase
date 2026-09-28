@@ -66,7 +66,7 @@ new #[Title('Home')] class extends Component
         return Auth::user()->leases()
             ->where('status', LeaseStatus::Active->value)
             ->whereHas('unit.property', fn ($properties) => $properties->where('team_id', $this->team->id))
-            ->with(['unit.property', 'currentRent', 'moveInCheck'])
+            ->with(['unit.property', 'currentRent', 'moveInCheck', 'contract'])
             ->latest()
             ->first();
     }
@@ -524,6 +524,12 @@ new #[Title('Home')] class extends Component
                 </flux:button>
                 @if ($this->currentLease->moveInCheck && ! $this->currentLease->moveInCheck->tenant_acknowledged_at)
                     <flux:badge size="sm" color="amber">{{ __('Please acknowledge') }}</flux:badge>
+                @endif
+                <flux:button size="sm" icon="document-text" :href="route('contract')" wire:navigate>
+                    {{ __('Contract') }}
+                </flux:button>
+                @if ($this->currentLease->contract && ! $this->currentLease->contract->isAccepted())
+                    <flux:badge size="sm" color="amber">{{ __('Please read and agree') }}</flux:badge>
                 @endif
 
                 <flux:button variant="danger" size="sm" wire:click="confirmLeaveUnit">

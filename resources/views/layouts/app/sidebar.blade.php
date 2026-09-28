@@ -92,6 +92,9 @@
                             <flux:sidebar.item icon="banknotes" :href="route('billing')" :current="request()->routeIs('billing')" wire:navigate>
                                 {{ __('Billing') }}
                             </flux:sidebar.item>
+                            <flux:sidebar.item icon="document-text" :href="route('contract')" :current="request()->routeIs('contract')" wire:navigate>
+                                {{ __('Contract') }}
+                            </flux:sidebar.item>
                             <flux:sidebar.item icon="wrench-screwdriver" :href="route('maintenance')" :current="request()->routeIs('maintenance')" wire:navigate>
                                 {{ __('Maintenance') }}
                             </flux:sidebar.item>

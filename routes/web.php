@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\ConcernPhotoController;
+use App\Http\Controllers\ContractPrintController;
 use App\Http\Controllers\ForcedPasswordChangeController;
 use App\Http\Controllers\LandlordVerificationController;
 use App\Http\Controllers\PublicListingController;
@@ -48,6 +49,10 @@ Route::prefix('{current_team}')
         Route::livewire('complaints', 'pages::complaints')->name('complaints');
         Route::livewire('announcements', 'pages::announcements')->name('announcements');
         Route::livewire('unit-checks', 'pages::unit-checks')->name('unit-checks');
+        Route::livewire('contract', 'pages::contract')->name('contract');
+        Route::get('contracts/{contract}/print', ContractPrintController::class)
+            ->whereNumber('contract')
+            ->name('contracts.print');
         Route::livewire('notifications', 'pages::notifications')->name('notifications');
         Route::get('reports/{concern}/photo', ConcernPhotoController::class)
             ->whereNumber('concern')
