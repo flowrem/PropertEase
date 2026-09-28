@@ -36,7 +36,7 @@ class ReservationSubmitted extends Notification
         return [
             'team_id' => $this->reservation->team_id,
             'route' => 'reservations',
-            'route_parameters' => [],
+            'route_parameters' => ['reservation' => $this->reservation->id],
             'reservation_id' => $this->reservation->id,
             'code' => $this->reservation->code,
             'applicant' => $this->reservation->fullName(),

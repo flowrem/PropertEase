@@ -12,20 +12,22 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 
-class ApproveReservation
+class ConfirmReservation
 {
     public const TEMPORARY_PASSWORD_HOURS = 72;
 
     /**
-     * Approve a pending reservation: create the tenant account, put it on the
-     * landlord's team as a Tenant, and hold the unit slot. The temporary
-     * password is only ever handed to the queued, encrypted notification.
+     * Confirm a reserved reservation once the landlord has checked that its
+     * downpayment arrived: create the tenant account, put it on the
+     * landlord's team as a Tenant, and keep holding the unit for them until
+     * they move in. The temporary password is only ever handed to the
+     * queued, encrypted notification.
      *
      * @throws ValidationException
      */
     public function handle(Reservation $reservation, User $reviewer, bool $downpaymentConfirmed): User
     {
-        $this->ensure($downpaymentConfirmed, __('Confirm that the downpayment arrived before approving.'));
+        $this->ensure($downpaymentConfirmed, __('Confirm that the downpayment arrived before confirming the reservation.'));
 
         $temporaryPassword = Str::password(16);
         $expiresAt = now()->addHours(self::TEMPORARY_PASSWORD_HOURS);
@@ -34,7 +36,8 @@ class ApproveReservation
             $locked = Reservation::query()->lockForUpdate()->findOrFail($reservation->id);
             $unit = Unit::query()->lockForUpdate()->findOrFail($locked->unit_id);
 
-            $this->ensure($locked->status === ReservationStatus::Pending, __('This reservation is no longer pending.'));
+            $this->ensure($locked->status === ReservationStatus::Reserved, __('Only a reserved reservation can be confirmed.'));
+            $this->ensure($locked->hasDownpaymentSent(), __('The applicant has not sent their downpayment yet.'));
             $this->ensure(
                 User::query()->where('username', Str::lower($locked->desired_username))->doesntExist(),
                 __('That username has since been taken.'),
@@ -43,7 +46,7 @@ class ApproveReservation
                 User::query()->whereRaw('lower(email) = ?', [Str::lower($locked->email)])->doesntExist(),
                 __('An account with that email already exists.'),
             );
-            $this->ensure($unit->hasRoomForAnotherTenant(), __('This unit has no room left.'));
+            $this->ensure($unit->hasRoomForAnotherTenant(excludingOwnHold: true), __('This unit has no room left.'));
 
             $tenant = (new User)->forceFill([
                 'name' => $locked->fullName(),
@@ -65,8 +68,6 @@ class ApproveReservation
             $locked->forceFill([
                 'status' => ReservationStatus::Confirmed,
                 'tenant_user_id' => $tenant->id,
-                'reviewed_by' => $reviewer->id,
-                'reviewed_at' => now(),
                 'downpayment_confirmed_at' => now(),
                 'downpayment_confirmed_by' => $reviewer->id,
             ])->save();

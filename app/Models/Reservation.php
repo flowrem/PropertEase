@@ -288,6 +288,21 @@ class Reservation extends Model
         $query->where('status', ReservationStatus::Pending->value);
     }
 
+    /**
+     * Reservations waiting on the landlord: new ones to review, and reserved
+     * ones whose downpayment arrived and needs checking.
+     *
+     * @param  Builder<Reservation>  $query
+     */
+    public function scopeNeedingLandlord(Builder $query): void
+    {
+        $query->where(fn (Builder $waiting) => $waiting
+            ->where('status', ReservationStatus::Pending->value)
+            ->orWhere(fn (Builder $sent) => $sent
+                ->where('status', ReservationStatus::Reserved->value)
+                ->whereNotNull('downpayment_submitted_at')));
+    }
+
     public function fullName(): string
     {
         return Str::squish($this->first_name.' '.$this->last_name);

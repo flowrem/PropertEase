@@ -13,9 +13,10 @@ use Illuminate\Validation\ValidationException;
 class CancelReservation
 {
     /**
-     * Cancel an approved reservation that was never fulfilled: release the
-     * held slot, disable the tenant account created for it and take that
-     * account off the team's roster. Any refund is handled outside the system.
+     * Cancel a reserved or confirmed reservation that was never fulfilled:
+     * release the held slot and, when it was confirmed, disable the tenant
+     * account created for it and take that account off the team's roster.
+     * Any refund is handled outside the system.
      *
      * @throws ValidationException
      */
@@ -30,8 +31,8 @@ class CancelReservation
         DB::transaction(function () use ($reservation, $reason) {
             $locked = Reservation::query()->lockForUpdate()->findOrFail($reservation->id);
 
-            if ($locked->status !== ReservationStatus::Confirmed) {
-                throw ValidationException::withMessages(['reservation' => __('Only an approved reservation can be cancelled.')]);
+            if (! in_array($locked->status, [ReservationStatus::Reserved, ReservationStatus::Confirmed], true)) {
+                throw ValidationException::withMessages(['reservation' => __('Only a reserved or confirmed reservation can be cancelled.')]);
             }
 
             $locked->forceFill([

@@ -1,7 +1,9 @@
 <?php
 
-use App\Actions\Reservations\ApproveReservation;
+use App\Actions\Reservations\AcceptReservation;
 use App\Actions\Reservations\CancelReservation;
+use App\Actions\Reservations\ConfirmReservation;
+use App\Actions\Reservations\ExtendReservation;
 use App\Actions\Reservations\RejectReservation;
 use App\Actions\Reservations\ResendLoginDetails;
 use App\Enums\ReservationStatus;
@@ -14,10 +16,16 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Gate;
 use Livewire\Attributes\Computed;
 use Livewire\Attributes\Title;
+use Livewire\Attributes\Url;
 use Livewire\Component;
 
 new #[Title('Reservations')] class extends Component
 {
+    /**
+     * The reservation open in the detail modal, kept in the address so a
+     * notification can link straight to it.
+     */
+    #[Url(as: 'reservation')]
     public ?int $selectedId = null;
 
     public bool $showDetailModal = false;
@@ -32,6 +40,22 @@ new #[Title('Reservations')] class extends Component
 
     public string $cancelReason = '';
 
+    public string $extendDays = '';
+
+    /**
+     * Open the reservation named in the address, if it is one of this team's.
+     */
+    public function mount(): void
+    {
+        $this->extendDays = (string) $this->team->reservation_hold_days;
+
+        if ($this->selectedId && $this->selected) {
+            $this->showDetailModal = true;
+        } else {
+            $this->selectedId = null;
+        }
+    }
+
     #[Computed]
     public function team(): Team
     {
@@ -45,17 +69,27 @@ new #[Title('Reservations')] class extends Component
     }
 
     /**
-     * @return Collection<int, Reservation>
+     * Reservations still in progress, grouped by what the landlord does next:
+     * review, check a downpayment, wait for one, or move the tenant in.
+     *
+     * @return Collection<string, Collection<int, Reservation>>
      */
     #[Computed]
-    public function pending(): Collection
+    public function active(): Collection
     {
-        return Reservation::query()
+        $reservations = Reservation::query()
             ->where('team_id', $this->team->id)
-            ->pending()
+            ->whereIn('status', [ReservationStatus::Pending->value, ReservationStatus::Reserved->value, ReservationStatus::Confirmed->value])
             ->with(['unit.property'])
             ->oldest()
             ->get();
+
+        return collect([
+            'review' => $reservations->where('status', ReservationStatus::Pending)->values(),
+            'check' => $reservations->filter(fn (Reservation $reservation): bool => $reservation->status === ReservationStatus::Reserved && $reservation->hasDownpaymentSent())->values(),
+            'waiting' => $reservations->filter(fn (Reservation $reservation): bool => $reservation->status === ReservationStatus::Reserved && ! $reservation->hasDownpaymentSent())->values(),
+            'moveIn' => $reservations->where('status', ReservationStatus::Confirmed)->values(),
+        ]);
     }
 
     /**
@@ -66,9 +100,9 @@ new #[Title('Reservations')] class extends Component
     {
         return Reservation::query()
             ->where('team_id', $this->team->id)
-            ->where('status', '!=', ReservationStatus::Pending->value)
+            ->whereIn('status', [ReservationStatus::Rejected->value, ReservationStatus::Cancelled->value, ReservationStatus::Expired->value, ReservationStatus::Fulfilled->value])
             ->with(['unit.property'])
-            ->latest('reviewed_at')
+            ->latest('updated_at')
             ->limit(50)
             ->get();
     }
@@ -82,7 +116,7 @@ new #[Title('Reservations')] class extends Component
 
         return Reservation::query()
             ->where('team_id', $this->team->id)
-            ->with(['unit.property', 'paymentChannel', 'tenant', 'reviewer'])
+            ->with(['unit.property', 'paymentChannel', 'tenant', 'reviewer', 'listing'])
             ->find($this->selectedId);
     }
 
@@ -106,20 +140,32 @@ new #[Title('Reservations')] class extends Component
         $this->resetErrorBag();
     }
 
-    public function approve(ApproveReservation $approve): void
+    public function accept(AcceptReservation $accept): void
     {
-        $reservation = $this->reviewable();
+        $accept->handle($this->reviewable(), Auth::user());
 
-        $approve->handle($reservation, Auth::user(), $this->downpaymentConfirmed);
+        $this->afterReview(__('Reservation accepted. The applicant was emailed the deadline to pay the downpayment.'));
+    }
 
-        $this->afterReview(__('Reservation approved. Login details were emailed to the applicant.'));
+    public function confirm(ConfirmReservation $confirm): void
+    {
+        $confirm->handle($this->reviewable(), Auth::user(), $this->downpaymentConfirmed);
+
+        $this->afterReview(__('Reservation confirmed. Login details were emailed to the tenant.'));
+    }
+
+    public function extend(ExtendReservation $extend): void
+    {
+        $this->validate(['extendDays' => ['required', 'integer']], attributes: ['extendDays' => __('days')]);
+
+        $extend->handle($this->reviewable(), (int) $this->extendDays);
+
+        $this->afterReview(__('Deadline extended. The applicant was emailed the new one.'));
     }
 
     public function reject(RejectReservation $reject): void
     {
-        $reservation = $this->reviewable();
-
-        $reject->handle($reservation, Auth::user(), $this->rejectReason);
+        $reject->handle($this->reviewable(), Auth::user(), $this->rejectReason);
 
         $this->afterReview(__('Reservation rejected. The applicant was emailed.'));
     }
@@ -147,7 +193,7 @@ new #[Title('Reservations')] class extends Component
     protected function afterReview(string $message): void
     {
         $this->closeDetail();
-        unset($this->pending, $this->history, $this->selected);
+        unset($this->active, $this->history, $this->selected);
 
         Flux::toast(variant: 'success', text: $message);
     }
@@ -155,6 +201,7 @@ new #[Title('Reservations')] class extends Component
     protected function resetForm(): void
     {
         $this->reset('downpaymentConfirmed', 'rejecting', 'rejectReason', 'cancelling', 'cancelReason');
+        $this->extendDays = (string) $this->team->reservation_hold_days;
         $this->resetErrorBag();
     }
 
@@ -190,39 +237,61 @@ new #[Title('Reservations')] class extends Component
 <section class="flex w-full flex-col gap-6">
     <div>
         <flux:heading size="xl" level="1">{{ __('Reservations') }}</flux:heading>
-        <flux:subheading>{{ __('Applications from people who found a unit on the public pages.') }}</flux:subheading>
+        <flux:subheading>
+            {{ trans_choice('Applications from people who found a unit on the public pages. An accepted reservation holds the unit for :count day while they pay the downpayment.|Applications from people who found a unit on the public pages. An accepted reservation holds the unit for :count days while they pay the downpayment.', $this->team->reservation_hold_days) }}
+        </flux:subheading>
     </div>
 
     @unless ($this->canReview)
-        <flux:text class="text-zinc-500">{{ __('You can view reservations. Ask your landlord or a manager to approve or reject them.') }}</flux:text>
+        <flux:text class="text-zinc-500">{{ __('You can view reservations. Ask your landlord or a manager to accept, confirm or reject them.') }}</flux:text>
     @endunless
 
-    <div class="space-y-2">
-        <flux:heading size="sm">{{ __('Pending') }} ({{ $this->pending->count() }})</flux:heading>
+    @php
+        $groups = [
+            'review' => [__('Needs your review'), __('No reservations waiting for review.')],
+            'check' => [__('Downpayment sent: check and confirm'), __('No downpayments to check.')],
+            'waiting' => [__('Waiting for the downpayment'), __('Nobody is paying a downpayment right now.')],
+            'moveIn' => [__('Confirmed: ready to move in'), __('Nobody waiting to move in.')],
+        ];
+    @endphp
 
-        @forelse ($this->pending as $reservation)
-            <button
-                type="button"
-                wire:key="pending-{{ $reservation->id }}"
-                wire:click="open({{ $reservation->id }})"
-                class="flex w-full items-center justify-between gap-4 rounded-lg border border-zinc-200 p-4 text-left transition hover:border-zinc-300 dark:border-zinc-700 dark:hover:border-zinc-600"
-            >
-                <div>
-                    <flux:heading size="sm">{{ $reservation->fullName() }}</flux:heading>
-                    <flux:text class="text-zinc-500">
-                        {{ $reservation->unit->property->name }} &middot; {{ __('Unit :number', ['number' => $reservation->unit->unit_number]) }}
-                        &middot; {{ $reservation->created_at?->diffForHumans() }}
-                    </flux:text>
-                </div>
-                <div class="text-right">
-                    <flux:text>&#8369;{{ number_format((float) $reservation->downpayment_amount, 2) }}</flux:text>
-                    <flux:text class="text-xs text-zinc-500">{{ $reservation->code }}</flux:text>
-                </div>
-            </button>
-        @empty
-            <flux:text class="text-zinc-500">{{ __('No reservations waiting for review.') }}</flux:text>
-        @endforelse
-    </div>
+    @foreach ($groups as $group => [$heading, $emptyText])
+        <div class="space-y-2" wire:key="group-{{ $group }}">
+            <flux:heading size="sm">{{ $heading }} ({{ $this->active[$group]->count() }})</flux:heading>
+
+            @forelse ($this->active[$group] as $reservation)
+                <button
+                    type="button"
+                    wire:key="reservation-{{ $reservation->id }}"
+                    wire:click="open({{ $reservation->id }})"
+                    class="flex w-full items-center justify-between gap-4 rounded-lg border border-zinc-200 p-4 text-left transition hover:border-zinc-300 dark:border-zinc-700 dark:hover:border-zinc-600"
+                >
+                    <div>
+                        <flux:heading size="sm">{{ $reservation->fullName() }}</flux:heading>
+                        <flux:text class="text-zinc-500">
+                            {{ $reservation->unit->property->name }} &middot; {{ __('Unit :number', ['number' => $reservation->unit->unit_number]) }}
+                            &middot; {{ $reservation->code }}
+                        </flux:text>
+                    </div>
+                    <div class="shrink-0 text-right">
+                        @if ($group === 'waiting')
+                            @if ($reservation->isOverdue())
+                                <flux:badge size="sm" color="red">{{ __('Deadline passed') }}</flux:badge>
+                            @else
+                                <flux:text class="text-sm">{{ __('Due :deadline', ['deadline' => $reservation->deadlineForDisplay()]) }}</flux:text>
+                            @endif
+                        @elseif ($group === 'check')
+                            <flux:text class="text-sm">&#8369;{{ number_format((float) $reservation->downpayment_amount, 2) }}</flux:text>
+                        @else
+                            <flux:text class="text-sm text-zinc-500">{{ $reservation->created_at?->diffForHumans() }}</flux:text>
+                        @endif
+                    </div>
+                </button>
+            @empty
+                <flux:text class="text-zinc-500">{{ $emptyText }}</flux:text>
+            @endforelse
+        </div>
+    @endforeach
 
     <div class="space-y-2">
         <flux:heading size="sm">{{ __('History') }}</flux:heading>
@@ -243,7 +312,7 @@ new #[Title('Reservations')] class extends Component
                 <flux:badge size="sm" :color="$reservation->status->color()">{{ $reservation->status->label() }}</flux:badge>
             </button>
         @empty
-            <flux:text class="text-zinc-500">{{ __('Nothing reviewed yet.') }}</flux:text>
+            <flux:text class="text-zinc-500">{{ __('Nothing finished yet.') }}</flux:text>
         @endforelse
     </div>
 
@@ -256,6 +325,22 @@ new #[Title('Reservations')] class extends Component
                     <flux:heading size="lg">{{ $reservation->fullName() }}</flux:heading>
                     <flux:badge size="sm" :color="$reservation->status->color()">{{ $reservation->status->label() }}</flux:badge>
                 </div>
+
+                @if ($reservation->status === ReservationStatus::Reserved)
+                    @if ($reservation->hasDownpaymentSent())
+                        <flux:callout icon="banknotes" color="blue">
+                            <flux:callout.text>{{ __('The applicant sent the downpayment. The unit stays held for them until you confirm or cancel.') }}</flux:callout.text>
+                        </flux:callout>
+                    @elseif ($reservation->isOverdue())
+                        <flux:callout icon="clock" color="red">
+                            <flux:callout.text>{{ __('The deadline (:deadline) passed with no downpayment, so the unit is open to others again. It will be marked expired within the hour.', ['deadline' => $reservation->deadlineForDisplay()]) }}</flux:callout.text>
+                        </flux:callout>
+                    @else
+                        <flux:callout icon="clock">
+                            <flux:callout.text>{{ __('Held until :deadline while the applicant pays the downpayment.', ['deadline' => $reservation->deadlineForDisplay()]) }}</flux:callout.text>
+                        </flux:callout>
+                    @endif
+                @endif
 
                 <dl class="grid gap-3 text-sm sm:grid-cols-2">
                     <div>
@@ -298,30 +383,43 @@ new #[Title('Reservations')] class extends Component
                     </div>
                 </dl>
 
-                <div class="space-y-3 rounded-lg border border-zinc-200 p-4 dark:border-zinc-700">
-                    <flux:heading size="sm">{{ __('Downpayment') }}</flux:heading>
-                    <dl class="grid gap-3 text-sm sm:grid-cols-2">
-                        <div>
-                            <dt class="text-zinc-500">{{ __('Amount') }}</dt>
-                            <dd>&#8369;{{ number_format((float) $reservation->downpayment_amount, 2) }}</dd>
-                        </div>
-                        <div>
-                            <dt class="text-zinc-500">{{ __('Paid to') }}</dt>
-                            <dd>{{ $reservation->paymentChannel ? $reservation->paymentChannel->method->label().' · '.$reservation->paymentChannel->account_name : $reservation->downpayment_method->label() }}</dd>
-                        </div>
-                        <div>
-                            <dt class="text-zinc-500">{{ __('Reference number') }}</dt>
-                            <dd>{{ $reservation->downpayment_reference }}</dd>
-                        </div>
-                        <div>
-                            <dt class="text-zinc-500">{{ __('Method') }}</dt>
-                            <dd>{{ $reservation->downpayment_method->label() }}</dd>
-                        </div>
-                    </dl>
+                @if ($reservation->hasFiles())
+                    <a href="{{ route('reservations.files', ['reservation' => $reservation->id, 'kind' => 'id']) }}" target="_blank" rel="noopener" class="block sm:w-1/2">
+                        <img
+                            src="{{ route('reservations.files', ['reservation' => $reservation->id, 'kind' => 'id']) }}"
+                            alt="{{ __('Valid ID') }}"
+                            class="max-h-72 w-full rounded-md border border-zinc-200 object-contain dark:border-zinc-700"
+                        >
+                        <flux:text class="mt-1 text-xs text-zinc-500">{{ __('Valid ID') }}</flux:text>
+                    </a>
+                @else
+                    <flux:text class="text-zinc-500">{{ __('The ID and payment proof were deleted after the retention period.') }}</flux:text>
+                @endif
 
-                    @if ($reservation->hasFiles())
-                        <div class="grid gap-3 sm:grid-cols-2">
-                            <a href="{{ route('reservations.files', ['reservation' => $reservation->id, 'kind' => 'proof']) }}" target="_blank" rel="noopener">
+                @if ($reservation->hasDownpaymentSent())
+                    <div class="space-y-3 rounded-lg border border-zinc-200 p-4 dark:border-zinc-700">
+                        <flux:heading size="sm">{{ __('Downpayment') }}</flux:heading>
+                        <dl class="grid gap-3 text-sm sm:grid-cols-2">
+                            <div>
+                                <dt class="text-zinc-500">{{ __('Amount') }}</dt>
+                                <dd>&#8369;{{ number_format((float) $reservation->downpayment_amount, 2) }}</dd>
+                            </div>
+                            <div>
+                                <dt class="text-zinc-500">{{ __('Paid to') }}</dt>
+                                <dd>{{ $reservation->paymentChannel ? $reservation->paymentChannel->method->label().' · '.$reservation->paymentChannel->account_name : $reservation->downpayment_method?->label() }}</dd>
+                            </div>
+                            <div>
+                                <dt class="text-zinc-500">{{ __('Reference number') }}</dt>
+                                <dd>{{ $reservation->downpayment_reference }}</dd>
+                            </div>
+                            <div>
+                                <dt class="text-zinc-500">{{ __('Sent') }}</dt>
+                                <dd>{{ $reservation->downpayment_submitted_at?->timezone(config('occuplace.display_timezone'))->format('M j, Y, g:i A') }}</dd>
+                            </div>
+                        </dl>
+
+                        @if ($reservation->hasFiles() && $reservation->downpayment_proof_path)
+                            <a href="{{ route('reservations.files', ['reservation' => $reservation->id, 'kind' => 'proof']) }}" target="_blank" rel="noopener" class="block sm:w-1/2">
                                 <img
                                     src="{{ route('reservations.files', ['reservation' => $reservation->id, 'kind' => 'proof']) }}"
                                     alt="{{ __('Proof of payment') }}"
@@ -329,19 +427,9 @@ new #[Title('Reservations')] class extends Component
                                 >
                                 <flux:text class="mt-1 text-xs text-zinc-500">{{ __('Proof of payment') }}</flux:text>
                             </a>
-                            <a href="{{ route('reservations.files', ['reservation' => $reservation->id, 'kind' => 'id']) }}" target="_blank" rel="noopener">
-                                <img
-                                    src="{{ route('reservations.files', ['reservation' => $reservation->id, 'kind' => 'id']) }}"
-                                    alt="{{ __('Valid ID') }}"
-                                    class="max-h-72 w-full rounded-md border border-zinc-200 object-contain dark:border-zinc-700"
-                                >
-                                <flux:text class="mt-1 text-xs text-zinc-500">{{ __('Valid ID') }}</flux:text>
-                            </a>
-                        </div>
-                    @else
-                        <flux:text class="text-zinc-500">{{ __('The ID and payment proof were deleted after the retention period.') }}</flux:text>
-                    @endif
-                </div>
+                        @endif
+                    </div>
+                @endif
 
                 @if ($reservation->rejection_reason)
                     <flux:callout variant="danger" icon="x-circle">
@@ -355,13 +443,8 @@ new #[Title('Reservations')] class extends Component
                 @if ($this->canReview && $reservation->status === ReservationStatus::Pending)
                     @if ($rejecting)
                         <div class="space-y-3">
-                            <flux:callout variant="warning" icon="exclamation-triangle">
-                                <flux:callout.text>
-                                    {{ __('If this applicant already sent a downpayment, the refund is handled outside Occuplace. Contact them directly.') }}
-                                </flux:callout.text>
-                            </flux:callout>
-
                             <flux:textarea wire:model="rejectReason" :label="__('Reason (sent to the applicant)')" rows="3" required />
+                            <flux:error name="reason" />
 
                             <div class="flex justify-end gap-2">
                                 <flux:button wire:click="$set('rejecting', false)">{{ __('Back') }}</flux:button>
@@ -369,18 +452,34 @@ new #[Title('Reservations')] class extends Component
                             </div>
                         </div>
                     @else
-                        <div class="space-y-3">
-                            <flux:checkbox
-                                wire:model="downpaymentConfirmed"
-                                :label="__('I confirmed this downpayment arrived in my account')"
-                            />
-
-                            <div class="flex justify-end gap-2">
+                        <div class="flex flex-wrap items-center justify-between gap-3">
+                            <flux:text class="text-zinc-500">
+                                {{ trans_choice('Accepting holds the unit for :count day and emails the applicant how to pay the downpayment.|Accepting holds the unit for :count days and emails the applicant how to pay the downpayment.', $this->team->reservation_hold_days) }}
+                            </flux:text>
+                            <div class="flex gap-2">
                                 <flux:button wire:click="startRejecting">{{ __('Reject') }}</flux:button>
-                                <flux:button variant="primary" wire:click="approve">{{ __('Approve') }}</flux:button>
+                                <flux:button variant="primary" wire:click="accept">{{ __('Accept') }}</flux:button>
                             </div>
                         </div>
                     @endif
+                @endif
+
+                @if ($this->canReview && $reservation->status === ReservationStatus::Reserved && $reservation->hasDownpaymentSent())
+                    <div class="space-y-3">
+                        <flux:checkbox wire:model="downpaymentConfirmed" :label="__('I checked that this downpayment arrived in my account')" />
+
+                        <div class="flex justify-end">
+                            <flux:button variant="primary" wire:click="confirm">{{ __('Confirm reservation') }}</flux:button>
+                        </div>
+                    </div>
+                @endif
+
+                @if ($this->canReview && $reservation->status === ReservationStatus::Reserved && ! $reservation->hasDownpaymentSent())
+                    <div class="flex flex-wrap items-end justify-end gap-2">
+                        <flux:input wire:model="extendDays" type="number" min="{{ config('occuplace.reservations.hold_days.min') }}" max="{{ config('occuplace.reservations.hold_days.max') }}" :label="__('Give more days')" class="max-w-32" />
+                        <flux:button wire:click="extend">{{ __('Extend deadline') }}</flux:button>
+                    </div>
+                    <flux:error name="extendDays" />
                 @endif
 
                 @if ($reservation->status === ReservationStatus::Confirmed && $reservation->tenant_user_id)
@@ -394,16 +493,18 @@ new #[Title('Reservations')] class extends Component
                     </div>
                 @endif
 
-                @if ($this->canReview && $reservation->status === ReservationStatus::Confirmed)
+                @if ($this->canReview && in_array($reservation->status, [ReservationStatus::Reserved, ReservationStatus::Confirmed], true))
                     @if ($cancelling)
                         <div class="space-y-3">
                             <flux:callout variant="warning" icon="exclamation-triangle">
                                 <flux:callout.text>
-                                    {{ __('Cancelling releases the slot and disables the applicant\'s account. If they already sent a downpayment, the refund is handled outside Occuplace.') }}
+                                    {{ $reservation->status === ReservationStatus::Confirmed
+                                        ? __('Cancelling releases the slot and disables the applicant\'s account. If they already sent a downpayment, the refund is handled outside Occuplace.')
+                                        : __('Cancelling releases the slot. If they already sent a downpayment, the refund is handled outside Occuplace.') }}
                                 </flux:callout.text>
                             </flux:callout>
 
-                            <flux:textarea wire:model="cancelReason" :label="__('Reason for cancelling')" rows="3" required />
+                            <flux:textarea wire:model="cancelReason" :label="__('Reason for cancelling (sent to the applicant)')" rows="3" required />
                             <flux:error name="cancelReason" />
 
                             <div class="flex justify-end gap-2">
@@ -428,7 +529,7 @@ new #[Title('Reservations')] class extends Component
                 @if ($this->canReview && $reservation->status === ReservationStatus::Confirmed && $reservation->tenant?->must_change_password)
                     <div class="flex items-center justify-between gap-3 rounded-lg border border-zinc-200 p-4 dark:border-zinc-700">
                         <flux:text class="text-zinc-500">
-                            {{ __('The applicant has not logged in yet. Send a fresh temporary password if the email never arrived or expired.') }}
+                            {{ __('The tenant has not logged in yet. Send a fresh temporary password if the email never arrived or expired.') }}
                         </flux:text>
                         <flux:button wire:click="resendLoginDetails">{{ __('Resend login details') }}</flux:button>
                     </div>

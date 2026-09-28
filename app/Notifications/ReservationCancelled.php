@@ -27,10 +27,15 @@ class ReservationCancelled extends Notification implements ShouldQueue
         return (new MailMessage)
             ->subject(__('Your reservation :code was cancelled', ['code' => $this->reservation->code]))
             ->greeting(__('Hello :name,', ['name' => $this->reservation->first_name]))
-            ->line(__('Your reservation :code with :team was cancelled and the login details we sent you no longer work.', [
-                'code' => $this->reservation->code,
-                'team' => $this->reservation->team->name,
-            ]))
+            ->line($this->reservation->tenant_user_id
+                ? __('Your reservation :code with :team was cancelled and the login details we sent you no longer work.', [
+                    'code' => $this->reservation->code,
+                    'team' => $this->reservation->team->name,
+                ])
+                : __('Your reservation :code with :team was cancelled and the unit is no longer held for you.', [
+                    'code' => $this->reservation->code,
+                    'team' => $this->reservation->team->name,
+                ]))
             ->line(__('Reason: :reason', ['reason' => $this->reservation->cancellation_reason]))
             ->line(__('If you already sent a downpayment, contact the landlord about a refund.'));
     }

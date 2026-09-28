@@ -6,7 +6,7 @@ use Illuminate\Support\Facades\RateLimiter;
 use Livewire\Livewire;
 
 /**
- * A tenant account as ApproveReservation creates it, with a known temporary password.
+ * A tenant account as ConfirmReservation creates it, with a known temporary password.
  */
 function tenantWithTemporaryPassword(array $overrides = []): User
 {

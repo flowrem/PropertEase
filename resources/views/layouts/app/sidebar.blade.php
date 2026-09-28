@@ -65,7 +65,7 @@
                                 icon="clipboard-document-check"
                                 :href="route('reservations')"
                                 :current="request()->routeIs('reservations')"
-                                :badge="\App\Models\Reservation::where('team_id', auth()->user()->current_team_id)->pending()->count() ?: null"
+                                :badge="\App\Models\Reservation::where('team_id', auth()->user()->current_team_id)->needingLandlord()->count() ?: null"
                                 wire:navigate
                             >
                                 {{ __('Reservations') }}

@@ -22,7 +22,7 @@ class ResendLoginDetails
     public function handle(Reservation $reservation): void
     {
         $temporaryPassword = Str::password(16);
-        $expiresAt = now()->addHours(ApproveReservation::TEMPORARY_PASSWORD_HOURS);
+        $expiresAt = now()->addHours(ConfirmReservation::TEMPORARY_PASSWORD_HOURS);
 
         $tenant = DB::transaction(function () use ($reservation, $temporaryPassword, $expiresAt) {
             $locked = Reservation::query()->lockForUpdate()->findOrFail($reservation->id);
