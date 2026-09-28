@@ -19,8 +19,11 @@ services:
         value: production
       - key: APP_DEBUG
         value: false
+      # The custom domain occuplace.org (registered at Z.com, DNS there: an A
+      # record for @ to Render's 216.24.57.1 and a www CNAME to
+      # occuplace.onrender.com). Email links and signed links are built from it.
       - key: APP_URL
-        value: https://occuplace.onrender.com
+        value: https://occuplace.org
       - key: APP_KEY
         sync: false
       - key: LOG_CHANNEL
@@ -44,8 +47,10 @@ services:
         value: resend
       - key: RESEND_API_KEY
         sync: false
+      # occuplace.org is a verified sending domain in Resend (DKIM, SPF and
+      # DMARC records at Z.com), so mail reaches any address.
       - key: MAIL_FROM_ADDRESS
-        sync: false
+        value: no-reply@occuplace.org
       - key: MAIL_FROM_NAME
         value: Occuplace
       # Render's filesystem is ephemeral, so uploads live in Supabase Storage

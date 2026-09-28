@@ -83,7 +83,8 @@ php artisan migrate
 
 ## Production
 
-Live at https://occuplace.onrender.com, deployed to Render as one Docker service that
+Live at https://occuplace.org (the custom domain of the Render service
+`occuplace.onrender.com`, which still works), deployed to Render as one Docker service that
 auto-deploys from `main`. The service was created by hand and its environment variables
 are managed in the Render dashboard. `render.yaml` documents that setup but is not linked
 to Render (the Blueprint was disconnected), so editing it does not change the deployment.
@@ -97,8 +98,12 @@ to Render (the Blueprint was disconnected), so editing it does not change the de
   background, because Render's free plan has no cron or worker service.
 - **Assets:** built locally and committed. After any CSS or JS change run `npm run build`
   and commit `public/build/`, or production serves stale styles.
-- **Email:** Resend's HTTP API. Until a sending domain is verified, Resend only delivers
-  to the account owner's own address, so approval, rejection and temporary-password
-  emails to anyone else fail.
+- **Email:** Resend's HTTP API, sending as `no-reply@occuplace.org` from the verified
+  domain `occuplace.org`. Its DKIM, SPF and DMARC records live in Z.com's DNS; if they are
+  removed, Resend falls back to delivering only to the account owner's address.
+- **Domain:** `occuplace.org`, registered at Z.com. DNS (Z.com's Manual DNS page) holds
+  an A record for `@` to Render's `216.24.57.1`, a `www` CNAME to `occuplace.onrender.com`,
+  and the Resend records. `APP_URL` must match the domain, since email links and signed
+  reservation links are built from it.
 - **Free tier limits:** the service sleeps after 15 minutes idle and takes up to a minute
   to wake. A free Supabase project pauses after a week without activity.
