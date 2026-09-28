@@ -3,6 +3,7 @@
 use App\Enums\BillingTiming;
 use App\Enums\LeaseStatus;
 use App\Enums\ReservationStatus;
+use App\Enums\StayType;
 use App\Enums\TeamRole;
 use App\Enums\UnitStatus;
 use App\Models\Lease;
@@ -11,6 +12,7 @@ use App\Models\Team;
 use App\Models\TeamInvitation;
 use App\Models\Unit;
 use App\Models\User;
+use App\Rules\PhilippineMobileNumber;
 use Flux\Flux;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Support\Collection;
@@ -33,6 +35,13 @@ new #[Title('Tenants')] class extends Component
     public int $due_day = 1;
 
     public string $billing_timing = 'advance';
+
+    public string $stay_type = '';
+
+    /**
+     * Stay type of the tenant's current lease, changed without moving them.
+     */
+    public string $currentLeaseStayType = '';
 
     /**
      * Assign the tenant even though the unit has no clean move-in check.
@@ -192,13 +201,32 @@ new #[Title('Tenants')] class extends Component
         $this->unit_id = null;
         $this->due_day = $lease?->due_day ?? 1;
         $this->billing_timing = $lease?->billing_timing->value ?? BillingTiming::Advance->value;
+        $this->currentLeaseStayType = $lease?->stay_type?->value ?? '';
+        $heldReservation = $this->managingTenant ? $this->approvedReservationFor($this->managingTenant) : null;
+        $this->stay_type = $lease?->stay_type?->value ?? $heldReservation?->stay_type?->value ?? '';
+    }
+
+    /**
+     * Change the stay type on the tenant's current lease without moving them.
+     */
+    public function updatedCurrentLeaseStayType(): void
+    {
+        $lease = $this->managingTenant?->leases->first();
+
+        abort_unless($lease, 404);
+
+        $this->validate(['currentLeaseStayType' => ['nullable', Rule::enum(StayType::class)]]);
+
+        $lease->update(['stay_type' => StayType::tryFrom($this->currentLeaseStayType)]);
+
+        Flux::toast(variant: 'success', text: __('Stay type updated.'));
     }
 
     public function closeManageModal(): void
     {
         $this->showManageModal = false;
         $this->managingTenantId = null;
-        $this->reset('unit_id', 'due_day', 'billing_timing', 'proceedAnyway', 'overrideReason');
+        $this->reset('unit_id', 'due_day', 'billing_timing', 'stay_type', 'currentLeaseStayType', 'proceedAnyway', 'overrideReason');
     }
 
     /**
@@ -236,6 +264,7 @@ new #[Title('Tenants')] class extends Component
             'unit_id' => ['required', Rule::exists('units', 'id')],
             'due_day' => ['required', 'integer', 'min:1', 'max:28'],
             'billing_timing' => ['required', Rule::enum(BillingTiming::class)],
+            'stay_type' => ['nullable', Rule::enum(StayType::class)],
         ]);
 
         $unit = Unit::withCount('activeLeases')->findOrFail($validated['unit_id']);
@@ -282,6 +311,7 @@ new #[Title('Tenants')] class extends Component
             'start_date' => now(),
             'due_day' => $validated['due_day'],
             'billing_timing' => BillingTiming::from($validated['billing_timing']),
+            'stay_type' => StayType::tryFrom((string) $validated['stay_type']),
             'status' => LeaseStatus::Active,
             'move_in_override_reason' => $moveInCheckPasses ? null : trim($this->overrideReason),
         ]);
@@ -365,6 +395,9 @@ new #[Title('Tenants')] class extends Component
             <div>
                 <flux:heading size="sm">{{ $tenant->name }}</flux:heading>
                 <flux:text class="text-zinc-500 dark:text-zinc-400">{{ $tenant->email }}</flux:text>
+                @if ($tenant->contact_number)
+                    <flux:text class="text-zinc-500 dark:text-zinc-400">{{ PhilippineMobileNumber::forDisplay($tenant->contact_number) }}</flux:text>
+                @endif
             </div>
 
             @php($lease = $tenant->leases->first())
@@ -415,6 +448,11 @@ new #[Title('Tenants')] class extends Component
                 <div>
                     <flux:heading size="lg">{{ $this->managingTenant->name }}</flux:heading>
                     <flux:text class="text-zinc-500 dark:text-zinc-400">{{ $this->managingTenant->email }}</flux:text>
+                    @if ($this->managingTenant->contact_number)
+                        <flux:link href="tel:{{ $this->managingTenant->contact_number }}" class="text-sm">{{ PhilippineMobileNumber::forDisplay($this->managingTenant->contact_number) }}</flux:link>
+                    @else
+                        <flux:text class="text-zinc-500 dark:text-zinc-400">{{ __('No mobile number yet') }}</flux:text>
+                    @endif
                 </div>
 
                 @if ($currentLease)
@@ -429,6 +467,13 @@ new #[Title('Tenants')] class extends Component
                                 &#8369;{{ number_format((float) $currentLease->currentRent->amount, 2) }}/mo
                             </flux:text>
                         @endif
+
+                        <flux:select wire:model.live="currentLeaseStayType" :label="__('Stay')" size="sm" class="mt-3">
+                            <flux:select.option value="">{{ __('Not set') }}</flux:select.option>
+                            @foreach (StayType::cases() as $stayType)
+                                <flux:select.option value="{{ $stayType->value }}">{{ __($stayType->label()) }}</flux:select.option>
+                            @endforeach
+                        </flux:select>
                     </div>
                 @endif
 
@@ -487,6 +532,13 @@ new #[Title('Tenants')] class extends Component
                             @endif
                         @endif
                     @endif
+
+                    <flux:select wire:model="stay_type" :label="__('Stay')">
+                        <flux:select.option value="">{{ __('Not set') }}</flux:select.option>
+                        @foreach (StayType::cases() as $stayType)
+                            <flux:select.option value="{{ $stayType->value }}">{{ __($stayType->label()) }} &middot; {{ __($stayType->description()) }}</flux:select.option>
+                        @endforeach
+                    </flux:select>
 
                     <flux:input wire:model="due_day" type="number" min="1" max="28" :label="__('Due day of month')" required />
 

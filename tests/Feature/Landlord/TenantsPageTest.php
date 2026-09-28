@@ -2,10 +2,13 @@
 
 use App\Enums\BillingTiming;
 use App\Enums\LeaseStatus;
+use App\Enums\ReservationStatus;
+use App\Enums\StayType;
 use App\Enums\TeamRole;
 use App\Enums\UnitStatus;
 use App\Models\Lease;
 use App\Models\Property;
+use App\Models\Reservation;
 use App\Models\Unit;
 use App\Models\User;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
@@ -158,6 +161,111 @@ test('opening a tenant with an existing lease prefills their current billing tim
     Livewire::test('pages::landlord.tenants')
         ->call('manageTenant', $tenant->id)
         ->assertSet('billing_timing', 'arrears');
+});
+
+test('the stay type chosen on a reservation is prefilled and carried to the lease', function () {
+    $landlord = User::factory()->create();
+    $tenant = User::factory()->create();
+    $landlord->currentTeam->members()->attach($tenant, ['role' => TeamRole::Tenant]);
+
+    $unit = Unit::factory()->for(Property::factory()->for($landlord->currentTeam))->readyForMoveIn()->create(['status' => UnitStatus::Vacant]);
+    Reservation::factory()->for($unit)->status(ReservationStatus::Approved)->create([
+        'tenant_user_id' => $tenant->id,
+        'stay_type' => StayType::ShortTerm,
+    ]);
+
+    $this->actingAs($landlord);
+
+    Livewire::test('pages::landlord.tenants')
+        ->call('manageTenant', $tenant->id)
+        ->assertSet('stay_type', 'short_term')
+        ->set('unit_id', $unit->id)
+        ->call('saveUnitAssignment')
+        ->assertHasNoErrors();
+
+    expect(Lease::where('tenant_id', $tenant->id)->firstOrFail()->stay_type)->toBe(StayType::ShortTerm);
+});
+
+test('a tenant assigned without a reservation gets whatever stay type the landlord picks, or none', function (string $picked, ?StayType $stored) {
+    $landlord = User::factory()->create();
+    $tenant = User::factory()->create();
+    $landlord->currentTeam->members()->attach($tenant, ['role' => TeamRole::Tenant]);
+
+    $unit = Unit::factory()->for(Property::factory()->for($landlord->currentTeam))->readyForMoveIn()->create(['status' => UnitStatus::Vacant]);
+
+    $this->actingAs($landlord);
+
+    Livewire::test('pages::landlord.tenants')
+        ->call('manageTenant', $tenant->id)
+        ->assertSet('stay_type', '')
+        ->set('unit_id', $unit->id)
+        ->set('stay_type', $picked)
+        ->call('saveUnitAssignment')
+        ->assertHasNoErrors();
+
+    expect(Lease::where('tenant_id', $tenant->id)->firstOrFail()->stay_type)->toBe($stored);
+})->with([
+    'long-term' => ['long_term', StayType::LongTerm],
+    'not set' => ['', null],
+]);
+
+test('an unknown stay type is rejected when assigning a unit', function () {
+    $landlord = User::factory()->create();
+    $tenant = User::factory()->create();
+    $landlord->currentTeam->members()->attach($tenant, ['role' => TeamRole::Tenant]);
+
+    $unit = Unit::factory()->for(Property::factory()->for($landlord->currentTeam))->readyForMoveIn()->create(['status' => UnitStatus::Vacant]);
+
+    $this->actingAs($landlord);
+
+    Livewire::test('pages::landlord.tenants')
+        ->call('manageTenant', $tenant->id)
+        ->set('unit_id', $unit->id)
+        ->set('stay_type', 'forever')
+        ->call('saveUnitAssignment')
+        ->assertHasErrors(['stay_type']);
+
+    expect(Lease::where('tenant_id', $tenant->id)->exists())->toBeFalse();
+});
+
+test('a landlord can change the stay type on a current lease without moving the tenant', function () {
+    $landlord = User::factory()->create();
+    $unit = Unit::factory()->for(Property::factory()->for($landlord->currentTeam))->create(['status' => UnitStatus::Occupied]);
+
+    $tenant = User::factory()->create();
+    $landlord->currentTeam->members()->attach($tenant, ['role' => TeamRole::Tenant]);
+    $lease = Lease::factory()->for($unit)->for($tenant, 'tenant')->create([
+        'status' => LeaseStatus::Active,
+        'stay_type' => StayType::ShortTerm,
+    ]);
+
+    $this->actingAs($landlord);
+
+    $component = Livewire::test('pages::landlord.tenants')
+        ->call('manageTenant', $tenant->id)
+        ->assertSet('currentLeaseStayType', 'short_term')
+        ->set('currentLeaseStayType', 'long_term')
+        ->assertHasNoErrors();
+
+    expect($lease->fresh()->stay_type)->toBe(StayType::LongTerm)
+        ->and($lease->fresh()->unit_id)->toBe($unit->id)
+        ->and(Lease::where('tenant_id', $tenant->id)->count())->toBe(1);
+
+    $component->set('currentLeaseStayType', 'forever')->assertHasErrors(['currentLeaseStayType']);
+
+    expect($lease->fresh()->stay_type)->toBe(StayType::LongTerm);
+});
+
+test('the tenant list shows each tenant\'s mobile number', function () {
+    $landlord = User::factory()->create();
+    $tenant = User::factory()->create(['contact_number' => '+639171234567']);
+    $landlord->currentTeam->members()->attach($tenant, ['role' => TeamRole::Tenant]);
+    $landlord->switchTeam($landlord->currentTeam);
+
+    $this->actingAs($landlord)
+        ->get(route('tenants'))
+        ->assertOk()
+        ->assertSee('0917 123 4567');
 });
 
 test('a unit that does not allow multiple tenants is unavailable once occupied', function () {
