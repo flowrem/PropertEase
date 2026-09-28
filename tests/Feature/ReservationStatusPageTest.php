@@ -232,3 +232,46 @@ test('each state explains what happens next', function (array $state, string $me
     'expired' => [['status' => ReservationStatus::Expired], 'No downpayment arrived by the deadline'],
     'rejected' => [['status' => ReservationStatus::Rejected, 'rejection_reason' => 'Unit already promised.'], 'Unit already promised.'],
 ]);
+
+test('the downpayment needs an account, an amount and an image of the receipt', function (array $values, string $field) {
+    [$reservation, $channel] = reservedForStatusPage();
+    grantStatusAccess($reservation);
+
+    $component = Livewire::test('pages::reservation-status', ['code' => $reservation->code]);
+
+    foreach ([
+        'payment_channel_id' => $channel->id,
+        'downpayment_amount' => '2000',
+        'downpayment_reference' => '1234567890',
+        'proof' => UploadedFile::fake()->image('receipt.png'),
+        ...$values,
+    ] as $key => $value) {
+        $component->set($key, $value);
+    }
+
+    $component->call('submitDownpayment')->assertHasErrors([$field]);
+
+    expect($reservation->fresh()->downpayment_submitted_at)->toBeNull();
+})->with([
+    'no account chosen' => [['payment_channel_id' => null], 'payment_channel_id'],
+    'zero amount' => [['downpayment_amount' => '0'], 'downpayment_amount'],
+    'no proof' => [['proof' => null], 'proof'],
+    'a pdf instead of an image' => [['proof' => UploadedFile::fake()->create('receipt.pdf', 100, 'application/pdf')], 'proof'],
+]);
+
+test('any amount is accepted when the listing sets no downpayment', function () {
+    [$reservation, $channel] = reservedForStatusPage();
+    $reservation->listing->forceFill(['downpayment_amount' => null])->save();
+    grantStatusAccess($reservation);
+
+    Livewire::test('pages::reservation-status', ['code' => $reservation->code])
+        ->assertSee('The landlord did not set an amount.')
+        ->set('payment_channel_id', $channel->id)
+        ->set('downpayment_amount', '500')
+        ->set('downpayment_reference', '1234567890')
+        ->set('proof', UploadedFile::fake()->image('receipt.png'))
+        ->call('submitDownpayment')
+        ->assertHasNoErrors();
+
+    expect($reservation->fresh()->downpayment_amount)->toEqual('500.00');
+});

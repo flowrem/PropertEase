@@ -1,5 +1,6 @@
 <?php
 
+use App\Enums\ReservationStatus;
 use App\Enums\StayType;
 use App\Enums\TeamRole;
 use App\Models\PaymentChannel;
@@ -50,14 +51,6 @@ new #[Layout('layouts::public'), Title('Reserve this unit')] class extends Compo
     public string $stay_type = '';
 
     public $valid_id = null;
-
-    public string $downpayment_amount = '';
-
-    public ?int $payment_channel_id = null;
-
-    public string $downpayment_reference = '';
-
-    public $proof = null;
 
     public bool $consent = false;
 
@@ -131,10 +124,9 @@ new #[Layout('layouts::public'), Title('Reserve this unit')] class extends Compo
         $this->desired_username = Str::lower(trim($this->desired_username));
         $this->email = Str::lower(trim($this->email));
 
-        $validated = $this->validate($this->reservationRules($listing, $teamId, $unit->id), $this->messages());
+        $validated = $this->validate($this->reservationRules($unit->id), $this->messages());
 
-        $channel = $this->channels->firstWhere('id', $validated['payment_channel_id']);
-        $reservation = DB::transaction(function () use ($validated, $listing, $unit, $teamId, $channel) {
+        $reservation = DB::transaction(function () use ($validated, $listing, $unit, $teamId) {
             $code = Reservation::generateCode();
             $disk = config('filesystems.sensitive_disk');
 
@@ -152,11 +144,6 @@ new #[Layout('layouts::public'), Title('Reserve this unit')] class extends Compo
                 'address' => trim($validated['address']),
                 'stay_type' => StayType::from($validated['stay_type']),
                 'valid_id_path' => $this->valid_id->store("reservations/{$code}", $disk),
-                'downpayment_amount' => $validated['downpayment_amount'],
-                'payment_channel_id' => $channel->id,
-                'downpayment_method' => $channel->method,
-                'downpayment_reference' => trim($validated['downpayment_reference']),
-                'downpayment_proof_path' => $this->proof->store("reservations/{$code}", $disk),
                 'consented_at' => now(),
             ]);
         });
@@ -168,23 +155,25 @@ new #[Layout('layouts::public'), Title('Reserve this unit')] class extends Compo
 
         RateLimiter::hit($submissionsKey, 3600);
 
+        session()->push(Reservation::STATUS_ACCESS_SESSION_KEY, $reservation->code);
+
         $this->submittedCode = $reservation->code;
-        $this->reset('desired_username', 'email', 'first_name', 'last_name', 'contact_number', 'age', 'address', 'stay_type', 'valid_id', 'downpayment_amount', 'payment_channel_id', 'downpayment_reference', 'proof', 'consent');
+        $this->reset('desired_username', 'email', 'first_name', 'last_name', 'contact_number', 'age', 'address', 'stay_type', 'valid_id', 'consent');
     }
 
     /**
      * @return array<string, array<int, mixed>>
      */
-    protected function reservationRules(UnitListing $listing, int $teamId, int $unitId): array
+    protected function reservationRules(int $unitId): array
     {
-        $minimumAmount = $listing->downpayment_amount !== null ? (float) $listing->downpayment_amount : 0.01;
+        $inProgress = [ReservationStatus::Pending->value, ReservationStatus::Reserved->value];
 
         return [
             'desired_username' => [
                 'required',
                 'regex:/^[a-z0-9._]{4,30}$/',
                 Rule::unique('users', 'username'),
-                Rule::unique('reservations', 'desired_username')->where('status', 'pending'),
+                Rule::unique('reservations', 'desired_username')->whereIn('status', $inProgress),
             ],
             'email' => [
                 'required',
@@ -193,7 +182,7 @@ new #[Layout('layouts::public'), Title('Reserve this unit')] class extends Compo
                 fn (string $attribute, mixed $value, Closure $fail) => User::whereRaw('lower(email) = ?', [Str::lower((string) $value)])->exists()
                     ? $fail(__('This email already has an account. Log in instead, or contact the landlord.'))
                     : null,
-                Rule::unique('reservations', 'email')->where('status', 'pending')->where('unit_id', $unitId),
+                Rule::unique('reservations', 'email')->whereIn('status', $inProgress)->where('unit_id', $unitId),
             ],
             'first_name' => ['required', 'string', 'max:100'],
             'last_name' => ['required', 'string', 'max:100'],
@@ -202,13 +191,6 @@ new #[Layout('layouts::public'), Title('Reserve this unit')] class extends Compo
             'address' => ['required', 'string', 'max:500'],
             'stay_type' => ['required', Rule::enum(StayType::class)],
             'valid_id' => ['required', 'file', 'mimes:jpg,jpeg,png,pdf', 'max:5120'],
-            'downpayment_amount' => ['required', 'numeric', 'min:'.$minimumAmount, 'max:99999999'],
-            'payment_channel_id' => [
-                'required',
-                Rule::exists('payment_channels', 'id')->where('team_id', $teamId)->where('is_active', true),
-            ],
-            'downpayment_reference' => ['required', 'string', 'min:4', 'max:50'],
-            'proof' => ['required', 'image', 'mimes:jpg,jpeg,png,webp', 'max:5120'],
             'consent' => ['accepted'],
         ];
     }
@@ -221,11 +203,9 @@ new #[Layout('layouts::public'), Title('Reserve this unit')] class extends Compo
         return [
             'desired_username.regex' => __('Use 4 to 30 lowercase letters, numbers, dots or underscores.'),
             'desired_username.unique' => __('That username is taken. Try another.'),
-            'email.unique' => __('You already have a pending reservation for this unit.'),
+            'email.unique' => __('You already have a reservation in progress for this unit.'),
             'age.min' => __('You must be at least :age years old to reserve.', ['age' => self::MINIMUM_AGE]),
             'stay_type.required' => __('Choose how long you plan to stay.'),
-            'payment_channel_id.required' => __('Choose the account you paid to.'),
-            'proof.required' => __('Upload a screenshot or photo of your payment receipt.'),
             'valid_id.required' => __('Upload a photo or scan of a valid ID.'),
             'consent.accepted' => __('You need to agree so the landlord can review your application.'),
         ];
@@ -249,8 +229,12 @@ new #[Layout('layouts::public'), Title('Reserve this unit')] class extends Compo
             <p class="mt-2 text-zinc-700">{{ __('Keep this reference code:') }}</p>
             <p class="mt-3 font-mono text-3xl tracking-widest text-zinc-900">{{ $submittedCode }}</p>
             <p class="mx-auto mt-4 max-w-md text-sm text-zinc-600">
-                {{ __('The landlord will review your details and payment. If approved, your login details will be sent to the email you gave. Nothing is confirmed until then.') }}
+                {{ __('The landlord will review your details. If they accept, we email you how to pay the downpayment and by when. Don\'t pay anything until then.') }}
             </p>
+            <a href="{{ route('reservations.status', ['code' => $submittedCode]) }}" class="mt-6 inline-block rounded-lg bg-brand-600 px-5 py-2.5 text-sm font-medium text-white hover:bg-brand-500">
+                {{ __('See your reservation') }}
+            </a>
+            <p class="mt-3 text-xs text-zinc-600">{{ __('You can also open it later from Check your reservation, with this code and your email.') }}</p>
         </div>
     @elseif ($this->channels->isEmpty())
         <div class="mt-8 rounded-xl border border-sand bg-white p-8 text-center">
@@ -268,79 +252,23 @@ new #[Layout('layouts::public'), Title('Reserve this unit')] class extends Compo
                 <input id="website" type="text" wire:model="website" tabindex="-1" autocomplete="off">
             </div>
 
-            <fieldset class="rounded-xl border border-sand bg-white p-6">
-                <legend class="px-2 text-lg font-semibold text-zinc-900">{{ __('1. Pay the downpayment') }}</legend>
-
-                <p class="text-zinc-700">
-                    @if ($this->listing->downpayment_amount !== null)
-                        {{ __('Downpayment requested:') }}
-                        <span class="font-semibold text-zinc-900">&#8369;{{ number_format((float) $this->listing->downpayment_amount, 2) }}</span>
-                    @else
-                        {{ __('The landlord did not set an amount. Ask them, then pay it below.') }}
-                    @endif
-                </p>
-                <p class="mt-1 text-sm text-amber-800">{{ __('Check that the account name matches the landlord before paying.') }}</p>
-
-                <div class="mt-5 grid gap-4 sm:grid-cols-2">
-                    @foreach ($this->channels as $channel)
-                        <label wire:key="channel-{{ $channel->id }}" class="flex cursor-pointer flex-col gap-3 rounded-lg border border-zinc-300 p-4 has-[:checked]:border-brand-500">
-                            <span class="flex items-center gap-2">
-                                <input type="radio" wire:model="payment_channel_id" value="{{ $channel->id }}" class="size-4">
-                                <span class="font-semibold text-zinc-900">{{ $channel->method->label() }}</span>
-                            </span>
-
-                            @if ($channel->qrUrl())
-                                <img
-                                    src="{{ $channel->qrUrl() }}"
-                                    alt="{{ __(':method QR code for :name', ['method' => $channel->method->label(), 'name' => $channel->account_name]) }}"
-                                    width="256"
-                                    height="256"
-                                    class="mx-auto size-64 max-w-full rounded bg-white object-contain"
-                                >
-                            @endif
-
-                            <span class="text-sm text-zinc-700">
-                                {{ $channel->account_name }}
-                                @if ($channel->bank_name)
-                                    <br>{{ $channel->bank_name }}
-                                @endif
-                                @if ($channel->account_number)
-                                    <br>{{ $channel->account_number }}
-                                @endif
-                            </span>
-                        </label>
-                    @endforeach
-                </div>
-                @error('payment_channel_id') <p class="mt-2 text-sm text-red-700">{{ $message }}</p> @enderror
-            </fieldset>
+            <div class="rounded-xl border border-sand bg-sand/30 p-6">
+                <h2 class="font-semibold text-zinc-900">{{ __('How reserving works') }}</h2>
+                <ol class="mt-3 list-decimal space-y-1 ps-5 text-sm text-zinc-700">
+                    <li>{{ __('Send your details below. Reserving is free.') }}</li>
+                    <li>
+                        {{ trans_choice('If the landlord accepts, the unit is held for you for :count day and we email you how to pay the downpayment.|If the landlord accepts, the unit is held for you for :count days and we email you how to pay the downpayment.', $property->team->reservation_hold_days) }}
+                        @if ($this->listing->downpayment_amount !== null)
+                            {{ __('The downpayment is :amount.', ['amount' => '₱'.number_format((float) $this->listing->downpayment_amount, 2)]) }}
+                        @endif
+                    </li>
+                    <li>{{ __('Once the landlord confirms your downpayment, your login details are emailed to you.') }}</li>
+                </ol>
+                <p class="mt-3 text-sm font-medium text-amber-800">{{ __('Don\'t pay anything until the landlord accepts.') }}</p>
+            </div>
 
             <fieldset class="rounded-xl border border-sand bg-white p-6">
-                <legend class="px-2 text-lg font-semibold text-zinc-900">{{ __('2. Your payment') }}</legend>
-
-                <div class="grid gap-4 sm:grid-cols-2">
-                    <div>
-                        <label for="downpayment_amount" class="mb-1 block text-sm text-zinc-700">{{ __('Amount you paid (PHP)') }}</label>
-                        <input id="downpayment_amount" type="number" step="0.01" min="0" wire:model="downpayment_amount" class="w-full rounded-lg border border-zinc-300 bg-brand-50 px-3 py-2 text-sm text-zinc-900">
-                        @error('downpayment_amount') <p class="mt-1 text-sm text-red-700">{{ $message }}</p> @enderror
-                    </div>
-
-                    <div>
-                        <label for="downpayment_reference" class="mb-1 block text-sm text-zinc-700">{{ __('Reference number') }}</label>
-                        <input id="downpayment_reference" type="text" maxlength="50" wire:model="downpayment_reference" class="w-full rounded-lg border border-zinc-300 bg-brand-50 px-3 py-2 text-sm text-zinc-900">
-                        @error('downpayment_reference') <p class="mt-1 text-sm text-red-700">{{ $message }}</p> @enderror
-                    </div>
-
-                    <div class="sm:col-span-2">
-                        <label for="proof" class="mb-1 block text-sm text-zinc-700">{{ __('Proof of payment (screenshot or photo of the receipt)') }}</label>
-                        <input id="proof" type="file" accept="image/jpeg,image/png,image/webp" wire:model="proof" class="w-full text-sm text-zinc-700">
-                        <p class="mt-1 text-xs text-zinc-600">{{ __('JPG, PNG or WebP, up to 5 MB. Only the landlord can see this.') }}</p>
-                        @error('proof') <p class="mt-1 text-sm text-red-700">{{ $message }}</p> @enderror
-                    </div>
-                </div>
-            </fieldset>
-
-            <fieldset class="rounded-xl border border-sand bg-white p-6">
-                <legend class="px-2 text-lg font-semibold text-zinc-900">{{ __('3. About you') }}</legend>
+                <legend class="px-2 text-lg font-semibold text-zinc-900">{{ __('Your details') }}</legend>
 
                 <div class="grid gap-4 sm:grid-cols-2">
                     <div>
@@ -427,7 +355,7 @@ new #[Layout('layouts::public'), Title('Reserve this unit')] class extends Compo
                 <button
                     type="submit"
                     wire:loading.attr="disabled"
-                    wire:target="submit,valid_id,proof"
+                    wire:target="submit,valid_id"
                     class="w-full rounded-lg bg-brand-600 px-6 py-3 text-sm font-medium text-white transition-colors hover:bg-brand-500 disabled:opacity-60 sm:w-auto"
                 >
                     <span wire:loading.remove wire:target="submit">{{ __('Send reservation') }}</span>

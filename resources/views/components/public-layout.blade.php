@@ -46,6 +46,8 @@
 
         <footer class="mx-auto w-full max-w-5xl px-6 py-10 text-center text-sm text-zinc-600 sm:px-8">
             &copy; {{ date('Y') }} {{ config('app.name') }}
+            &middot;
+            <a href="{{ route('reservations.lookup') }}" class="underline transition-colors hover:text-zinc-900" wire:navigate>{{ __('Check your reservation') }}</a>
             @guest
                 &middot;
                 <a href="{{ route('login') }}" class="underline transition-colors hover:text-zinc-900">{{ __('Landlord or tenant log in') }}</a>

@@ -1,7 +1,6 @@
 <?php
 
 use App\Enums\ListingStatus;
-use App\Enums\PaymentMethod;
 use App\Enums\ReservationStatus;
 use App\Enums\StayType;
 use App\Enums\TeamRole;
@@ -64,12 +63,8 @@ function reservationInput(PaymentChannel $channel, array $overrides = []): array
         'age' => '21',
         'address' => '12 Rizal St, Lipa',
         'stay_type' => 'long_term',
-        'downpayment_amount' => '2000',
-        'payment_channel_id' => $channel->id,
-        'downpayment_reference' => '1234567890123',
         'consent' => true,
         'valid_id' => UploadedFile::fake()->image('id.jpg'),
-        'proof' => UploadedFile::fake()->image('receipt.png'),
     ], $overrides);
 }
 
@@ -87,7 +82,7 @@ function submitReservation(UnitListing $listing, array $input): Testable
     return $component->call('submit');
 }
 
-test('a guest can submit a reservation and gets a reference code', function () {
+test('a guest can submit a reservation for free and gets a reference code and a link to it', function () {
     ['listing' => $listing, 'team' => $team, 'channel' => $channel] = reservableListing();
 
     $component = submitReservation($listing, reservationInput($channel))->assertHasNoErrors();
@@ -98,7 +93,9 @@ test('a guest can submit a reservation and gets a reference code', function () {
         ->and($reservation->team_id)->toBe($team->id)
         ->and($reservation->unit_id)->toBe($listing->unit_id)
         ->and($reservation->unit_listing_id)->toBe($listing->id)
-        ->and($reservation->downpayment_method)->toBe(PaymentMethod::Gcash)
+        ->and($reservation->downpayment_submitted_at)->toBeNull()
+        ->and($reservation->downpayment_proof_path)->toBeNull()
+        ->and($reservation->expires_at)->toBeNull()
         ->and($reservation->desired_username)->toBe('juan.tenant')
         ->and($reservation->age)->toBe(21)
         ->and($reservation->contact_number)->toBe('+639171234567')
@@ -106,10 +103,13 @@ test('a guest can submit a reservation and gets a reference code', function () {
         ->and($reservation->consented_at)->not->toBeNull()
         ->and(User::where('email', 'juan@example.com')->exists())->toBeFalse();
 
-    $component->assertSee($reservation->code);
+    $component->assertSee($reservation->code)
+        ->assertSeeHtml('href="'.route('reservations.status', ['code' => $reservation->code]).'"');
+
+    expect(session(Reservation::STATUS_ACCESS_SESSION_KEY))->toContain($reservation->code);
 });
 
-test('the id and payment proof are stored on the private sensitive disk only', function () {
+test('the id is stored on the private sensitive disk only', function () {
     ['listing' => $listing, 'channel' => $channel] = reservableListing();
 
     submitReservation($listing, reservationInput($channel))->assertHasNoErrors();
@@ -117,10 +117,15 @@ test('the id and payment proof are stored on the private sensitive disk only', f
     $reservation = Reservation::firstOrFail();
 
     Storage::disk('sensitive')->assertExists($reservation->valid_id_path);
-    Storage::disk('sensitive')->assertExists($reservation->downpayment_proof_path);
     Storage::disk('media')->assertMissing($reservation->valid_id_path);
-    Storage::disk('media')->assertMissing($reservation->downpayment_proof_path);
 });
+
+test('the form takes no payment details', function (string $field) {
+    ['listing' => $listing] = reservableListing();
+
+    expect(fn () => Livewire::test('pages::reserve', ['listing' => $listing->id])->set($field, 'anything'))
+        ->toThrow(PublicPropertyNotFoundException::class);
+})->with(['downpayment_amount', 'payment_channel_id', 'downpayment_reference', 'proof']);
 
 test('the team owner and managers are notified but staff are not', function () {
     ['listing' => $listing, 'team' => $team, 'channel' => $channel] = reservableListing();
@@ -140,14 +145,16 @@ test('the team owner and managers are notified but staff are not', function () {
         ->and($staff->notifications()->count())->toBe(0);
 });
 
-test('the form shows each payment channel with its QR and a reminder to check the account name', function () {
-    ['listing' => $listing, 'channel' => $channel] = reservableListing();
+test('the form explains reserving is free, how long the unit is held and the downpayment to pay later', function () {
+    ['listing' => $listing, 'team' => $team] = reservableListing();
+    $team->forceFill(['reservation_hold_days' => 5])->save();
 
     Livewire::test('pages::reserve', ['listing' => $listing->id])
-        ->assertSee('Maria Landlord')
-        ->assertSee($channel->qrUrl(), false)
-        ->assertSee('Check that the account name matches the landlord before paying.')
-        ->assertSee('2,000.00');
+        ->assertSee('Reserving is free.')
+        ->assertSee('the unit is held for you for 5 days')
+        ->assertSee('The downpayment is ₱2,000.00.')
+        ->assertSee('Don\'t pay anything until the landlord accepts.')
+        ->assertDontSee('Maria Landlord');
 });
 
 test('the form is replaced by a closed message when the team has no active payment channel', function () {
@@ -214,32 +221,6 @@ test('team id cannot be spoofed and always comes from the unit', function () {
         ->set('team_id', $otherTeam->id);
 })->throws(PublicPropertyNotFoundException::class);
 
-test('a payment channel from another team is rejected', function () {
-    ['listing' => $listing, 'channel' => $channel] = reservableListing();
-    $foreign = PaymentChannel::factory()->for(Team::factory()->create())->create();
-
-    submitReservation($listing, reservationInput($channel, ['payment_channel_id' => $foreign->id]))
-        ->assertHasErrors(['payment_channel_id']);
-
-    expect(Reservation::count())->toBe(0);
-});
-
-test('an inactive payment channel is rejected', function () {
-    ['listing' => $listing, 'team' => $team, 'channel' => $channel] = reservableListing();
-    $inactive = PaymentChannel::factory()->for($team)->inactive()->create();
-
-    submitReservation($listing, reservationInput($channel, ['payment_channel_id' => $inactive->id]))
-        ->assertHasErrors(['payment_channel_id']);
-});
-
-test('submitting without proof of payment fails', function () {
-    ['listing' => $listing, 'channel' => $channel] = reservableListing();
-
-    submitReservation($listing, reservationInput($channel, ['proof' => null]))->assertHasErrors(['proof']);
-
-    expect(Reservation::count())->toBe(0);
-});
-
 test('reservation input is validated', function (array $overrides, string $field) {
     ['listing' => $listing, 'channel' => $channel] = reservableListing();
 
@@ -255,11 +236,7 @@ test('reservation input is validated', function (array $overrides, string $field
     'under 18' => [['age' => '17'], 'age'],
     'not a number age' => [['age' => 'twenty'], 'age'],
     'no address' => [['address' => ''], 'address'],
-    'zero downpayment' => [['downpayment_amount' => '0'], 'downpayment_amount'],
-    'below the requested downpayment' => [['downpayment_amount' => '1999.99'], 'downpayment_amount'],
-    'reference too short' => [['downpayment_reference' => 'abc'], 'downpayment_reference'],
     'no consent' => [['consent' => false], 'consent'],
-    'no channel chosen' => [['payment_channel_id' => null], 'payment_channel_id'],
     'no contact number' => [['contact_number' => ''], 'contact_number'],
     'landline number' => [['contact_number' => '(043) 756 1234'], 'contact_number'],
     'mobile number one digit short' => [['contact_number' => '0917123456'], 'contact_number'],
@@ -306,19 +283,6 @@ test('the valid id must be a jpg, png or pdf under 5 MB', function () {
         ->assertHasErrors(['valid_id']);
     submitReservation($listing, reservationInput($channel, ['valid_id' => UploadedFile::fake()->create('id.pdf', 200, 'application/pdf')]))
         ->assertHasNoErrors();
-});
-
-test('the payment proof must be an image', function () {
-    ['listing' => $listing, 'channel' => $channel] = reservableListing();
-
-    submitReservation($listing, reservationInput($channel, ['proof' => UploadedFile::fake()->create('receipt.pdf', 100, 'application/pdf')]))
-        ->assertHasErrors(['proof']);
-});
-
-test('a downpayment is not enforced against a minimum when the listing sets none', function () {
-    ['listing' => $listing, 'channel' => $channel] = reservableListing(downpayment: null);
-
-    submitReservation($listing, reservationInput($channel, ['downpayment_amount' => '500']))->assertHasNoErrors();
 });
 
 test('usernames and emails already in use are rejected', function () {

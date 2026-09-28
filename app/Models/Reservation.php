@@ -58,8 +58,7 @@ use Illuminate\Support\Str;
  */
 #[Fillable([
     'code', 'unit_listing_id', 'unit_id', 'team_id', 'desired_username', 'email', 'first_name', 'last_name',
-    'contact_number', 'age', 'address', 'stay_type', 'valid_id_path', 'downpayment_amount', 'payment_channel_id',
-    'downpayment_method', 'downpayment_reference', 'downpayment_proof_path', 'consented_at',
+    'contact_number', 'age', 'address', 'stay_type', 'valid_id_path', 'consented_at',
 ])]
 class Reservation extends Model
 {
