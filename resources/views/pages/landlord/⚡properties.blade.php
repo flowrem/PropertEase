@@ -361,17 +361,24 @@ new #[Title('Properties')] class extends Component
                                     <x-unit-photo :unit="$unit" />
 
                                     <div class="absolute inset-x-2 top-2 flex flex-wrap items-start justify-between gap-1">
+                                        {{-- Flux badges are see-through, so each sits on a white chip to stay readable over any photo. --}}
                                         <div class="flex flex-wrap gap-1">
                                             @unless ($unit->hasLockedDetails())
-                                                <flux:badge color="amber" size="sm">{{ __('Details needed') }}</flux:badge>
+                                                <span class="inline-flex rounded-md bg-white shadow-sm">
+                                                    <flux:badge color="amber" size="sm">{{ __('Details needed') }}</flux:badge>
+                                                </span>
                                             @endunless
                                             @if ($unit->open_concerns_count > 0)
-                                                <flux:badge color="amber" size="sm">
-                                                    {{ trans_choice(':count open report|:count open reports', $unit->open_concerns_count) }}
-                                                </flux:badge>
+                                                <span class="inline-flex rounded-md bg-white shadow-sm">
+                                                    <flux:badge color="amber" size="sm">
+                                                        {{ trans_choice(':count open report|:count open reports', $unit->open_concerns_count) }}
+                                                    </flux:badge>
+                                                </span>
                                             @endif
                                         </div>
-                                        <flux:badge :color="$unit->status->color()" size="sm">{{ $unit->status->label() }}</flux:badge>
+                                        <span class="inline-flex rounded-md bg-white shadow-sm">
+                                            <flux:badge :color="$unit->status->color()" size="sm">{{ $unit->status->label() }}</flux:badge>
+                                        </span>
                                     </div>
                                 </div>
 
