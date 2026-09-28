@@ -19,6 +19,7 @@ use App\Models\User;
 use App\Notifications\ContractReady;
 use App\Notifications\TransferRequested;
 use App\Notifications\TransferUpdated;
+use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Notification;
 use Illuminate\Validation\ValidationException;
@@ -280,4 +281,74 @@ test('another tenant cannot withdraw someone else\'s request', function () {
 
     expect(Gate::forUser($other)->allows('withdraw', $transfer))->toBeFalse()
         ->and(Gate::forUser($lease->tenant)->allows('withdraw', $transfer))->toBeTrue();
+});
+
+test('a landlord approves from the Transfers page, which a notification link opens', function () {
+    Notification::fake();
+    ['landlord' => $landlord, 'lease' => $lease, 'to' => $to] = transferSetup();
+    $transfer = app(RequestTransfer::class)->handle($lease, $to, 'I need the ground floor.', now()->addWeek());
+    $landlord->switchTeam($landlord->currentTeam);
+
+    $this->actingAs($landlord)->get(route('transfers'))->assertOk()->assertSee('Juana Dela Cruz');
+
+    Livewire::withQueryParams(['transfer' => $transfer->id])
+        ->actingAs($landlord)
+        ->test('pages::landlord.transfers')
+        ->assertSet('showDetailModal', true)
+        ->assertSet('moveDate', now()->addWeek()->toDateString())
+        ->assertSee('Their rent would change from ₱4,500.00 to ₱5,200.00 per month.')
+        ->set('moveDate', now()->addDays(2)->toDateString())
+        ->call('approve')
+        ->assertHasNoErrors();
+
+    expect($transfer->fresh()->status)->toBe(TransferStatus::Approved)
+        ->and($transfer->fresh()->move_date->toDateString())->toBe(now()->addDays(2)->toDateString());
+});
+
+test('a landlord completes a due move from the Transfers page once the move-out check is recorded', function () {
+    Notification::fake();
+    ['landlord' => $landlord, 'tenant' => $tenant, 'lease' => $lease, 'from' => $from, 'to' => $to] = transferSetup();
+    $transfer = app(RequestTransfer::class)->handle($lease, $to, 'I need the ground floor.', now());
+    app(ReviewTransfer::class)->approve($transfer, $landlord, now());
+
+    $component = Livewire::actingAs($landlord)
+        ->test('pages::landlord.transfers')
+        ->call('open', $transfer->id)
+        ->assertSee('Move-out check of Unit 101');
+
+    recordMoveOutCheck($from);
+
+    $component->call('open', $transfer->id)
+        ->call('complete')
+        ->assertHasNoErrors();
+
+    expect($transfer->fresh()->status)->toBe(TransferStatus::Completed)
+        ->and($lease->fresh()->status)->toBe(LeaseStatus::Ended)
+        ->and($tenant->leases()->where('status', LeaseStatus::Active->value)->value('unit_id'))->toBe($to->id);
+});
+
+test('staff can see transfers but not decide them, and other teams cannot open them', function () {
+    Notification::fake();
+    ['landlord' => $landlord, 'lease' => $lease, 'to' => $to] = transferSetup();
+    $transfer = app(RequestTransfer::class)->handle($lease, $to, 'I need the ground floor.', now()->addWeek());
+    $staff = User::factory()->create();
+    $landlord->currentTeam->members()->attach($staff, ['role' => TeamRole::Member]);
+    $staff->switchTeam($landlord->currentTeam);
+
+    Livewire::actingAs($staff)
+        ->test('pages::landlord.transfers')
+        ->call('open', $transfer->id)
+        ->assertDontSeeHtml('wire:click="approve"')
+        ->call('approve')
+        ->assertForbidden();
+
+    expect($transfer->fresh()->status)->toBe(TransferStatus::Pending);
+
+    $outsider = User::factory()->create();
+
+    expect(fn () => Livewire::actingAs($outsider)->test('pages::landlord.transfers')->call('open', $transfer->id))
+        ->toThrow(ModelNotFoundException::class);
+
+    $lease->tenant->switchTeam($landlord->currentTeam);
+    $this->actingAs($lease->tenant)->get(route('transfers'))->assertForbidden();
 });

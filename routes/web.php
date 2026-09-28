@@ -73,6 +73,7 @@ Route::prefix('{current_team}')
                 ->name('units.inventory');
             Route::livewire('amenities', 'pages::landlord.amenities')->name('amenities');
             Route::livewire('tenants', 'pages::landlord.tenants')->name('tenants');
+            Route::livewire('transfers', 'pages::landlord.transfers')->name('transfers');
             Route::livewire('invoices', 'pages::landlord.invoices')->name('invoices');
             Route::livewire('requests/maintenance', 'pages::landlord.maintenance')->name('landlord.maintenance');
             Route::livewire('requests/complaints', 'pages::landlord.complaints')->name('landlord.complaints');

@@ -58,6 +58,15 @@
                             <flux:sidebar.item icon="users" :href="route('tenants')" :current="request()->routeIs('tenants', 'leases.contract')" wire:navigate>
                                 {{ __('Tenants') }}
                             </flux:sidebar.item>
+                            <flux:sidebar.item
+                                icon="arrows-right-left"
+                                :href="route('transfers')"
+                                :current="request()->routeIs('transfers')"
+                                :badge="\App\Models\TransferRequest::where('team_id', auth()->user()->current_team_id)->where('status', \App\Enums\TransferStatus::Pending->value)->count() ?: null"
+                                wire:navigate
+                            >
+                                {{ __('Transfers') }}
+                            </flux:sidebar.item>
                             <flux:sidebar.item icon="home-modern" :href="route('listings')" :current="request()->routeIs('listings')" wire:navigate>
                                 {{ __('Listings') }}
                             </flux:sidebar.item>
