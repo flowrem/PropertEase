@@ -1,5 +1,6 @@
 <?php
 
+use App\Actions\Contracts\GenerateLeaseContract;
 use App\Enums\BillingTiming;
 use App\Enums\LeaseStatus;
 use App\Enums\ReservationStatus;
@@ -283,9 +284,10 @@ new #[Title('Tenants')] class extends Component
     /**
      * Assign a unit to the tenant being managed, or move them to a different
      * one if they already have an active lease. Either way, rent on the
-     * affected unit(s) is re-split among whoever remains afterward.
+     * affected unit(s) is re-split among whoever remains afterward, and the
+     * new lease gets its contract from the landlord's current terms.
      */
-    public function saveUnitAssignment(): void
+    public function saveUnitAssignment(GenerateLeaseContract $generateLeaseContract): void
     {
         $tenant = $this->managingTenant;
 
@@ -351,6 +353,8 @@ new #[Title('Tenants')] class extends Component
 
         $unit->update(['status' => UnitStatus::Occupied]);
         $unit->splitRentAmongActiveTenants();
+
+        $generateLeaseContract->handle($lease->fresh(), Auth::user());
 
         $this->closeManageModal();
 

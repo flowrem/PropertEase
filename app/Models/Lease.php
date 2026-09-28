@@ -42,6 +42,7 @@ use Illuminate\Support\Carbon;
  * @property-read Collection<int, Document> $documents
  * @property-read Collection<int, Concern> $concerns
  * @property-read ConditionCheck|null $moveInCheck
+ * @property-read LeaseContract|null $contract
  */
 #[Fillable(['unit_id', 'tenant_id', 'start_date', 'end_date', 'due_day', 'billing_timing', 'stay_type', 'status', 'move_in_override_reason'])]
 class Lease extends Model
@@ -172,6 +173,16 @@ class Lease extends Model
     public function moveInCheck(): HasOne
     {
         return $this->hasOne(ConditionCheck::class)->where('kind', ConditionCheckKind::MoveIn->value);
+    }
+
+    /**
+     * The contract made for this lease, if any.
+     *
+     * @return HasOne<LeaseContract, $this>
+     */
+    public function contract(): HasOne
+    {
+        return $this->hasOne(LeaseContract::class);
     }
 
     /**
