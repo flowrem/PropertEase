@@ -116,7 +116,7 @@ test('editing a unit replaces its amenities but keeps a deactivated one it alrea
         ->call('updateUnit')
         ->assertHasNoErrors();
 
-    expect($unit->amenities()->pluck('name')->sort()->values()->all())->toBe(['Air conditioner', $retired->name]);
+    expect($unit->amenities()->pluck('name')->all())->toEqualCanonicalizing(['Air conditioner', $retired->name]);
 });
 
 test('the beds ticked on the form decide how many tenants a shared unit fits', function () {
