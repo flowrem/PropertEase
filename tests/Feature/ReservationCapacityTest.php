@@ -3,10 +3,12 @@
 use App\Enums\LeaseStatus;
 use App\Enums\ReservationStatus;
 use App\Enums\TeamRole;
+use App\Enums\TransferStatus;
 use App\Enums\UnitStatus;
 use App\Models\Lease;
 use App\Models\Property;
 use App\Models\Reservation;
+use App\Models\TransferRequest;
 use App\Models\Unit;
 use App\Models\User;
 use Livewire\Livewire;
@@ -190,4 +192,25 @@ test('a hold does not let a different tenant take the slot', function () {
 
     expect($reservation->fresh()->status)->toBe(ReservationStatus::Confirmed)
         ->and($unit->fresh()->activeLeaseCount())->toBe(0);
+});
+
+test('an approved transfer holds a slot in the unit the tenant is moving to, a pending one does not', function () {
+    $unit = Unit::factory()->create(['status' => UnitStatus::Vacant]);
+    $transfer = TransferRequest::factory()->create(['to_unit_id' => $unit->id]);
+
+    expect($unit->fresh()->hasRoomForAnotherTenant())->toBeTrue()
+        ->and(Unit::hasRoom()->whereKey($unit->id)->exists())->toBeTrue();
+
+    $transfer->forceFill(['status' => TransferStatus::Approved, 'move_date' => now()->addWeek()])->save();
+
+    expect($unit->fresh()->hasRoomForAnotherTenant())->toBeFalse()
+        ->and($unit->fresh()->hasRoomForAnotherTenant(excludingOwnHold: true))->toBeTrue()
+        ->and($unit->fresh()->slotsAvailable())->toBe(0)
+        ->and(Unit::hasRoom()->whereKey($unit->id)->exists())->toBeFalse()
+        ->and(Unit::withCount('incomingTransfers')->find($unit->id)->takenSlotCount())->toBe(1);
+
+    $transfer->forceFill(['status' => TransferStatus::Rejected])->save();
+
+    expect($unit->fresh()->hasRoomForAnotherTenant())->toBeTrue()
+        ->and(Unit::hasRoom()->whereKey($unit->id)->exists())->toBeTrue();
 });

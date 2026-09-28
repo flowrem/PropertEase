@@ -66,7 +66,7 @@ new #[Title('Properties')] class extends Component
             ->with(['units' => fn ($units) => $units
                 ->with(['activeLeases.tenant', 'activeLeases.currentInvoice'])
                 ->withBedSpaces()
-                ->withCount(['heldReservations', 'concerns as open_concerns_count' => fn ($concerns) => $concerns
+                ->withCount(['heldReservations', 'incomingTransfers', 'concerns as open_concerns_count' => fn ($concerns) => $concerns
                     ->where('concerns.status', '!=', ConcernStatus::Resolved->value)]),
             ])
             ->latest()

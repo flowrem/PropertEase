@@ -5,6 +5,7 @@ namespace App\Models;
 use App\Enums\ConditionCheckKind;
 use App\Enums\LeaseStatus;
 use App\Enums\PropertyType;
+use App\Enums\TransferStatus;
 use App\Enums\UnitStatus;
 use Carbon\CarbonImmutable;
 use Closure;
@@ -48,6 +49,8 @@ use Illuminate\Support\Facades\Storage;
  * @property-read Collection<int, Reservation> $reservations
  * @property-read Collection<int, Reservation> $heldReservations
  * @property-read int|null $held_reservations_count
+ * @property-read Collection<int, TransferRequest> $incomingTransfers
+ * @property-read int|null $incoming_transfers_count
  * @property-read int|string|null $bed_spaces
  * @property-read Collection<int, Concern> $concerns
  * @property-read Collection<int, UnitItem> $items
@@ -212,6 +215,35 @@ class Unit extends Model
     public function heldReservationCount(): int
     {
         return $this->held_reservations_count ?? $this->heldReservations()->count();
+    }
+
+    /**
+     * Approved transfers of tenants moving into this unit, holding a slot
+     * each until the move is completed, rejected or cancelled.
+     *
+     * @return HasMany<TransferRequest, $this>
+     */
+    public function incomingTransfers(): HasMany
+    {
+        return $this->hasMany(TransferRequest::class, 'to_unit_id')->where('status', TransferStatus::Approved->value);
+    }
+
+    /**
+     * Count the slots held by incoming transfers, reusing an eager-loaded
+     * count before falling back to a query.
+     */
+    public function incomingTransferCount(): int
+    {
+        return $this->incoming_transfers_count ?? $this->incomingTransfers()->count();
+    }
+
+    /**
+     * Slots held for someone who has not moved in yet: reservations and
+     * approved transfers.
+     */
+    public function heldSlotCount(): int
+    {
+        return $this->heldReservationCount() + $this->incomingTransferCount();
     }
 
     /**
@@ -437,11 +469,12 @@ class Unit extends Model
     }
 
     /**
-     * Count the slots taken by active tenants and held reservations.
+     * Count the slots taken by active tenants, held reservations and
+     * approved transfers into this unit.
      */
     public function takenSlotCount(): int
     {
-        return $this->activeLeaseCount() + $this->heldReservationCount();
+        return $this->activeLeaseCount() + $this->heldSlotCount();
     }
 
     /**
@@ -457,8 +490,8 @@ class Unit extends Model
 
     /**
      * Determine whether this unit currently has room for another tenant.
-     * Slots held by reserved and confirmed reservations count as taken; pass true when the
-     * person being assigned is the one holding one of them.
+     * Slots held by reservations and approved transfers count as taken; pass
+     * true when the person being assigned is the one holding one of them.
      */
     public function hasRoomForAnotherTenant(bool $excludingOwnHold = false): bool
     {
@@ -466,7 +499,7 @@ class Unit extends Model
             return false;
         }
 
-        $held = max(0, $this->heldReservationCount() - ($excludingOwnHold ? 1 : 0));
+        $held = max(0, $this->heldSlotCount() - ($excludingOwnHold ? 1 : 0));
 
         return $this->capacity() - $this->activeLeaseCount() - $held > 0;
     }
@@ -488,8 +521,9 @@ class Unit extends Model
         [$holdingSql, $holdingBindings] = Reservation::holdingSlotSql();
 
         $taken = '((select count(*) from leases where leases.unit_id = units.id and leases.status = ?)'
-            ." + (select count(*) from reservations where reservations.unit_id = units.id and {$holdingSql}))";
-        $takenBindings = [LeaseStatus::Active->value, ...$holdingBindings];
+            ." + (select count(*) from reservations where reservations.unit_id = units.id and {$holdingSql})"
+            .' + (select count(*) from transfer_requests where transfer_requests.to_unit_id = units.id and transfer_requests.status = ?))';
+        $takenBindings = [LeaseStatus::Active->value, ...$holdingBindings, TransferStatus::Approved->value];
 
         [$areaPerTenant, $areaPerTenantBindings] = self::perPropertyTypeSql(
             fn (PropertyType $type): float => $type->areaPerTenant(),

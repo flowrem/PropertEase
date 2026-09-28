@@ -25,7 +25,7 @@ class PublicListingController extends Controller
             ->publiclyVisible()
             ->with([
                 'photos',
-                'unit' => fn ($unit) => $unit->withCount(['activeLeases', 'heldReservations'])->withBedSpaces()->with('property'),
+                'unit' => fn ($unit) => $unit->withCount(['activeLeases', 'heldReservations', 'incomingTransfers'])->withBedSpaces()->with('property'),
             ])
             ->when($search !== '', function (Builder $query) use ($search) {
                 $term = '%'.addcslashes($search, '\\%_').'%';
@@ -78,7 +78,7 @@ class PublicListingController extends Controller
             ->publiclyVisible()
             ->with([
                 'photos',
-                'unit' => fn ($unit) => $unit->withCount(['activeLeases', 'heldReservations'])->withBedSpaces()->with(['property.team', 'amenities' => fn ($amenities) => $amenities->orderBy('name')]),
+                'unit' => fn ($unit) => $unit->withCount(['activeLeases', 'heldReservations', 'incomingTransfers'])->withBedSpaces()->with(['property.team', 'amenities' => fn ($amenities) => $amenities->orderBy('name')]),
             ])
             ->findOrFail($listing);
 
