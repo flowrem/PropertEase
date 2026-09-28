@@ -28,6 +28,37 @@ test('profile information can be updated', function () {
     expect($user->email_verified_at)->toBeNull();
 });
 
+test('a user can add, change and clear their mobile number', function (string $typed, ?string $stored) {
+    $user = User::factory()->create(['contact_number' => '+639170000000']);
+
+    $this->actingAs($user);
+
+    Livewire::test('pages::settings.profile')
+        ->assertSet('contact_number', '0917 000 0000')
+        ->set('contact_number', $typed)
+        ->call('updateProfileInformation')
+        ->assertHasNoErrors();
+
+    expect($user->refresh()->contact_number)->toBe($stored);
+})->with([
+    'local format' => ['0918 765 4321', '+639187654321'],
+    'international format' => ['+639187654321', '+639187654321'],
+    'cleared' => ['', null],
+]);
+
+test('an invalid mobile number is rejected on the profile', function () {
+    $user = User::factory()->create(['contact_number' => '+639170000000']);
+
+    $this->actingAs($user);
+
+    Livewire::test('pages::settings.profile')
+        ->set('contact_number', '12345')
+        ->call('updateProfileInformation')
+        ->assertHasErrors(['contact_number']);
+
+    expect($user->refresh()->contact_number)->toBe('+639170000000');
+});
+
 test('email verification status is unchanged when email address is unchanged', function () {
     $user = User::factory()->create();
 

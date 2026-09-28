@@ -1,6 +1,7 @@
 <?php
 
 use App\Concerns\ProfileValidationRules;
+use App\Rules\PhilippineMobileNumber;
 use Illuminate\Contracts\Auth\MustVerifyEmail;
 use Flux\Flux;
 use Illuminate\Support\Facades\Auth;
@@ -15,6 +16,8 @@ new #[Title('Profile settings')] class extends Component {
     public string $name = '';
     public string $email = '';
 
+    public string $contact_number = '';
+
     /**
      * Mount the component.
      */
@@ -22,6 +25,9 @@ new #[Title('Profile settings')] class extends Component {
     {
         $this->name = Auth::user()->name;
         $this->email = Auth::user()->email;
+        $this->contact_number = Auth::user()->contact_number
+            ? PhilippineMobileNumber::forDisplay(Auth::user()->contact_number)
+            : '';
     }
 
     /**
@@ -31,7 +37,14 @@ new #[Title('Profile settings')] class extends Component {
     {
         $user = Auth::user();
 
-        $validated = $this->validate($this->profileRules($user->id));
+        $validated = $this->validate([
+            ...$this->profileRules($user->id),
+            'contact_number' => ['nullable', 'string', 'max:20', new PhilippineMobileNumber],
+        ]);
+
+        $validated['contact_number'] = filled($validated['contact_number'])
+            ? PhilippineMobileNumber::normalize($validated['contact_number'])
+            : null;
 
         $user->fill($validated);
 
@@ -81,7 +94,7 @@ new #[Title('Profile settings')] class extends Component {
 
     <flux:heading level="2" class="sr-only">{{ __('Profile settings') }}</flux:heading>
 
-    <x-pages::settings.layout :heading="__('Profile')" :subheading="__('Update your name and email address')">
+    <x-pages::settings.layout :heading="__('Profile')" :subheading="__('Update your name, email address and mobile number')">
         <form wire:submit="updateProfileInformation" class="my-6 w-full space-y-6">
             <flux:input wire:model="name" :label="__('Name')" type="text" required autofocus autocomplete="name" />
 
@@ -106,6 +119,17 @@ new #[Title('Profile settings')] class extends Component {
                     </div>
                 @endif
             </div>
+
+            <flux:input
+                wire:model="contact_number"
+                :label="__('Mobile number')"
+                :description="__('Optional. Your landlord uses this to reach you.')"
+                type="tel"
+                inputmode="tel"
+                maxlength="20"
+                placeholder="0917 123 4567"
+                autocomplete="tel"
+            />
 
             <div class="flex items-center gap-4">
                 <div class="flex items-center justify-end">
