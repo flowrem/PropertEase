@@ -80,6 +80,9 @@ Route::prefix('{current_team}')
             Route::livewire('listings', 'pages::landlord.listings')->name('listings');
             Route::livewire('payment-settings', 'pages::landlord.payment-settings')->name('payment-settings');
             Route::livewire('contract-terms', 'pages::landlord.contract-terms')->name('contract-terms');
+            Route::livewire('leases/{lease}/contract', 'pages::landlord.lease-contract')
+                ->whereNumber('lease')
+                ->name('leases.contract');
             Route::livewire('reservations', 'pages::landlord.reservations')->name('reservations');
             Route::get('reservations/{reservation}/files/{kind}', ReservationFileController::class)
                 ->whereNumber('reservation')

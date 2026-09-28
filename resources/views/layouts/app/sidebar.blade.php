@@ -55,7 +55,7 @@
                             <flux:sidebar.item icon="sparkles" :href="route('amenities')" :current="request()->routeIs('amenities')" wire:navigate>
                                 {{ __('Amenities') }}
                             </flux:sidebar.item>
-                            <flux:sidebar.item icon="users" :href="route('tenants')" :current="request()->routeIs('tenants')" wire:navigate>
+                            <flux:sidebar.item icon="users" :href="route('tenants')" :current="request()->routeIs('tenants', 'leases.contract')" wire:navigate>
                                 {{ __('Tenants') }}
                             </flux:sidebar.item>
                             <flux:sidebar.item icon="home-modern" :href="route('listings')" :current="request()->routeIs('listings')" wire:navigate>
@@ -76,7 +76,7 @@
                             <flux:sidebar.item icon="qr-code" :href="route('payment-settings')" :current="request()->routeIs('payment-settings')" wire:navigate>
                                 {{ __('Payment settings') }}
                             </flux:sidebar.item>
-                            <flux:sidebar.item icon="document-text" :href="route('contract-terms')" :current="request()->routeIs('contract-terms', 'leases.contract')" wire:navigate>
+                            <flux:sidebar.item icon="document-text" :href="route('contract-terms')" :current="request()->routeIs('contract-terms')" wire:navigate>
                                 {{ __('Contract terms') }}
                             </flux:sidebar.item>
                             <flux:sidebar.item icon="wrench-screwdriver" :href="route('landlord.maintenance')" :current="request()->routeIs('landlord.maintenance', 'issue-types')" wire:navigate>

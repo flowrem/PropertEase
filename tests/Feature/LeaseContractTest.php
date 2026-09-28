@@ -15,6 +15,7 @@ use App\Models\Unit;
 use App\Models\UnitItem;
 use App\Models\User;
 use App\Notifications\ContractReady;
+use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Notification;
 use Illuminate\Validation\ValidationException;
@@ -259,4 +260,64 @@ test('the print page opens for the tenant and the landlord\'s side only', functi
 
     auth()->logout();
     $this->get($url)->assertRedirect(route('login'));
+});
+
+test('a landlord creates a contract for a tenant who moved in before contracts existed, and sees its status', function () {
+    Notification::fake();
+    [$landlord, $tenant, $unit] = contractSetup();
+    $lease = Lease::factory()->for($unit)->for($tenant, 'tenant')->create(['status' => LeaseStatus::Active]);
+    $landlord->switchTeam($landlord->currentTeam);
+
+    $this->actingAs($landlord)->get(route('leases.contract', ['lease' => $lease]))->assertOk()->assertSee('Not made yet');
+
+    Livewire::actingAs($landlord)
+        ->test('pages::landlord.lease-contract', ['lease' => $lease->id])
+        ->call('generate')
+        ->assertSee('Waiting for the tenant')
+        ->assertSee('Unit 101 of Sunrise Apartments');
+
+    expect($lease->fresh()->contract)->not->toBeNull();
+    Notification::assertSentTo($tenant, ContractReady::class);
+
+    Livewire::actingAs($landlord)->test('pages::landlord.tenants')
+        ->call('manageTenant', $tenant->id)
+        ->assertSee('Waiting for the tenant')
+        ->assertSeeHtml('href="'.route('leases.contract', ['lease' => $lease]).'"');
+});
+
+test('an agreed contract shows as agreed and offers no way to make it again', function () {
+    [$landlord, $tenant, $unit] = contractSetup();
+    $lease = Lease::factory()->for($unit)->for($tenant, 'tenant')->create(['status' => LeaseStatus::Active]);
+    LeaseContract::factory()->for($lease)->accepted()->create();
+
+    Livewire::actingAs($landlord)
+        ->test('pages::landlord.lease-contract', ['lease' => $lease->id])
+        ->assertSee('Agreed')
+        ->assertDontSee('Make again from current terms')
+        ->call('generate')
+        ->assertForbidden();
+});
+
+test('staff can read a tenant\'s contract but not make one, and other teams\' leases are not found', function () {
+    [$landlord, $tenant, $unit] = contractSetup();
+    $lease = Lease::factory()->for($unit)->for($tenant, 'tenant')->create(['status' => LeaseStatus::Active]);
+    $staff = User::factory()->create();
+    $landlord->currentTeam->members()->attach($staff, ['role' => TeamRole::Member]);
+    $staff->switchTeam($landlord->currentTeam);
+
+    Livewire::actingAs($staff)
+        ->test('pages::landlord.lease-contract', ['lease' => $lease->id])
+        ->assertDontSee('Create contract')
+        ->call('generate')
+        ->assertForbidden();
+
+    expect($lease->fresh()->contract)->toBeNull();
+
+    $tenant->switchTeam($landlord->currentTeam);
+    $this->actingAs($tenant)->get(route('leases.contract', ['lease' => $lease]))->assertForbidden();
+
+    $outsider = User::factory()->create();
+
+    expect(fn () => Livewire::actingAs($outsider)->test('pages::landlord.lease-contract', ['lease' => $lease->id]))
+        ->toThrow(ModelNotFoundException::class);
 });

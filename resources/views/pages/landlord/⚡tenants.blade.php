@@ -83,7 +83,7 @@ new #[Title('Tenants')] class extends Component
             ->with(['leases' => fn ($leases) => $leases
                 ->where('status', LeaseStatus::Active->value)
                 ->whereHas('unit.property', fn ($properties) => $properties->where('team_id', $this->team->id))
-                ->with(['unit.property', 'currentRent'])
+                ->with(['unit.property', 'currentRent', 'contract'])
                 ->latest(),
             ]);
     }
@@ -502,6 +502,18 @@ new #[Title('Tenants')] class extends Component
                                 &#8369;{{ number_format((float) $currentLease->currentRent->amount, 2) }}/mo
                             </flux:text>
                         @endif
+
+                        <div class="mt-2 flex items-center gap-2 text-sm">
+                            <flux:text>{{ __('Contract:') }}</flux:text>
+                            @if (! $currentLease->contract)
+                                <flux:badge size="sm" color="zinc">{{ __('Not made yet') }}</flux:badge>
+                            @elseif ($currentLease->contract->isAccepted())
+                                <flux:badge size="sm" color="lime">{{ __('Agreed') }}</flux:badge>
+                            @else
+                                <flux:badge size="sm" color="amber">{{ __('Waiting for the tenant') }}</flux:badge>
+                            @endif
+                            <flux:link :href="route('leases.contract', ['lease' => $currentLease])" wire:navigate>{{ __('View') }}</flux:link>
+                        </div>
 
                         <flux:select wire:model.live="currentLeaseStayType" :label="__('Stay')" size="sm" class="mt-3">
                             <flux:select.option value="">{{ __('Not set') }}</flux:select.option>

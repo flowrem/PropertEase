@@ -160,6 +160,7 @@ new #[Title('Unit')] class extends Component
                         <span>
                             {{ $lease->tenant->name }}
                             <span class="text-zinc-500">&middot; {{ __('since :date', ['date' => $lease->start_date->format('M j, Y')]) }}</span>
+                            &middot; <flux:link :href="route('leases.contract', ['lease' => $lease])" wire:navigate>{{ __('Contract') }}</flux:link>
                         </span>
                         @if ($lease->currentInvoice)
                             <flux:badge :color="$lease->currentInvoice->status->color()" size="sm">
