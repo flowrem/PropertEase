@@ -193,7 +193,7 @@ new #[Title('Tenants')] class extends Component
         return Reservation::query()
             ->where('team_id', $this->team->id)
             ->where('tenant_user_id', $tenant->id)
-            ->where('status', ReservationStatus::Approved->value)
+            ->where('status', ReservationStatus::Confirmed->value)
             ->first();
     }
 

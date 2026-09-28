@@ -30,7 +30,7 @@ class CancelReservation
         DB::transaction(function () use ($reservation, $reason) {
             $locked = Reservation::query()->lockForUpdate()->findOrFail($reservation->id);
 
-            if ($locked->status !== ReservationStatus::Approved) {
+            if ($locked->status !== ReservationStatus::Confirmed) {
                 throw ValidationException::withMessages(['reservation' => __('Only an approved reservation can be cancelled.')]);
             }
 

@@ -8,6 +8,7 @@ use App\Enums\StayType;
 use App\Models\PaymentChannel;
 use App\Models\Reservation;
 use App\Models\Unit;
+use Carbon\CarbonInterface;
 use Illuminate\Database\Eloquent\Factories\Factory;
 
 /**
@@ -36,17 +37,51 @@ class ReservationFactory extends Factory
             'address' => fake()->address(),
             'stay_type' => StayType::LongTerm,
             'valid_id_path' => 'reservations/'.fake()->uuid().'.jpg',
+            'consented_at' => now(),
+        ];
+    }
+
+    /**
+     * The applicant has paid and sent proof of the downpayment.
+     */
+    public function downpaymentSent(): static
+    {
+        return $this->state(fn () => [
             'downpayment_amount' => fake()->numberBetween(1000, 5000),
             'payment_channel_id' => fn (array $attributes) => PaymentChannel::factory()->for(Unit::query()->whereKey($attributes['unit_id'])->firstOrFail()->property->team),
             'downpayment_method' => PaymentMethod::Gcash,
             'downpayment_reference' => (string) fake()->numerify('#############'),
             'downpayment_proof_path' => 'reservations/'.fake()->uuid().'.png',
-            'consented_at' => now(),
-        ];
+            'downpayment_submitted_at' => now(),
+        ]);
+    }
+
+    /**
+     * Downpayment received and checked by the landlord.
+     */
+    public function confirmed(): static
+    {
+        return $this->downpaymentSent()->state(fn () => [
+            'status' => ReservationStatus::Confirmed,
+            'expires_at' => now()->addDays(3),
+            'downpayment_confirmed_at' => now(),
+        ]);
     }
 
     public function status(ReservationStatus $status): static
     {
         return $this->state(fn () => ['status' => $status]);
+    }
+
+    /**
+     * Accepted by the landlord and holding the unit until the deadline, with
+     * no downpayment sent yet.
+     */
+    public function reserved(?CarbonInterface $expiresAt = null): static
+    {
+        return $this->state(fn () => [
+            'status' => ReservationStatus::Reserved,
+            'expires_at' => $expiresAt ?? now()->addDays(3),
+        ]);
     }
 }

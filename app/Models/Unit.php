@@ -5,7 +5,6 @@ namespace App\Models;
 use App\Enums\ConditionCheckKind;
 use App\Enums\LeaseStatus;
 use App\Enums\PropertyType;
-use App\Enums\ReservationStatus;
 use App\Enums\UnitStatus;
 use Carbon\CarbonImmutable;
 use Closure;
@@ -194,19 +193,21 @@ class Unit extends Model
     }
 
     /**
-     * Approved reservations that are holding a slot until they are fulfilled,
-     * cancelled or rejected.
+     * Reservations holding a slot: confirmed ones, and reserved ones still
+     * within their downpayment deadline (see Reservation::scopeHoldingSlot()).
      *
      * @return HasMany<Reservation, $this>
      */
     public function heldReservations(): HasMany
     {
-        return $this->hasMany(Reservation::class)->where('status', ReservationStatus::Approved->value);
+        [$sql, $bindings] = Reservation::holdingSlotSql();
+
+        return $this->hasMany(Reservation::class)->whereRaw($sql, $bindings);
     }
 
     /**
-     * Count the slots held by approved reservations, reusing an eager-loaded
-     * count before falling back to a query.
+     * Count the slots held by reservations, reusing an eager-loaded count
+     * before falling back to a query.
      */
     public function heldReservationCount(): int
     {
@@ -436,7 +437,7 @@ class Unit extends Model
     }
 
     /**
-     * Count the slots taken by active tenants and approved reservations.
+     * Count the slots taken by active tenants and held reservations.
      */
     public function takenSlotCount(): int
     {
@@ -456,7 +457,7 @@ class Unit extends Model
 
     /**
      * Determine whether this unit currently has room for another tenant.
-     * Slots held by approved reservations count as taken; pass true when the
+     * Slots held by reserved and confirmed reservations count as taken; pass true when the
      * person being assigned is the one holding one of them.
      */
     public function hasRoomForAnotherTenant(bool $excludingOwnHold = false): bool
@@ -484,9 +485,11 @@ class Unit extends Model
      */
     public function scopeHasRoom(Builder $query): void
     {
+        [$holdingSql, $holdingBindings] = Reservation::holdingSlotSql();
+
         $taken = '((select count(*) from leases where leases.unit_id = units.id and leases.status = ?)'
-            .' + (select count(*) from reservations where reservations.unit_id = units.id and reservations.status = ?))';
-        $takenBindings = [LeaseStatus::Active->value, ReservationStatus::Approved->value];
+            ." + (select count(*) from reservations where reservations.unit_id = units.id and {$holdingSql}))";
+        $takenBindings = [LeaseStatus::Active->value, ...$holdingBindings];
 
         [$areaPerTenant, $areaPerTenantBindings] = self::perPropertyTypeSql(
             fn (PropertyType $type): float => $type->areaPerTenant(),

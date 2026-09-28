@@ -29,12 +29,15 @@ use Illuminate\Support\Str;
  * @property string $address
  * @property StayType|null $stay_type
  * @property string $valid_id_path
- * @property string $downpayment_amount
+ * @property string|null $downpayment_amount
  * @property int|null $payment_channel_id
- * @property PaymentMethod $downpayment_method
- * @property string $downpayment_reference
+ * @property PaymentMethod|null $downpayment_method
+ * @property string|null $downpayment_reference
  * @property string|null $downpayment_proof_path
+ * @property Carbon|null $downpayment_submitted_at
  * @property ReservationStatus $status
+ * @property Carbon|null $expires_at
+ * @property Carbon|null $expired_at
  * @property int|null $reviewed_by
  * @property Carbon|null $reviewed_at
  * @property string|null $rejection_reason
@@ -86,9 +89,67 @@ class Reservation extends Model
             'reviewed_at' => 'datetime',
             'consented_at' => 'datetime',
             'downpayment_confirmed_at' => 'datetime',
+            'downpayment_submitted_at' => 'datetime',
+            'expires_at' => 'datetime',
+            'expired_at' => 'datetime',
             'cancelled_at' => 'datetime',
             'files_pruned_at' => 'datetime',
         ];
+    }
+
+    /**
+     * Reservations holding a slot on their unit: confirmed ones, and reserved
+     * ones whose downpayment deadline has not passed. A reserved one stops
+     * holding the moment its deadline passes, even before the hourly job
+     * marks it expired, since that job can be missed while the server sleeps.
+     *
+     * @param  Builder<Reservation>  $query
+     */
+    public function scopeHoldingSlot(Builder $query): void
+    {
+        [$sql, $bindings] = self::holdingSlotSql();
+
+        $query->whereRaw($sql, $bindings);
+    }
+
+    /**
+     * The same rule as scopeHoldingSlot(), as raw SQL on `reservations` for
+     * the capacity subqueries in Unit::scopeHasRoom().
+     *
+     * @return array{0: literal-string, 1: array<int, mixed>}
+     */
+    public static function holdingSlotSql(): array
+    {
+        return [
+            '(reservations.status = ? or (reservations.status = ? and reservations.expires_at > ?))',
+            [ReservationStatus::Confirmed->value, ReservationStatus::Reserved->value, now()],
+        ];
+    }
+
+    /**
+     * Whether this reservation holds a slot right now (see scopeHoldingSlot()).
+     */
+    public function holdsSlot(): bool
+    {
+        return $this->status === ReservationStatus::Confirmed
+            || ($this->status === ReservationStatus::Reserved && ! $this->isPastDeadline());
+    }
+
+    /**
+     * Whether a reserved reservation's downpayment deadline has passed.
+     */
+    public function isPastDeadline(): bool
+    {
+        return $this->status === ReservationStatus::Reserved
+            && ($this->expires_at === null || ! $this->expires_at->isFuture());
+    }
+
+    /**
+     * Whether the applicant can still send their downpayment proof.
+     */
+    public function acceptsDownpayment(): bool
+    {
+        return $this->status === ReservationStatus::Reserved && ! $this->isPastDeadline();
     }
 
     /**

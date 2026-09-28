@@ -169,7 +169,7 @@ test('the stay type chosen on a reservation is prefilled and carried to the leas
     $landlord->currentTeam->members()->attach($tenant, ['role' => TeamRole::Tenant]);
 
     $unit = Unit::factory()->for(Property::factory()->for($landlord->currentTeam))->readyForMoveIn()->create(['status' => UnitStatus::Vacant]);
-    Reservation::factory()->for($unit)->status(ReservationStatus::Approved)->create([
+    Reservation::factory()->for($unit)->status(ReservationStatus::Confirmed)->create([
         'tenant_user_id' => $tenant->id,
         'stay_type' => StayType::ShortTerm,
     ]);

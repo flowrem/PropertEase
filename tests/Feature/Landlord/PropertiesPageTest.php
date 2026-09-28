@@ -533,7 +533,7 @@ test('a shared unit\'s limit snaps back up to the tenants and reservations alrea
         'tenant_limit' => 4,
     ]);
     Lease::factory()->for($unit)->count(2)->create(['status' => LeaseStatus::Active]);
-    Reservation::factory()->for($unit)->status(ReservationStatus::Approved)->create();
+    Reservation::factory()->for($unit)->status(ReservationStatus::Confirmed)->create();
 
     $this->actingAs($user);
 

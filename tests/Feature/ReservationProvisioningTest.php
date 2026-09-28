@@ -29,7 +29,7 @@ function pendingReservation(array $overrides = []): array
 {
     $landlord = User::factory()->create();
     $unit = Unit::factory()->for(Property::factory()->for($landlord->currentTeam))->create(['status' => UnitStatus::Vacant]);
-    $reservation = Reservation::factory()->for($unit)->create($overrides);
+    $reservation = Reservation::factory()->for($unit)->downpaymentSent()->create($overrides);
 
     return [$landlord, $reservation];
 }
@@ -53,7 +53,7 @@ test('approving creates exactly one tenant account, membership and hold', functi
     $tenant = app(ApproveReservation::class)->handle($reservation, $landlord, true);
 
     $fresh = $reservation->fresh();
-    expect($fresh->status)->toBe(ReservationStatus::Approved)
+    expect($fresh->status)->toBe(ReservationStatus::Confirmed)
         ->and($fresh->tenant_user_id)->toBe($tenant->id)
         ->and($fresh->reviewed_by)->toBe($landlord->id)
         ->and($fresh->downpayment_confirmed_at)->not->toBeNull()
@@ -129,7 +129,7 @@ test('approval fails cleanly when the email got an account meanwhile', function 
 test('approval fails cleanly when the unit filled up meanwhile', function () {
     Notification::fake();
     [$landlord, $reservation] = pendingReservation();
-    Reservation::factory()->for($reservation->unit)->status(ReservationStatus::Approved)->create();
+    Reservation::factory()->for($reservation->unit)->status(ReservationStatus::Confirmed)->create();
 
     expect(fn () => app(ApproveReservation::class)->handle($reservation, $landlord, true))
         ->toThrow(ValidationException::class);

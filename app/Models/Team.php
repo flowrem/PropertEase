@@ -29,6 +29,7 @@ use Illuminate\Support\Carbon;
  * @property string|null $verification_id_path
  * @property Carbon|null $verification_submitted_at
  * @property Carbon|null $verification_id_pruned_at
+ * @property int $reservation_hold_days
  * @property-read Collection<int, TeamInvitation> $invitations
  * @property-read Collection<int, Membership> $memberships
  * @property-read Collection<int, PaymentChannel> $paymentChannels
@@ -40,6 +41,13 @@ class Team extends Model
 {
     /** @use HasFactory<TeamFactory> */
     use GeneratesUniqueTeamSlugs, HasFactory, SoftDeletes;
+
+    /**
+     * @var array<string, mixed>
+     */
+    protected $attributes = [
+        'reservation_hold_days' => 3,
+    ];
 
     /**
      * Bootstrap the model and its traits.
@@ -204,6 +212,7 @@ class Team extends Model
             'rejected_at' => 'datetime',
             'verification_submitted_at' => 'datetime',
             'verification_id_pruned_at' => 'datetime',
+            'reservation_hold_days' => 'integer',
         ];
     }
 

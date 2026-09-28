@@ -11,19 +11,37 @@ use App\Models\Unit;
 use App\Models\User;
 use Livewire\Livewire;
 
-test('an approved reservation holds the only slot of a vacant unit', function () {
+test('a confirmed reservation holds the only slot of a vacant unit', function () {
     $unit = Unit::factory()->create(['status' => UnitStatus::Vacant]);
 
     expect($unit->hasRoomForAnotherTenant())->toBeTrue();
 
-    Reservation::factory()->for($unit)->status(ReservationStatus::Approved)->create();
+    Reservation::factory()->for($unit)->status(ReservationStatus::Confirmed)->create();
 
     expect($unit->fresh()->hasRoomForAnotherTenant())->toBeFalse()
         ->and($unit->fresh()->slotsAvailable())->toBe(0)
         ->and(Unit::hasRoom()->whereKey($unit->id)->exists())->toBeFalse();
 });
 
-test('pending, rejected, cancelled and fulfilled reservations hold nothing', function (ReservationStatus $status) {
+test('a reserved reservation holds its slot until its deadline, then frees it before any job runs', function () {
+    $unit = Unit::factory()->create(['status' => UnitStatus::Vacant]);
+    $reservation = Reservation::factory()->for($unit)->reserved(now()->addDays(3))->create();
+
+    expect($unit->fresh()->hasRoomForAnotherTenant())->toBeFalse()
+        ->and(Unit::hasRoom()->whereKey($unit->id)->exists())->toBeFalse()
+        ->and($reservation->holdsSlot())->toBeTrue();
+
+    $this->travel(3)->days();
+    $this->travel(1)->minutes();
+
+    expect($reservation->fresh()->status)->toBe(ReservationStatus::Reserved)
+        ->and($reservation->fresh()->holdsSlot())->toBeFalse()
+        ->and($unit->fresh()->hasRoomForAnotherTenant())->toBeTrue()
+        ->and($unit->fresh()->slotsAvailable())->toBe(1)
+        ->and(Unit::hasRoom()->whereKey($unit->id)->exists())->toBeTrue();
+});
+
+test('pending, rejected, cancelled, expired and fulfilled reservations hold nothing', function (ReservationStatus $status) {
     $unit = Unit::factory()->create(['status' => UnitStatus::Vacant]);
 
     Reservation::factory()->for($unit)->status($status)->create();
@@ -34,6 +52,7 @@ test('pending, rejected, cancelled and fulfilled reservations hold nothing', fun
     ReservationStatus::Pending,
     ReservationStatus::Rejected,
     ReservationStatus::Cancelled,
+    ReservationStatus::Expired,
     ReservationStatus::Fulfilled,
 ]);
 
@@ -45,12 +64,12 @@ test('held reservations and active leases share a multi-tenant unit capacity', f
     ]);
 
     Lease::factory()->for($unit)->create(['status' => LeaseStatus::Active]);
-    Reservation::factory()->for($unit)->status(ReservationStatus::Approved)->create();
+    Reservation::factory()->for($unit)->status(ReservationStatus::Confirmed)->create();
 
     expect($unit->fresh()->slotsAvailable())->toBe(1)
         ->and($unit->fresh()->hasRoomForAnotherTenant())->toBeTrue();
 
-    Reservation::factory()->for($unit)->status(ReservationStatus::Approved)->create();
+    Reservation::factory()->for($unit)->status(ReservationStatus::Confirmed)->create();
 
     expect($unit->fresh()->slotsAvailable())->toBe(0)
         ->and($unit->fresh()->hasRoomForAnotherTenant())->toBeFalse()
@@ -66,7 +85,7 @@ test('a holder can be assigned to their held unit and the reservation becomes fu
         'status' => UnitStatus::Vacant,
         'price' => 5000,
     ]);
-    $reservation = Reservation::factory()->for($unit)->status(ReservationStatus::Approved)->create([
+    $reservation = Reservation::factory()->for($unit)->status(ReservationStatus::Confirmed)->create([
         'tenant_user_id' => $tenant->id,
     ]);
 
@@ -89,7 +108,7 @@ test('opening a holder picks their reserved unit and labels it', function () {
     $landlord->currentTeam->members()->attach($tenant, ['role' => TeamRole::Tenant]);
 
     $unit = Unit::factory()->for(Property::factory()->for($landlord->currentTeam))->create(['status' => UnitStatus::Vacant]);
-    Reservation::factory()->for($unit)->status(ReservationStatus::Approved)->create(['tenant_user_id' => $tenant->id]);
+    Reservation::factory()->for($unit)->status(ReservationStatus::Confirmed)->create(['tenant_user_id' => $tenant->id]);
 
     $this->actingAs($landlord);
 
@@ -107,7 +126,7 @@ test('moving a holder into a different unit fulfills the reservation and frees t
     $property = Property::factory()->for($landlord->currentTeam)->create();
     $reservedUnit = Unit::factory()->for($property)->create(['status' => UnitStatus::Vacant]);
     $otherUnit = Unit::factory()->for($property)->readyForMoveIn()->create(['status' => UnitStatus::Vacant]);
-    $reservation = Reservation::factory()->for($reservedUnit)->status(ReservationStatus::Approved)->create([
+    $reservation = Reservation::factory()->for($reservedUnit)->status(ReservationStatus::Confirmed)->create([
         'tenant_user_id' => $tenant->id,
     ]);
 
@@ -130,7 +149,7 @@ test('the tenant in the address opens their manage modal, but not another team\'
     $landlord->currentTeam->members()->attach($tenant, ['role' => TeamRole::Tenant]);
 
     $unit = Unit::factory()->for(Property::factory()->for($landlord->currentTeam))->create(['status' => UnitStatus::Vacant]);
-    Reservation::factory()->for($unit)->status(ReservationStatus::Approved)->create(['tenant_user_id' => $tenant->id]);
+    Reservation::factory()->for($unit)->status(ReservationStatus::Confirmed)->create(['tenant_user_id' => $tenant->id]);
 
     $outsider = User::factory()->create();
     $otherLandlord = User::factory()->create();
@@ -157,7 +176,7 @@ test('a hold does not let a different tenant take the slot', function () {
     $landlord->currentTeam->members()->attach($other, ['role' => TeamRole::Tenant]);
 
     $unit = Unit::factory()->for(Property::factory()->for($landlord->currentTeam))->create(['status' => UnitStatus::Vacant]);
-    $reservation = Reservation::factory()->for($unit)->status(ReservationStatus::Approved)->create([
+    $reservation = Reservation::factory()->for($unit)->status(ReservationStatus::Confirmed)->create([
         'tenant_user_id' => $holder->id,
     ]);
 
@@ -169,6 +188,6 @@ test('a hold does not let a different tenant take the slot', function () {
         ->call('saveUnitAssignment')
         ->assertForbidden();
 
-    expect($reservation->fresh()->status)->toBe(ReservationStatus::Approved)
+    expect($reservation->fresh()->status)->toBe(ReservationStatus::Confirmed)
         ->and($unit->fresh()->activeLeaseCount())->toBe(0);
 });

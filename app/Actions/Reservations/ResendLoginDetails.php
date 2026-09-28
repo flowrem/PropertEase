@@ -28,7 +28,7 @@ class ResendLoginDetails
             $locked = Reservation::query()->lockForUpdate()->findOrFail($reservation->id);
             $tenant = $locked->tenant_user_id ? User::query()->lockForUpdate()->find($locked->tenant_user_id) : null;
 
-            if ($locked->status !== ReservationStatus::Approved || ! $tenant?->must_change_password) {
+            if ($locked->status !== ReservationStatus::Confirmed || ! $tenant?->must_change_password) {
                 throw ValidationException::withMessages([
                     'reservation' => __('Login details can only be resent before the tenant has set their own password.'),
                 ]);

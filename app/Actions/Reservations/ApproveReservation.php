@@ -63,7 +63,7 @@ class ApproveReservation
             ]);
 
             $locked->forceFill([
-                'status' => ReservationStatus::Approved,
+                'status' => ReservationStatus::Confirmed,
                 'tenant_user_id' => $tenant->id,
                 'reviewed_by' => $reviewer->id,
                 'reviewed_at' => now(),

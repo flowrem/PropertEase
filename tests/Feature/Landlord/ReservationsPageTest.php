@@ -23,7 +23,7 @@ function landlordWithReservation(): array
     $landlord = User::factory()->create();
     $unit = Unit::factory()->for(Property::factory()->for($landlord->currentTeam))->create(['status' => UnitStatus::Vacant]);
 
-    return [$landlord, Reservation::factory()->for($unit)->create()];
+    return [$landlord, Reservation::factory()->for($unit)->downpaymentSent()->create()];
 }
 
 function reservationTeamMember(User $landlord, TeamRole $role): User
@@ -76,7 +76,7 @@ test('an approved reservation links to moving the tenant in, a pending one does 
         ->assertDontSee('Move in');
 
     $tenant = User::factory()->create();
-    $reservation->forceFill(['status' => ReservationStatus::Approved, 'tenant_user_id' => $tenant->id])->save();
+    $reservation->forceFill(['status' => ReservationStatus::Confirmed, 'tenant_user_id' => $tenant->id])->save();
     $landlord->switchTeam($landlord->currentTeam);
 
     Livewire::test('pages::landlord.reservations')
@@ -96,7 +96,7 @@ test('a landlord can approve a reservation with the downpayment confirmed', func
         ->call('approve')
         ->assertHasNoErrors();
 
-    expect($reservation->fresh()->status)->toBe(ReservationStatus::Approved);
+    expect($reservation->fresh()->status)->toBe(ReservationStatus::Confirmed);
     Notification::assertSentTimes(TenantAccountCreated::class, 1);
 });
 

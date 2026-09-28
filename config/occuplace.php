@@ -34,6 +34,23 @@ return [
 
     ],
 
+    /*
+    |--------------------------------------------------------------------------
+    | Reservations
+    |--------------------------------------------------------------------------
+    |
+    | How many days an accepted reservation holds the unit while the landlord
+    | waits for the downpayment. Each landlord picks their own within these
+    | bounds (the brief's default of 3, from 1 to 14).
+    |
+    */
+
+    'reservations' => [
+
+        'hold_days' => ['default' => 3, 'min' => 1, 'max' => 14],
+
+    ],
+
     'units' => [
 
         'floor_area' => ['min' => 6, 'max' => 70],

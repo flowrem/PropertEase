@@ -79,7 +79,7 @@ new #[Title('Admin dashboard')] class extends Component
             'units' => Unit::count(),
             'activeLeases' => Lease::where('status', LeaseStatus::Active->value)->count(),
             'pendingReservations' => Reservation::where('status', ReservationStatus::Pending->value)->count(),
-            'heldReservations' => Reservation::where('status', ReservationStatus::Approved->value)->count(),
+            'heldReservations' => Reservation::holdingSlot()->count(),
         ];
     }
 

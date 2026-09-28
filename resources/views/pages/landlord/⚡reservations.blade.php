@@ -383,7 +383,7 @@ new #[Title('Reservations')] class extends Component
                     @endif
                 @endif
 
-                @if ($reservation->status === ReservationStatus::Approved && $reservation->tenant_user_id)
+                @if ($reservation->status === ReservationStatus::Confirmed && $reservation->tenant_user_id)
                     <div class="flex items-center justify-between gap-3 rounded-lg border border-zinc-200 p-4 dark:border-zinc-700">
                         <flux:text class="text-zinc-500">
                             {{ __('The unit is held for this tenant. Move them in when they arrive to start their lease and rent.') }}
@@ -394,7 +394,7 @@ new #[Title('Reservations')] class extends Component
                     </div>
                 @endif
 
-                @if ($this->canReview && $reservation->status === ReservationStatus::Approved)
+                @if ($this->canReview && $reservation->status === ReservationStatus::Confirmed)
                     @if ($cancelling)
                         <div class="space-y-3">
                             <flux:callout variant="warning" icon="exclamation-triangle">
@@ -425,7 +425,7 @@ new #[Title('Reservations')] class extends Component
                     </flux:callout>
                 @endif
 
-                @if ($this->canReview && $reservation->status === ReservationStatus::Approved && $reservation->tenant?->must_change_password)
+                @if ($this->canReview && $reservation->status === ReservationStatus::Confirmed && $reservation->tenant?->must_change_password)
                     <div class="flex items-center justify-between gap-3 rounded-lg border border-zinc-200 p-4 dark:border-zinc-700">
                         <flux:text class="text-zinc-500">
                             {{ __('The applicant has not logged in yet. Send a fresh temporary password if the email never arrived or expired.') }}

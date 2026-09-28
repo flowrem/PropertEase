@@ -169,7 +169,7 @@ test('the dashboard shows landlord review counts and platform totals', function 
     Team::factory()->awaitingApproval()->count(2)->create();
     Team::factory()->rejectedByAdmin()->create();
     Team::factory()->create();
-    Reservation::factory()->status(ReservationStatus::Approved)->create();
+    Reservation::factory()->status(ReservationStatus::Confirmed)->create();
 
     $this->actingAs(superAdmin());
 
