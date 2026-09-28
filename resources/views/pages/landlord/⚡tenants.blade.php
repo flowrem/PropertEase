@@ -22,12 +22,18 @@ use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 use Livewire\Attributes\Computed;
 use Livewire\Attributes\Title;
+use Livewire\Attributes\Url;
 use Livewire\Component;
 
 new #[Title('Tenants')] class extends Component
 {
     public bool $showManageModal = false;
 
+    /**
+     * The tenant open in the manage modal, kept in the address so a
+     * reservation's "Move in" button can link straight to them.
+     */
+    #[Url(as: 'tenant')]
     public ?int $managingTenantId = null;
 
     public ?int $unit_id = null;
@@ -191,19 +197,44 @@ new #[Title('Tenants')] class extends Component
             ->first();
     }
 
+    /**
+     * Open the tenant named in the address, if they are one of this team's.
+     */
+    public function mount(): void
+    {
+        if ($this->managingTenantId && $this->managingTenant) {
+            $this->manageTenant($this->managingTenantId);
+        } else {
+            $this->managingTenantId = null;
+        }
+    }
+
+    /**
+     * Open the manage modal. A tenant holding a reservation starts with the
+     * reserved unit picked, so moving them in is one click.
+     */
     public function manageTenant(int $tenantId): void
     {
         $this->managingTenantId = $tenantId;
         $this->showManageModal = true;
 
         $lease = $this->managingTenant?->leases->first();
+        $heldReservation = $this->managingTenant ? $this->approvedReservationFor($this->managingTenant) : null;
 
-        $this->unit_id = null;
+        $this->unit_id = $heldReservation && $heldReservation->unit_id !== $lease?->unit_id ? $heldReservation->unit_id : null;
         $this->due_day = $lease?->due_day ?? 1;
         $this->billing_timing = $lease?->billing_timing->value ?? BillingTiming::Advance->value;
         $this->currentLeaseStayType = $lease?->stay_type?->value ?? '';
-        $heldReservation = $this->managingTenant ? $this->approvedReservationFor($this->managingTenant) : null;
         $this->stay_type = $lease?->stay_type?->value ?? $heldReservation?->stay_type?->value ?? '';
+    }
+
+    /**
+     * The unit the tenant being managed has reserved, if any.
+     */
+    #[Computed]
+    public function reservedUnitId(): ?int
+    {
+        return $this->managingTenant ? $this->approvedReservationFor($this->managingTenant)?->unit_id : null;
     }
 
     /**
@@ -302,9 +333,9 @@ new #[Title('Tenants')] class extends Component
             $currentLease->end(LeaseStatus::Ended);
         }
 
-        if ($holdsThisUnit) {
-            $heldReservation->forceFill(['status' => ReservationStatus::Fulfilled])->save();
-        }
+        // The reservation is done once the tenant moves in anywhere on this
+        // team, so a move into a different unit also releases the held slot.
+        $heldReservation?->forceFill(['status' => ReservationStatus::Fulfilled])->save();
 
         $lease = $unit->leases()->create([
             'tenant_id' => $tenant->id,
@@ -486,6 +517,9 @@ new #[Title('Tenants')] class extends Component
                                 &mdash; &#8369;{{ number_format((float) $unit->price, 2) }}/mo
                                 @if ($unit->allows_multiple_tenants && $unit->tenant_limit !== null)
                                     ({{ $unit->active_leases_count }}/{{ $unit->capacity() }} {{ __('tenants') }})
+                                @endif
+                                @if ($unit->id === $this->reservedUnitId)
+                                    &middot; {{ __('Reserved by this tenant') }}
                                 @endif
                             </flux:select.option>
                         @endforeach
