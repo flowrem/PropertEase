@@ -599,6 +599,15 @@ class Unit extends Model
     }
 
     /**
+     * What one more tenant moving in would pay: the price split among the
+     * current tenants plus them.
+     */
+    public function rentShareForNewcomer(): float
+    {
+        return $this->rentSharePerTenant($this->activeLeaseCount() + 1);
+    }
+
+    /**
      * Record every active tenant's equal share of this unit's price as their
      * new rent. Call after the price changes or a tenant is added or removed.
      *

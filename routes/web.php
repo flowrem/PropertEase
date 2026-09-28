@@ -50,6 +50,7 @@ Route::prefix('{current_team}')
         Route::livewire('announcements', 'pages::announcements')->name('announcements');
         Route::livewire('unit-checks', 'pages::unit-checks')->name('unit-checks');
         Route::livewire('contract', 'pages::contract')->name('contract');
+        Route::livewire('transfer', 'pages::transfer')->name('transfer');
         Route::get('contracts/{contract}/print', ContractPrintController::class)
             ->whereNumber('contract')
             ->name('contracts.print');

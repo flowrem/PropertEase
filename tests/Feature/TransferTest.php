@@ -19,8 +19,10 @@ use App\Models\User;
 use App\Notifications\ContractReady;
 use App\Notifications\TransferRequested;
 use App\Notifications\TransferUpdated;
+use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Notification;
 use Illuminate\Validation\ValidationException;
+use Livewire\Livewire;
 
 /**
  * A landlord with a tenant living in Unit 101 and a vacant Unit 202 ready
@@ -215,4 +217,67 @@ test('completing the move needs the new unit\'s move-in check or the landlord\'s
     $newLease = app(CompleteTransfer::class)->handle($transfer->fresh(), $landlord, 'Tenant agreed to move before the check.');
 
     expect($newLease->move_in_override_reason)->toBe('Tenant agreed to move before the check.');
+});
+
+test('a tenant sees their rent change, sends a request from the Transfer page and can withdraw it', function () {
+    Notification::fake();
+    ['landlord' => $landlord, 'tenant' => $tenant, 'to' => $to] = transferSetup();
+    $tenant->switchTeam($landlord->currentTeam);
+
+    $this->actingAs($tenant)->get(route('transfer'))->assertOk()->assertSee('Unit 202');
+
+    Livewire::actingAs($tenant)
+        ->test('pages::transfer')
+        ->set('to_unit_id', $to->id)
+        ->assertSee('Your rent would change from ₱4,500.00 to ₱5,200.00 per month.')
+        ->set('preferred_date', now()->addWeek()->toDateString())
+        ->set('reason', 'I need the ground floor.')
+        ->call('submit')
+        ->assertHasNoErrors()
+        ->assertSee('Waiting for your landlord.')
+        ->call('withdraw')
+        ->assertSee('Earlier requests');
+
+    expect(TransferRequest::firstOrFail()->status)->toBe(TransferStatus::Cancelled);
+});
+
+test('the Transfer page validates the request and only offers the landlord\'s units with room', function (array $input, string $field) {
+    Notification::fake();
+    ['landlord' => $landlord, 'tenant' => $tenant, 'to' => $to] = transferSetup();
+    $foreignUnit = Unit::factory()->create(['status' => UnitStatus::Vacant]);
+    $tenant->switchTeam($landlord->currentTeam);
+
+    $component = Livewire::actingAs($tenant)
+        ->test('pages::transfer')
+        ->assertDontSee('Unit '.$foreignUnit->unit_number.' ');
+
+    foreach ([
+        'to_unit_id' => $to->id,
+        'preferred_date' => now()->addWeek()->toDateString(),
+        'reason' => 'I need the ground floor.',
+        ...array_map(fn ($value) => $value instanceof Closure ? $value($foreignUnit) : $value, $input),
+    ] as $key => $value) {
+        $component->set($key, $value);
+    }
+
+    $component->call('submit')->assertHasErrors([$field]);
+
+    expect(TransferRequest::count())->toBe(0);
+})->with([
+    'no unit' => [['to_unit_id' => null], 'to_unit_id'],
+    'another landlord\'s unit' => [['to_unit_id' => fn (Unit $foreignUnit) => $foreignUnit->id], 'to_unit_id'],
+    'a date in the past' => [['preferred_date' => '2020-01-01'], 'preferred_date'],
+    'more than 90 days ahead' => [['preferred_date' => '2099-01-01'], 'preferred_date'],
+    'a short reason' => [['reason' => 'Move me'], 'reason'],
+]);
+
+test('another tenant cannot withdraw someone else\'s request', function () {
+    Notification::fake();
+    ['landlord' => $landlord, 'lease' => $lease, 'to' => $to] = transferSetup();
+    $transfer = app(RequestTransfer::class)->handle($lease, $to, 'Please move me.', now()->addWeek());
+    $other = User::factory()->create();
+    $landlord->currentTeam->members()->attach($other, ['role' => TeamRole::Tenant]);
+
+    expect(Gate::forUser($other)->allows('withdraw', $transfer))->toBeFalse()
+        ->and(Gate::forUser($lease->tenant)->allows('withdraw', $transfer))->toBeTrue();
 });
