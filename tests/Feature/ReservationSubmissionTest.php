@@ -3,6 +3,7 @@
 use App\Enums\ListingStatus;
 use App\Enums\PaymentMethod;
 use App\Enums\ReservationStatus;
+use App\Enums\StayType;
 use App\Enums\TeamRole;
 use App\Enums\UnitStatus;
 use App\Models\ListingPhoto;
@@ -59,8 +60,10 @@ function reservationInput(PaymentChannel $channel, array $overrides = []): array
         'email' => 'juan@example.com',
         'first_name' => 'Juan',
         'last_name' => 'Dela Cruz',
+        'contact_number' => '09171234567',
         'age' => '21',
         'address' => '12 Rizal St, Lipa',
+        'stay_type' => 'long_term',
         'downpayment_amount' => '2000',
         'payment_channel_id' => $channel->id,
         'downpayment_reference' => '1234567890123',
@@ -98,6 +101,8 @@ test('a guest can submit a reservation and gets a reference code', function () {
         ->and($reservation->downpayment_method)->toBe(PaymentMethod::Gcash)
         ->and($reservation->desired_username)->toBe('juan.tenant')
         ->and($reservation->age)->toBe(21)
+        ->and($reservation->contact_number)->toBe('+639171234567')
+        ->and($reservation->stay_type)->toBe(StayType::LongTerm)
         ->and($reservation->consented_at)->not->toBeNull()
         ->and(User::where('email', 'juan@example.com')->exists())->toBeFalse();
 
@@ -255,7 +260,36 @@ test('reservation input is validated', function (array $overrides, string $field
     'reference too short' => [['downpayment_reference' => 'abc'], 'downpayment_reference'],
     'no consent' => [['consent' => false], 'consent'],
     'no channel chosen' => [['payment_channel_id' => null], 'payment_channel_id'],
+    'no contact number' => [['contact_number' => ''], 'contact_number'],
+    'landline number' => [['contact_number' => '(043) 756 1234'], 'contact_number'],
+    'mobile number one digit short' => [['contact_number' => '0917123456'], 'contact_number'],
+    'mobile number one digit long' => [['contact_number' => '091712345678'], 'contact_number'],
+    'foreign number' => [['contact_number' => '+14155550123'], 'contact_number'],
+    'letters in the number' => [['contact_number' => '0917abc4567'], 'contact_number'],
+    'no stay type' => [['stay_type' => ''], 'stay_type'],
+    'unknown stay type' => [['stay_type' => 'forever'], 'stay_type'],
 ]);
+
+test('a mobile number in either format is stored as +639XXXXXXXXX', function (string $typed) {
+    ['listing' => $listing, 'channel' => $channel] = reservableListing();
+
+    submitReservation($listing, reservationInput($channel, ['contact_number' => $typed]))->assertHasNoErrors();
+
+    expect(Reservation::firstOrFail()->contact_number)->toBe('+639171234567');
+})->with([
+    'local' => '09171234567',
+    'international' => '+639171234567',
+    'local with spaces' => '0917 123 4567',
+    'international with dashes' => '+63-917-123-4567',
+]);
+
+test('a short-term stay is stored on the reservation', function () {
+    ['listing' => $listing, 'channel' => $channel] = reservableListing();
+
+    submitReservation($listing, reservationInput($channel, ['stay_type' => 'short_term']))->assertHasNoErrors();
+
+    expect(Reservation::firstOrFail()->stay_type)->toBe(StayType::ShortTerm);
+});
 
 test('age 18 is accepted', function () {
     ['listing' => $listing, 'channel' => $channel] = reservableListing();

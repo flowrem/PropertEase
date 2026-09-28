@@ -1,11 +1,13 @@
 <?php
 
+use App\Enums\StayType;
 use App\Enums\TeamRole;
 use App\Models\PaymentChannel;
 use App\Models\Reservation;
 use App\Models\UnitListing;
 use App\Models\User;
 use App\Notifications\ReservationSubmitted;
+use App\Rules\PhilippineMobileNumber;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\RateLimiter;
@@ -39,9 +41,13 @@ new #[Layout('layouts::public'), Title('Reserve this unit')] class extends Compo
 
     public string $last_name = '';
 
+    public string $contact_number = '';
+
     public string $age = '';
 
     public string $address = '';
+
+    public string $stay_type = '';
 
     public $valid_id = null;
 
@@ -141,8 +147,10 @@ new #[Layout('layouts::public'), Title('Reserve this unit')] class extends Compo
                 'email' => $validated['email'],
                 'first_name' => trim($validated['first_name']),
                 'last_name' => trim($validated['last_name']),
+                'contact_number' => PhilippineMobileNumber::normalize($validated['contact_number']),
                 'age' => (int) $validated['age'],
                 'address' => trim($validated['address']),
+                'stay_type' => StayType::from($validated['stay_type']),
                 'valid_id_path' => $this->valid_id->store("reservations/{$code}", $disk),
                 'downpayment_amount' => $validated['downpayment_amount'],
                 'payment_channel_id' => $channel->id,
@@ -161,7 +169,7 @@ new #[Layout('layouts::public'), Title('Reserve this unit')] class extends Compo
         RateLimiter::hit($submissionsKey, 3600);
 
         $this->submittedCode = $reservation->code;
-        $this->reset('desired_username', 'email', 'first_name', 'last_name', 'age', 'address', 'valid_id', 'downpayment_amount', 'payment_channel_id', 'downpayment_reference', 'proof', 'consent');
+        $this->reset('desired_username', 'email', 'first_name', 'last_name', 'contact_number', 'age', 'address', 'stay_type', 'valid_id', 'downpayment_amount', 'payment_channel_id', 'downpayment_reference', 'proof', 'consent');
     }
 
     /**
@@ -189,8 +197,10 @@ new #[Layout('layouts::public'), Title('Reserve this unit')] class extends Compo
             ],
             'first_name' => ['required', 'string', 'max:100'],
             'last_name' => ['required', 'string', 'max:100'],
+            'contact_number' => ['required', 'string', 'max:20', new PhilippineMobileNumber],
             'age' => ['required', 'integer', 'min:'.self::MINIMUM_AGE, 'max:120'],
             'address' => ['required', 'string', 'max:500'],
+            'stay_type' => ['required', Rule::enum(StayType::class)],
             'valid_id' => ['required', 'file', 'mimes:jpg,jpeg,png,pdf', 'max:5120'],
             'downpayment_amount' => ['required', 'numeric', 'min:'.$minimumAmount, 'max:99999999'],
             'payment_channel_id' => [
@@ -213,6 +223,7 @@ new #[Layout('layouts::public'), Title('Reserve this unit')] class extends Compo
             'desired_username.unique' => __('That username is taken. Try another.'),
             'email.unique' => __('You already have a pending reservation for this unit.'),
             'age.min' => __('You must be at least :age years old to reserve.', ['age' => self::MINIMUM_AGE]),
+            'stay_type.required' => __('Choose how long you plan to stay.'),
             'payment_channel_id.required' => __('Choose the account you paid to.'),
             'proof.required' => __('Upload a screenshot or photo of your payment receipt.'),
             'valid_id.required' => __('Upload a photo or scan of a valid ID.'),
@@ -357,11 +368,34 @@ new #[Layout('layouts::public'), Title('Reserve this unit')] class extends Compo
                         @error('email') <p class="mt-1 text-sm text-red-700">{{ $message }}</p> @enderror
                     </div>
 
+                    <div>
+                        <label for="contact_number" class="mb-1 block text-sm text-zinc-700">{{ __('Mobile number') }}</label>
+                        <input id="contact_number" type="tel" maxlength="20" wire:model="contact_number" autocomplete="tel" inputmode="tel" placeholder="0917 123 4567" class="w-full rounded-lg border border-zinc-300 bg-brand-50 px-3 py-2 text-sm text-zinc-900">
+                        <p class="mt-1 text-xs text-zinc-600">{{ __('The landlord uses this to reach you about the reservation.') }}</p>
+                        @error('contact_number') <p class="mt-1 text-sm text-red-700">{{ $message }}</p> @enderror
+                    </div>
+
                     <div class="sm:col-span-2">
                         <label for="address" class="mb-1 block text-sm text-zinc-700">{{ __('Home address') }}</label>
                         <input id="address" type="text" maxlength="500" wire:model="address" autocomplete="street-address" class="w-full rounded-lg border border-zinc-300 bg-brand-50 px-3 py-2 text-sm text-zinc-900">
                         @error('address') <p class="mt-1 text-sm text-red-700">{{ $message }}</p> @enderror
                     </div>
+
+                    <fieldset class="sm:col-span-2">
+                        <legend class="mb-1 text-sm text-zinc-700">{{ __('How long do you plan to stay?') }}</legend>
+                        <div class="grid gap-3 sm:grid-cols-2">
+                            @foreach (StayType::cases() as $stayType)
+                                <label wire:key="stay-{{ $stayType->value }}" class="flex cursor-pointer items-start gap-3 rounded-lg border border-zinc-300 p-3 has-[:checked]:border-brand-500">
+                                    <input type="radio" wire:model="stay_type" value="{{ $stayType->value }}" class="mt-0.5 size-4">
+                                    <span>
+                                        <span class="block text-sm font-medium text-zinc-900">{{ __($stayType->label()) }}</span>
+                                        <span class="block text-xs text-zinc-600">{{ __($stayType->description()) }}</span>
+                                    </span>
+                                </label>
+                            @endforeach
+                        </div>
+                        @error('stay_type') <p class="mt-1 text-sm text-red-700">{{ $message }}</p> @enderror
+                    </fieldset>
 
                     <div class="sm:col-span-2">
                         <label for="desired_username" class="mb-1 block text-sm text-zinc-700">{{ __('Username you want to log in with') }}</label>
