@@ -71,6 +71,22 @@ test('the detail view shows the team\'s active payment channels only', function 
         ->assertDontSee('Other Team Account');
 });
 
+test('each card shows the listing\'s details before it is opened', function () {
+    $landlord = User::factory()->create();
+    $listing = pendingListingFor($landlord);
+    $property = $listing->unit->property;
+
+    $this->actingAs(superAdmin());
+
+    Livewire::test('pages::admin.listings')
+        ->assertSee($listing->title)
+        ->assertSee($property->name)
+        ->assertSee('Unit '.$listing->unit->unit_number)
+        ->assertSee($property->type->label())
+        ->assertSee($property->city)
+        ->assertSee('Landlord: '.$landlord->currentTeam->name);
+});
+
 test('clicking a listing expands its review, and clicking it again collapses it', function () {
     $landlord = User::factory()->create();
     $listing = pendingListingFor($landlord);

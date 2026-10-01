@@ -27,7 +27,7 @@ new #[Title('Listing review')] class extends Component
     public function queue(): Collection
     {
         return UnitListing::where('status', ListingStatus::PendingReview)
-            ->with('unit.property')
+            ->with(['unit.property.team', 'photos'])
             ->orderBy('submitted_at')
             ->get();
     }
@@ -147,110 +147,140 @@ new #[Title('Listing review')] class extends Component
         <flux:subheading>{{ __('Listings waiting for approval, oldest first.') }}</flux:subheading>
     </div>
 
-    @forelse ($this->queue as $queuedListing)
-        @php($isOpen = $selectedListingId === $queuedListing->id)
-        <div wire:key="queue-{{ $queuedListing->id }}" class="rounded-xl border border-zinc-200 dark:border-zinc-700">
-            <div
-                wire:click="toggle({{ $queuedListing->id }})"
-                class="flex w-full cursor-pointer items-center justify-between gap-4 p-4 text-left"
-            >
-                <div>
-                    <flux:heading>{{ $queuedListing->title }}</flux:heading>
-                    <flux:text class="text-zinc-500 dark:text-zinc-400">
-                        {{ $queuedListing->unit->property->name }} &middot; {{ __('Unit :number', ['number' => $queuedListing->unit->unit_number]) }}
-                    </flux:text>
-                </div>
-
-                <div class="flex shrink-0 items-center gap-3">
-                    <flux:badge color="zinc">
-                        {{ __('Submitted :time', ['time' => $queuedListing->submitted_at?->diffForHumans()]) }}
-                    </flux:badge>
-                    @if ($isOpen)
-                        <flux:icon.chevron-up class="size-4 text-zinc-500" />
-                    @else
-                        <flux:icon.chevron-down class="size-4 text-zinc-500" />
-                    @endif
-                </div>
-            </div>
-
-            @if ($isOpen && $this->selectedListing)
-                @php($listing = $this->selectedListing)
-                @php($property = $listing->unit->property)
-
-                <div class="flex flex-col gap-5 border-t border-zinc-200 p-4 dark:border-zinc-700">
-                    <flux:text class="text-zinc-500">
-                        {{ $property->team->name }} &middot; {{ $property->name }} ({{ $property->type->label() }})
-                    </flux:text>
-
-                    @if ($listing->photos->isNotEmpty())
-                        <div class="grid grid-cols-2 gap-3 sm:grid-cols-4">
-                            @foreach ($listing->photos as $photo)
-                                <img src="{{ $photo->url() }}" alt="" loading="lazy" width="160" height="120" class="aspect-[4/3] w-full rounded object-cover">
-                            @endforeach
-                        </div>
-                    @else
-                        <flux:text class="text-amber-400">{{ __('This listing has no photos.') }}</flux:text>
-                    @endif
-
-                    <flux:text class="whitespace-pre-line">{{ $listing->description }}</flux:text>
-
-                    <dl class="grid gap-3 text-sm sm:grid-cols-2">
-                        <div>
-                            <dt class="text-zinc-500">{{ __('Address') }}</dt>
-                            <dd>{{ $property->address_line }}, {{ $property->city }}, {{ $property->province }} {{ $property->postal_code }}</dd>
-                        </div>
-                        <div>
-                            <dt class="text-zinc-500">{{ __('Monthly price') }}</dt>
-                            <dd>&#8369;{{ number_format((float) $listing->unit->price, 2) }}</dd>
-                        </div>
-                        <div>
-                            <dt class="text-zinc-500">{{ __('Contact') }}</dt>
-                            <dd>{{ $listing->contact_name }} &middot; {{ $listing->contact_phone }} &middot; {{ $listing->contact_email }}</dd>
-                        </div>
-                        <div>
-                            <dt class="text-zinc-500">{{ __('Downpayment requested') }}</dt>
-                            <dd>{{ $listing->downpayment_amount !== null ? '₱'.number_format((float) $listing->downpayment_amount, 2) : __('Not set') }}</dd>
-                        </div>
-                    </dl>
-
-                    <div class="flex flex-col gap-3">
-                        <flux:heading size="sm">{{ __('Payment channels') }}</flux:heading>
-                        @forelse ($this->paymentChannels as $channel)
-                            <div wire:key="channel-{{ $channel->id }}" class="flex gap-4 rounded-lg border border-zinc-200 p-3 dark:border-zinc-700">
-                                @if ($channel->qrUrl())
-                                    <img src="{{ $channel->qrUrl() }}" alt="{{ __('QR code for :name', ['name' => $channel->account_name]) }}" loading="lazy" width="96" height="96" class="size-24 shrink-0 rounded bg-white object-contain">
-                                @endif
-                                <div>
-                                    <flux:text class="font-medium">{{ $channel->method->label() }}</flux:text>
-                                    <flux:text class="text-zinc-500">{{ $channel->account_name }}</flux:text>
-                                    @if ($channel->bank_name)
-                                        <flux:text class="text-zinc-500">{{ $channel->bank_name }}</flux:text>
-                                    @endif
-                                    @if ($channel->account_number)
-                                        <flux:text class="text-zinc-500">{{ $channel->account_number }}</flux:text>
-                                    @endif
-                                </div>
-                            </div>
-                        @empty
-                            <flux:text class="text-amber-400">{{ __('This landlord has no active payment channel.') }}</flux:text>
-                        @endforelse
-                    </div>
-
-                    <div class="flex flex-col gap-3 border-t border-zinc-200 pt-4 dark:border-zinc-700">
-                        <flux:textarea wire:model="rejection_reason" :label="__('Reason (required to reject)')" rows="3" />
-
-                        <div class="flex justify-end gap-2">
-                            <flux:button variant="danger" wire:click="reject({{ $listing->id }})">{{ __('Reject') }}</flux:button>
-                            <flux:button variant="primary" wire:click="approve({{ $listing->id }})">{{ __('Approve') }}</flux:button>
-                        </div>
-                    </div>
-                </div>
-            @endif
-        </div>
-    @empty
+    @if ($this->queue->isEmpty())
         <div class="rounded-xl border border-zinc-200 p-8 text-center dark:border-zinc-700">
             <flux:heading>{{ __('Nothing to review') }}</flux:heading>
             <flux:subheading>{{ __('Submitted listings appear here.') }}</flux:subheading>
         </div>
-    @endforelse
+    @else
+        {{-- "Dense" lets the cards after an open one fill its row, so the review panel sits under that whole row. --}}
+        <div class="grid grid-flow-row-dense grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
+            @foreach ($this->queue as $queuedListing)
+                @php($isOpen = $selectedListingId === $queuedListing->id)
+                @php($queuedProperty = $queuedListing->unit->property)
+                <button
+                    type="button"
+                    wire:key="queue-{{ $queuedListing->id }}"
+                    wire:click="toggle({{ $queuedListing->id }})"
+                    aria-expanded="{{ $isOpen ? 'true' : 'false' }}"
+                    @class([
+                        'group flex flex-col overflow-hidden rounded-xl border bg-white text-left transition hover:border-brand-500 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-500',
+                        'border-zinc-200' => ! $isOpen,
+                        'border-brand-500 ring-2 ring-brand-500' => $isOpen,
+                    ])
+                >
+                    <div class="relative">
+                        @if ($cover = $queuedListing->photos->first())
+                            <img src="{{ $cover->url() }}" alt="{{ __('Cover photo of :title', ['title' => $queuedListing->title]) }}" loading="lazy" decoding="async" class="aspect-[4/3] w-full object-cover">
+                        @else
+                            <x-unit-photo :unit="$queuedListing->unit" />
+                        @endif
+
+                        {{-- Flux badges are see-through, so each sits on a white chip to stay readable over any photo. --}}
+                        <span class="absolute end-2 top-2 inline-flex rounded-md bg-white shadow-sm">
+                            <flux:badge :color="$queuedListing->photos->isEmpty() ? 'amber' : 'zinc'" size="sm">
+                                {{ trans_choice(':count photo|:count photos', $queuedListing->photos->count()) }}
+                            </flux:badge>
+                        </span>
+                    </div>
+
+                    <div class="flex flex-col gap-0.5 p-3 text-center">
+                        <span class="font-medium text-zinc-900 group-hover:text-brand-600">{{ $queuedListing->title }}</span>
+                        <span class="text-xs text-zinc-600">
+                            {{ $queuedProperty->name }} &middot; {{ __('Unit :number', ['number' => $queuedListing->unit->unit_number]) }}
+                        </span>
+                        <span class="text-xs text-zinc-500">
+                            {{ $queuedProperty->type->label() }} &middot; &#8369;{{ number_format((float) $queuedListing->unit->price) }}/mo
+                        </span>
+                        <span class="text-xs text-zinc-500">{{ $queuedProperty->city }}, {{ $queuedProperty->province }}</span>
+                        <span class="text-xs text-zinc-500">{{ __('Landlord: :name', ['name' => $queuedProperty->team->name]) }}</span>
+                        <span class="text-xs text-zinc-500">
+                            {{ __('Submitted :time', ['time' => $queuedListing->submitted_at?->diffForHumans()]) }}
+                        </span>
+                    </div>
+                </button>
+
+                @if ($isOpen && $this->selectedListing)
+                    @php($listing = $this->selectedListing)
+                    @php($property = $listing->unit->property)
+
+                    <div wire:key="review-{{ $listing->id }}" class="col-span-full flex flex-col gap-5 rounded-xl border border-brand-500 bg-white p-5">
+                        <div class="flex items-start justify-between gap-4">
+                            <div>
+                                <flux:heading size="lg">{{ $listing->title }}</flux:heading>
+                                <flux:text class="text-zinc-500">
+                                    {{ $property->team->name }} &middot; {{ $property->name }} ({{ $property->type->label() }})
+                                    &middot; {{ __('Unit :number', ['number' => $listing->unit->unit_number]) }}
+                                </flux:text>
+                            </div>
+                            <flux:button variant="ghost" size="sm" icon="x-mark" :aria-label="__('Close review')" wire:click="toggle({{ $listing->id }})" />
+                        </div>
+
+                        @if ($listing->photos->isNotEmpty())
+                            <div class="grid grid-cols-2 gap-3 sm:grid-cols-4">
+                                @foreach ($listing->photos as $photo)
+                                    <img src="{{ $photo->url() }}" alt="" loading="lazy" width="160" height="120" class="aspect-[4/3] w-full rounded object-cover">
+                                @endforeach
+                            </div>
+                        @else
+                            <flux:text class="text-amber-400">{{ __('This listing has no photos.') }}</flux:text>
+                        @endif
+
+                        <flux:text class="whitespace-pre-line">{{ $listing->description }}</flux:text>
+
+                        <dl class="grid gap-3 text-sm sm:grid-cols-2">
+                            <div>
+                                <dt class="text-zinc-500">{{ __('Address') }}</dt>
+                                <dd>{{ $property->address_line }}, {{ $property->city }}, {{ $property->province }} {{ $property->postal_code }}</dd>
+                            </div>
+                            <div>
+                                <dt class="text-zinc-500">{{ __('Monthly price') }}</dt>
+                                <dd>&#8369;{{ number_format((float) $listing->unit->price, 2) }}</dd>
+                            </div>
+                            <div>
+                                <dt class="text-zinc-500">{{ __('Contact') }}</dt>
+                                <dd>{{ $listing->contact_name }} &middot; {{ $listing->contact_phone }} &middot; {{ $listing->contact_email }}</dd>
+                            </div>
+                            <div>
+                                <dt class="text-zinc-500">{{ __('Downpayment requested') }}</dt>
+                                <dd>{{ $listing->downpayment_amount !== null ? '₱'.number_format((float) $listing->downpayment_amount, 2) : __('Not set') }}</dd>
+                            </div>
+                        </dl>
+
+                        <div class="flex flex-col gap-3">
+                            <flux:heading size="sm">{{ __('Payment channels') }}</flux:heading>
+                            @forelse ($this->paymentChannels as $channel)
+                                <div wire:key="channel-{{ $channel->id }}" class="flex gap-4 rounded-lg border border-zinc-200 p-3 dark:border-zinc-700">
+                                    @if ($channel->qrUrl())
+                                        <img src="{{ $channel->qrUrl() }}" alt="{{ __('QR code for :name', ['name' => $channel->account_name]) }}" loading="lazy" width="96" height="96" class="size-24 shrink-0 rounded bg-white object-contain">
+                                    @endif
+                                    <div>
+                                        <flux:text class="font-medium">{{ $channel->method->label() }}</flux:text>
+                                        <flux:text class="text-zinc-500">{{ $channel->account_name }}</flux:text>
+                                        @if ($channel->bank_name)
+                                            <flux:text class="text-zinc-500">{{ $channel->bank_name }}</flux:text>
+                                        @endif
+                                        @if ($channel->account_number)
+                                            <flux:text class="text-zinc-500">{{ $channel->account_number }}</flux:text>
+                                        @endif
+                                    </div>
+                                </div>
+                            @empty
+                                <flux:text class="text-amber-400">{{ __('This landlord has no active payment channel.') }}</flux:text>
+                            @endforelse
+                        </div>
+
+                        <div class="flex flex-col gap-3 border-t border-zinc-200 pt-4 dark:border-zinc-700">
+                            <flux:textarea wire:model="rejection_reason" :label="__('Reason (required to reject)')" rows="3" />
+
+                            <div class="flex justify-end gap-2">
+                                <flux:button variant="danger" wire:click="reject({{ $listing->id }})">{{ __('Reject') }}</flux:button>
+                                <flux:button variant="primary" wire:click="approve({{ $listing->id }})">{{ __('Approve') }}</flux:button>
+                            </div>
+                        </div>
+                    </div>
+                @endif
+            @endforeach
+        </div>
+    @endif
 </div>
