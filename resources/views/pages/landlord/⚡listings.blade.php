@@ -340,6 +340,10 @@ new #[Title('Listings')] class extends Component
      * the cover, so a landlord who already photographed the unit doesn't have
      * to upload it again. It's a copy, not the same file, because removing a
      * listing photo deletes its file. Returns whether the listing now has one.
+     *
+     * The photo is read and written rather than copied: an S3 copy first
+     * asks for the file's ACL, which Supabase Storage doesn't support, so
+     * the copy fails quietly and would leave a photo row with no file.
      */
     protected function useUnitPhotoAsCover(UnitListing $listing): bool
     {
@@ -349,13 +353,17 @@ new #[Title('Listings')] class extends Component
 
         $unitPhotoPath = $listing->unit->photo_path;
         $disk = Storage::disk(config('filesystems.media_disk'));
+        $contents = $unitPhotoPath ? $disk->get($unitPhotoPath) : null;
 
-        if (! $unitPhotoPath || ! $disk->exists($unitPhotoPath)) {
+        if ($contents === null) {
             return false;
         }
 
         $copyPath = 'listings/'.Str::random(40).'.'.pathinfo($unitPhotoPath, PATHINFO_EXTENSION);
-        $disk->copy($unitPhotoPath, $copyPath);
+
+        if (! $disk->put($copyPath, $contents)) {
+            return false;
+        }
 
         $listing->photos()->create(['path' => $copyPath, 'sort_order' => 0]);
 

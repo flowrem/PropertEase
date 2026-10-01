@@ -235,6 +235,20 @@ test('a listing without photos uses a copy of its unit\'s photo as the cover', f
     Storage::disk('media')->assertExists([$cover->path, 'units/unit-cover.webp']);
 });
 
+test('a unit photo that cannot be read leaves no broken cover behind', function () {
+    $landlord = User::factory()->create();
+    $listing = listingFor($landlord);
+    $listing->unit->forceFill(['photo_path' => 'units/missing.webp'])->save();
+    PaymentChannel::factory()->for($landlord->currentTeam)->create();
+
+    $this->actingAs($landlord);
+
+    Livewire::test('pages::landlord.listings')->call('submitForReview', $listing->id);
+
+    expect($listing->refresh()->status)->toBe(ListingStatus::Draft)
+        ->and($listing->photos()->exists())->toBeFalse();
+});
+
 test('saving a listing without photos uses its unit\'s photo, but not when photos are uploaded', function (bool $uploadsPhoto) {
     $landlord = User::factory()->create();
     $unit = Unit::factory()->for(Property::factory()->for($landlord->currentTeam))->create();
