@@ -342,6 +342,29 @@ test('shrinking an existing unit\'s floor area below what its rooms need is reje
         ->assertHasErrors(['form.floor_area_sqm']);
 });
 
+test('a floor area typed outside the allowed range is explained before saving', function (string $typed, string $message) {
+    $user = User::factory()->create();
+    $property = Property::factory()->for($user->currentTeam)->create();
+
+    config(['occuplace.units.floor_area' => ['min' => 6, 'max' => 70]]);
+
+    $this->actingAs($user);
+
+    Livewire::test('pages::landlord.properties')
+        ->call('startAddingUnit', $property->id)
+        ->set('form.floor_area_sqm', $typed)
+        ->assertHasErrors(['form.floor_area_sqm' => $message])
+        ->assertSee($message)
+        ->assertSet('form.floor_area_sqm', $typed)
+        ->call('addUnit')
+        ->assertHasErrors(['form.floor_area_sqm' => $message])
+        ->set('form.floor_area_sqm', '18.5')
+        ->assertHasNoErrors('form.floor_area_sqm');
+})->with([
+    'below the minimum' => ['2', 'The minimum size required is 6 m².'],
+    'above the maximum' => ['250', 'The maximum size allowed is 70 m².'],
+]);
+
 test('typing more bedrooms or bathrooms than the floor area fits snaps the value back down', function () {
     $user = User::factory()->create();
     $property = Property::factory()->for($user->currentTeam)->create(['type' => PropertyType::Apartment]);

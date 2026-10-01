@@ -413,6 +413,47 @@ class UnitForm extends Form
     }
 
     /**
+     * Say right away when the floor area is typed outside the allowed range,
+     * like 2 m² or 200 m², instead of waiting for the save button: the
+     * browser's "min" and "max" only limit the arrows, not what can be
+     * typed. The value stays as typed so the landlord sees what to fix, and
+     * anything that isn't a number is left for validation on save.
+     */
+    public function updatedFloorAreaSqm(): void
+    {
+        $this->resetErrorBag('floor_area_sqm');
+
+        if (! is_numeric($this->floor_area_sqm)) {
+            return;
+        }
+
+        $limits = config('occuplace.units.floor_area');
+        $messages = $this->floorAreaLimitMessages();
+
+        if ((float) $this->floor_area_sqm < $limits['min']) {
+            $this->addError('floor_area_sqm', $messages['floor_area_sqm.min']);
+        } elseif ((float) $this->floor_area_sqm > $limits['max']) {
+            $this->addError('floor_area_sqm', $messages['floor_area_sqm.max']);
+        }
+    }
+
+    /**
+     * The messages for a floor area below the minimum or above the maximum,
+     * shared by the instant check above and validation on save.
+     *
+     * @return array{'floor_area_sqm.min': string, 'floor_area_sqm.max': string}
+     */
+    private function floorAreaLimitMessages(): array
+    {
+        $limits = config('occuplace.units.floor_area');
+
+        return [
+            'floor_area_sqm.min' => __('The minimum size required is :min m².', ['min' => $limits['min']]),
+            'floor_area_sqm.max' => __('The maximum size allowed is :max m².', ['max' => $limits['max']]),
+        ];
+    }
+
+    /**
      * Snap bedrooms (or bathrooms) back down the moment it's typed past what
      * the current floor area allows, so a landlord can't leave an
      * unrealistic number, like 15 bedrooms in a 24 m² unit, sitting in the
@@ -580,7 +621,7 @@ class UnitForm extends Form
             $this->bathrooms = '0';
         }
 
-        $validated = $this->validate($this->rulesFor($type, $propertyId, $unit), attributes: [
+        $validated = $this->validate($this->rulesFor($type, $propertyId, $unit), $this->floorAreaLimitMessages(), [
             'unit_number' => __('unit name'),
             'floor_level' => __('floor level'),
             'floor_area_sqm' => __('floor area'),
