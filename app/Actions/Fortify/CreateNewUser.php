@@ -8,7 +8,6 @@ use App\Concerns\PasswordValidationRules;
 use App\Concerns\ProfileValidationRules;
 use App\Models\TeamInvitation;
 use App\Models\User;
-use App\Rules\TeamName;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
@@ -30,8 +29,9 @@ class CreateNewUser implements CreatesNewUsers
      * Validate and create a newly registered user.
      *
      * A user registering through a valid, pending invitation for their email
-     * joins that team directly. Everyone else is a new landlord: they must
-     * upload a valid ID and their team waits for Super Admin approval.
+     * joins that team directly. Everyone else is a new landlord: their team is
+     * named after them, they must upload a valid ID, and the team waits for
+     * Super Admin approval.
      *
      * @param  array<string, mixed>  $input
      */
@@ -43,7 +43,6 @@ class CreateNewUser implements CreatesNewUsers
             ...$this->profileRules(),
             'password' => $this->passwordRules(),
             'invitation' => ['nullable', 'string'],
-            'business_name' => ['nullable', 'string', 'max:255', new TeamName],
             ...($invitation ? [] : self::verificationRules()),
         ], self::verificationMessages())->validate();
 
@@ -57,7 +56,7 @@ class CreateNewUser implements CreatesNewUsers
             if ($invitation) {
                 $this->acceptTeamInvitation->handle($user, $invitation);
             } else {
-                $team = $this->createTeam->handle($user, $input['business_name'] ?? $user->name."'s Team", isPersonal: true);
+                $team = $this->createTeam->handle($user, $user->name, isPersonal: true);
 
                 /** @var UploadedFile $idFile */
                 $idFile = $input['verification_id'];

@@ -68,7 +68,6 @@ test('is_super_admin cannot be set through the registration form', function () {
         'email' => 'someone@example.com',
         'password' => 'password',
         'password_confirmation' => 'password',
-        'business_name' => "Someone's Apartments",
         'verification_id' => UploadedFile::fake()->image('id.jpg'),
         'consent' => '1',
         'is_super_admin' => true,

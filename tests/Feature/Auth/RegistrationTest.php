@@ -29,13 +29,12 @@ test('registration screen can be rendered', function () {
     $response->assertOk();
 });
 
-test('new users can register as a landlord with a business name', function () {
+test('new users can register as a landlord whose team is named after them', function () {
     $response = $this->post(route('register.store'), [
         'name' => 'John Doe',
         'email' => 'test@example.com',
         'password' => 'password',
         'password_confirmation' => 'password',
-        'business_name' => "John's Apartments",
         ...landlordIdPayload(),
     ]);
 
@@ -47,23 +46,7 @@ test('new users can register as a landlord with a business name', function () {
     $this->assertAuthenticated();
 
     expect($user->personalTeam())->not->toBeNull()
-        ->and($user->personalTeam()->name)->toBe("John's Apartments");
-});
-
-test('registering without a business name falls back to a default team name', function () {
-    $response = $this->post(route('register.store'), [
-        'name' => 'John Doe',
-        'email' => 'test@example.com',
-        'password' => 'password',
-        'password_confirmation' => 'password',
-        ...landlordIdPayload(),
-    ]);
-
-    $user = User::where('email', 'test@example.com')->first();
-
-    $response->assertSessionHasNoErrors();
-
-    expect($user->personalTeam()->name)->toBe("John Doe's Team");
+        ->and($user->personalTeam()->name)->toBe('John Doe');
 });
 
 test('registering through a valid invitation joins that team instead of a personal team', function () {

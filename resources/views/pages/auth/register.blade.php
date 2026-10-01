@@ -44,17 +44,6 @@
             />
 
             @unless ($teamInvitation)
-                <!-- Business or property name -->
-                <flux:input
-                    name="business_name"
-                    :label="__('Business or property name')"
-                    :value="old('business_name')"
-                    type="text"
-                    required
-                    autocomplete="organization"
-                    :placeholder="__('e.g. Dela Cruz Apartments')"
-                />
-
                 <!-- Valid ID -->
                 <div class="flex flex-col gap-2">
                     <flux:input

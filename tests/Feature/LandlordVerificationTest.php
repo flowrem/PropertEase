@@ -22,7 +22,6 @@ function landlordRegistration(array $overrides = []): array
         'email' => 'juana@example.test',
         'password' => 'password',
         'password_confirmation' => 'password',
-        'business_name' => 'Juana Apartments',
         'verification_id' => UploadedFile::fake()->image('id.jpg'),
         'consent' => '1',
     ], $overrides);
