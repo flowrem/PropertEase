@@ -61,6 +61,8 @@ test('a landlord sees pending reservations and the pending badge', function () {
 });
 
 test('reservations are grouped by what the landlord does next, with the deadline for those waiting', function () {
+    $this->travelTo('2026-09-01 08:00:00');
+
     $landlord = User::factory()->create();
     $unit = fn () => Unit::factory()->for(Property::factory()->for($landlord->currentTeam))->create();
     $pending = Reservation::factory()->for($unit())->create(['first_name' => 'Pia']);

@@ -99,6 +99,8 @@ test('the lookup is rate limited', function () {
 });
 
 test('the deadline is shown in Philippine time', function () {
+    $this->travelTo('2026-09-01 08:00:00');
+
     [$reservation] = reservedForStatusPage(['expires_at' => '2026-09-30 09:00:00']);
     grantStatusAccess($reservation);
 
