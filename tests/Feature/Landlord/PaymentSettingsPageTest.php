@@ -57,6 +57,34 @@ test('a landlord can add a GCash channel with a QR code', function () {
     Storage::disk('media')->assertExists($channel->qr_path);
 });
 
+test('a new GCash channel starts with the landlord\'s mobile number, and a bank starts blank', function () {
+    $landlord = User::factory()->create(['contact_number' => '+639171234567']);
+
+    $this->actingAs($landlord);
+
+    Livewire::test('pages::landlord.payment-settings')
+        ->call('openCreate')
+        ->assertSet('account_number', '09171234567')
+        ->set('method', 'bank_transfer')
+        ->assertSet('account_number', '')
+        ->set('method', 'gcash')
+        ->assertSet('account_number', '09171234567');
+});
+
+test('a GCash mobile number must be a valid mobile number', function () {
+    $landlord = User::factory()->create();
+
+    $this->actingAs($landlord);
+
+    Livewire::test('pages::landlord.payment-settings')
+        ->call('openCreate')
+        ->set('account_name', 'Maria Santos')
+        ->set('account_number', '0917')
+        ->set('qr', UploadedFile::fake()->image('my-gcash.png'))
+        ->call('save')
+        ->assertHasErrors('account_number');
+});
+
 test('a GCash channel requires a QR code', function () {
     $landlord = User::factory()->create();
 

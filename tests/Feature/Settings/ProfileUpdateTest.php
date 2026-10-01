@@ -34,7 +34,7 @@ test('a user can add, change and clear their mobile number', function (string $t
     $this->actingAs($user);
 
     Livewire::test('pages::settings.profile')
-        ->assertSet('contact_number', '0917 000 0000')
+        ->assertSet('contact_number', '09170000000')
         ->set('contact_number', $typed)
         ->call('updateProfileInformation')
         ->assertHasNoErrors();

@@ -25,9 +25,7 @@ new #[Title('Profile settings')] class extends Component {
     {
         $this->name = Auth::user()->name;
         $this->email = Auth::user()->email;
-        $this->contact_number = Auth::user()->contact_number
-            ? PhilippineMobileNumber::forDisplay(Auth::user()->contact_number)
-            : '';
+        $this->contact_number = PhilippineMobileNumber::forInput(Auth::user()->contact_number);
     }
 
     /**
@@ -125,10 +123,10 @@ new #[Title('Profile settings')] class extends Component {
                 :label="__('Mobile number')"
                 :description="__('Optional. Your landlord uses this to reach you.')"
                 type="tel"
-                inputmode="tel"
-                maxlength="20"
-                placeholder="0917 123 4567"
-                autocomplete="tel"
+                mask="99999999999"
+                inputmode="numeric"
+                placeholder="09171234567"
+                autocomplete="tel-national"
             />
 
             <div class="flex items-center gap-4">

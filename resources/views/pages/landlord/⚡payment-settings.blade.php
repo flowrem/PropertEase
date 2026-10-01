@@ -3,6 +3,7 @@
 use App\Enums\PaymentMethod;
 use App\Models\PaymentChannel;
 use App\Models\Team;
+use App\Rules\PhilippineMobileNumber;
 use Flux\Flux;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Facades\Auth;
@@ -82,7 +83,19 @@ new #[Title('Payment settings')] class extends Component
         Gate::authorize('create', [PaymentChannel::class, $this->team]);
 
         $this->resetForm();
+        $this->account_number = $this->landlordMobileNumber();
         $this->showFormModal = true;
+    }
+
+    /**
+     * Swapping between a bank and a mobile wallet swaps the number too: a bank
+     * starts blank, a wallet starts with the landlord's own mobile number.
+     */
+    public function updatedMethod(): void
+    {
+        $this->account_number = $this->method === PaymentMethod::BankTransfer->value
+            ? ''
+            : $this->landlordMobileNumber();
     }
 
     public function openEdit(int $channelId): void
@@ -120,7 +133,9 @@ new #[Title('Payment settings')] class extends Component
         $validated = $this->validate([
             'method' => ['required', Rule::in(array_map(fn (PaymentMethod $method) => $method->value, PaymentChannel::onlineMethods()))],
             'account_name' => ['required', 'string', 'max:100'],
-            'account_number' => [$isBank ? 'required' : 'nullable', 'string', 'max:50'],
+            'account_number' => $isBank
+                ? ['required', 'string', 'max:50']
+                : ['nullable', 'string', 'max:20', new PhilippineMobileNumber],
             'bank_name' => [$isBank ? 'required' : 'nullable', 'string', 'max:100'],
             'qr' => [$needsQr ? 'required' : 'nullable', 'image', 'mimes:jpg,jpeg,png,webp', 'max:2048'],
         ], [
@@ -183,6 +198,11 @@ new #[Title('Payment settings')] class extends Component
         $this->team->forceFill(['reservation_hold_days' => (int) $validated['reservationHoldDays']])->save();
 
         Flux::toast(variant: 'success', text: __('Reservation hold saved. It applies to reservations you accept from now on.'));
+    }
+
+    protected function landlordMobileNumber(): string
+    {
+        return PhilippineMobileNumber::forInput(Auth::user()->contact_number);
     }
 
     protected function resetForm(): void
@@ -300,7 +320,7 @@ new #[Title('Payment settings')] class extends Component
                 <flux:input wire:model="bank_name" :label="__('Bank name')" required />
                 <flux:input wire:model="account_number" :label="__('Account number')" required />
             @else
-                <flux:input wire:model="account_number" :label="__('Mobile number (optional)')" />
+                <flux:input wire:model="account_number" :label="__('Mobile number (optional)')" type="tel" mask="99999999999" inputmode="numeric" placeholder="09171234567" />
             @endif
 
             <div class="space-y-2">

@@ -8,6 +8,7 @@ use App\Concerns\PasswordValidationRules;
 use App\Concerns\ProfileValidationRules;
 use App\Models\TeamInvitation;
 use App\Models\User;
+use App\Rules\PhilippineMobileNumber;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
@@ -30,8 +31,8 @@ class CreateNewUser implements CreatesNewUsers
      *
      * A user registering through a valid, pending invitation for their email
      * joins that team directly. Everyone else is a new landlord: their team is
-     * named after them, they must upload a valid ID, and the team waits for
-     * Super Admin approval.
+     * named after them, they must give a mobile number and upload a valid ID,
+     * and the team waits for Super Admin approval.
      *
      * @param  array<string, mixed>  $input
      */
@@ -43,13 +44,17 @@ class CreateNewUser implements CreatesNewUsers
             ...$this->profileRules(),
             'password' => $this->passwordRules(),
             'invitation' => ['nullable', 'string'],
-            ...($invitation ? [] : self::verificationRules()),
+            ...($invitation ? [] : [
+                'contact_number' => ['required', 'string', 'max:20', new PhilippineMobileNumber],
+                ...self::verificationRules(),
+            ]),
         ], self::verificationMessages())->validate();
 
         return DB::transaction(function () use ($input, $invitation) {
             $user = User::create([
                 'name' => $input['name'],
                 'email' => $input['email'],
+                'contact_number' => $invitation ? null : PhilippineMobileNumber::normalize($input['contact_number']),
                 'password' => $input['password'],
             ]);
 

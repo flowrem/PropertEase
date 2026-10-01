@@ -44,6 +44,21 @@
             />
 
             @unless ($teamInvitation)
+                <!-- Mobile number -->
+                <div x-data>
+                    <flux:input
+                        name="contact_number"
+                        :label="__('Mobile number')"
+                        :value="old('contact_number')"
+                        type="tel"
+                        mask="99999999999"
+                        inputmode="numeric"
+                        required
+                        autocomplete="tel-national"
+                        placeholder="09171234567"
+                    />
+                </div>
+
                 <!-- Valid ID -->
                 <div class="flex flex-col gap-2">
                     <flux:input

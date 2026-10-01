@@ -20,7 +20,7 @@ class PhilippineMobileNumber implements ValidationRule
     public function validate(string $attribute, mixed $value, Closure $fail): void
     {
         if (! is_string($value) || self::normalize($value) === null) {
-            $fail(__('Enter a mobile number like 0917 123 4567 or +63 917 123 4567.'));
+            $fail(__('Enter an 11-digit mobile number like 09171234567.'));
         }
     }
 
@@ -43,8 +43,17 @@ class PhilippineMobileNumber implements ValidationRule
      */
     public static function forDisplay(string $normalized): string
     {
-        $local = '0'.substr($normalized, 3);
+        $local = self::forInput($normalized);
 
         return substr($local, 0, 4).' '.substr($local, 4, 3).' '.substr($local, 7);
+    }
+
+    /**
+     * A stored +639XXXXXXXXX number as the 11 digits a phone input accepts: 09171234567.
+     * No number gives an empty string, so it can prefill an input as-is.
+     */
+    public static function forInput(?string $normalized): string
+    {
+        return $normalized ? '0'.substr($normalized, 3) : '';
     }
 }

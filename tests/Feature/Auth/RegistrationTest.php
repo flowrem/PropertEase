@@ -11,13 +11,14 @@ beforeEach(function () {
 });
 
 /**
- * The valid ID and consent every self-registering landlord must send.
+ * The mobile number, valid ID and consent every self-registering landlord must send.
  *
- * @return array{verification_id: UploadedFile, consent: string}
+ * @return array{contact_number: string, verification_id: UploadedFile, consent: string}
  */
-function landlordIdPayload(): array
+function landlordSignUpPayload(): array
 {
     return [
+        'contact_number' => '09171234567',
         'verification_id' => UploadedFile::fake()->image('id.jpg'),
         'consent' => '1',
     ];
@@ -35,7 +36,7 @@ test('new users can register as a landlord whose team is named after them', func
         'email' => 'test@example.com',
         'password' => 'password',
         'password_confirmation' => 'password',
-        ...landlordIdPayload(),
+        ...landlordSignUpPayload(),
     ]);
 
     $user = User::where('email', 'test@example.com')->first();
@@ -46,8 +47,28 @@ test('new users can register as a landlord whose team is named after them', func
     $this->assertAuthenticated();
 
     expect($user->personalTeam())->not->toBeNull()
-        ->and($user->personalTeam()->name)->toBe('John Doe');
+        ->and($user->personalTeam()->name)->toBe('John Doe')
+        ->and($user->contact_number)->toBe('+639171234567');
 });
+
+test('a landlord cannot register without a valid mobile number', function (string $typed) {
+    $response = $this->post(route('register.store'), [
+        'name' => 'John Doe',
+        'email' => 'test@example.com',
+        'password' => 'password',
+        'password_confirmation' => 'password',
+        ...landlordSignUpPayload(),
+        'contact_number' => $typed,
+    ]);
+
+    $response->assertSessionHasErrors('contact_number');
+
+    $this->assertGuest();
+})->with([
+    'missing' => [''],
+    'one digit short' => ['0917123456'],
+    'not a mobile number' => ['02123456789'],
+]);
 
 test('registering through a valid invitation joins that team instead of a personal team', function () {
     $landlord = User::factory()->create();
@@ -98,7 +119,7 @@ test('registering with an email that does not match the invitation gets a person
         'password' => 'password',
         'password_confirmation' => 'password',
         'invitation' => $invitation->code,
-        ...landlordIdPayload(),
+        ...landlordSignUpPayload(),
     ]);
 
     $response->assertSessionHasNoErrors();

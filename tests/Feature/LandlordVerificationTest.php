@@ -22,6 +22,7 @@ function landlordRegistration(array $overrides = []): array
         'email' => 'juana@example.test',
         'password' => 'password',
         'password_confirmation' => 'password',
+        'contact_number' => '09171234567',
         'verification_id' => UploadedFile::fake()->image('id.jpg'),
         'consent' => '1',
     ], $overrides);

@@ -5,12 +5,14 @@ use App\Models\ListingPhoto;
 use App\Models\Team;
 use App\Models\Unit;
 use App\Models\UnitListing;
+use App\Rules\PhilippineMobileNumber;
 use Flux\Flux;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 use Livewire\Attributes\Computed;
 use Livewire\Attributes\Title;
@@ -121,12 +123,25 @@ new #[Title('Listings')] class extends Component
         return collect($this->photoIds)->map(fn (int $id) => $photos->get($id))->filter()->values();
     }
 
+    /**
+     * The photo of the unit this form is for, which becomes the listing's
+     * cover when no listing photos are added.
+     */
+    #[Computed]
+    public function unitPhotoUrl(): ?string
+    {
+        $unit = $this->editingListing?->unit ?? $this->unitsWithoutListing->firstWhere('id', $this->unit_id);
+
+        return $unit?->photoUrl();
+    }
+
     public function openCreate(): void
     {
         abort_unless($this->canManage, 403);
 
         $this->resetForm();
         $this->contact_name = Auth::user()->name;
+        $this->contact_phone = PhilippineMobileNumber::forInput(Auth::user()->contact_number);
         $this->contact_email = Auth::user()->email;
         $this->showFormModal = true;
     }
@@ -197,7 +212,7 @@ new #[Title('Listings')] class extends Component
             'title' => ['required', 'string', 'max:120'],
             'description' => ['required', 'string', 'max:5000'],
             'contact_name' => ['required', 'string', 'max:100'],
-            'contact_phone' => ['required', 'string', 'max:30'],
+            'contact_phone' => ['required', 'string', 'max:20', new PhilippineMobileNumber],
             'contact_email' => ['required', 'email', 'max:255'],
             'downpayment_amount' => ['nullable', 'numeric', 'min:1', 'max:99999999'],
             'newPhotos' => ['array'],
@@ -254,6 +269,8 @@ new #[Title('Listings')] class extends Component
                     'sort_order' => $position++,
                 ]);
             }
+
+            $this->useUnitPhotoAsCover($listing);
         });
 
         unset($this->listings, $this->unitsWithoutListing);
@@ -284,7 +301,7 @@ new #[Title('Listings')] class extends Component
             return;
         }
 
-        if ($listing->photos_count < 1) {
+        if ($listing->photos_count < 1 && ! $this->useUnitPhotoAsCover($listing)) {
             Flux::toast(variant: 'danger', text: __('Add at least one photo before submitting.'));
 
             return;
@@ -316,6 +333,33 @@ new #[Title('Listings')] class extends Component
         unset($this->listings);
 
         Flux::toast(variant: 'success', text: __('Listing taken down.'));
+    }
+
+    /**
+     * Give a listing with no photos of its own a copy of its unit's photo as
+     * the cover, so a landlord who already photographed the unit doesn't have
+     * to upload it again. It's a copy, not the same file, because removing a
+     * listing photo deletes its file. Returns whether the listing now has one.
+     */
+    protected function useUnitPhotoAsCover(UnitListing $listing): bool
+    {
+        if ($listing->photos()->exists()) {
+            return true;
+        }
+
+        $unitPhotoPath = $listing->unit->photo_path;
+        $disk = Storage::disk(config('filesystems.media_disk'));
+
+        if (! $unitPhotoPath || ! $disk->exists($unitPhotoPath)) {
+            return false;
+        }
+
+        $copyPath = 'listings/'.Str::random(40).'.'.pathinfo($unitPhotoPath, PATHINFO_EXTENSION);
+        $disk->copy($unitPhotoPath, $copyPath);
+
+        $listing->photos()->create(['path' => $copyPath, 'sort_order' => 0]);
+
+        return true;
     }
 
     protected function resetForm(): void
@@ -448,7 +492,7 @@ new #[Title('Listings')] class extends Component
 
             <div class="grid gap-4 sm:grid-cols-2">
                 <flux:input wire:model="contact_name" :label="__('Contact name')" required />
-                <flux:input wire:model="contact_phone" :label="__('Contact phone')" required />
+                <flux:input wire:model="contact_phone" :label="__('Contact phone')" type="tel" mask="99999999999" inputmode="numeric" placeholder="09171234567" required />
                 <flux:input wire:model="contact_email" type="email" :label="__('Contact email')" required />
                 <flux:input wire:model="downpayment_amount" type="number" min="1" step="0.01" :label="__('Downpayment requested (optional)')" />
             </div>
@@ -468,6 +512,11 @@ new #[Title('Listings')] class extends Component
                                 </div>
                             </div>
                         @endforeach
+                    </div>
+                @elseif ($this->unitPhotoUrl)
+                    <div class="flex items-center gap-3">
+                        <img src="{{ $this->unitPhotoUrl }}" alt="" loading="lazy" width="160" height="120" class="aspect-[4/3] w-28 rounded object-cover">
+                        <flux:text class="text-zinc-500">{{ __('No listing photos yet, so this unit photo will be the cover. Add photos below to use your own instead.') }}</flux:text>
                     </div>
                 @endif
 

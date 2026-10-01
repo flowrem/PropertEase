@@ -82,6 +82,32 @@ test('a landlord can create a draft listing with photos', function () {
     Storage::disk('media')->assertExists($listing->photos->first()->path);
 });
 
+test('a new listing starts with the landlord\'s own contact details', function () {
+    $landlord = User::factory()->create(['contact_number' => '+639171234567']);
+    Unit::factory()->for(Property::factory()->for($landlord->currentTeam))->create();
+
+    $this->actingAs($landlord);
+
+    Livewire::test('pages::landlord.listings')
+        ->call('openCreate')
+        ->assertSet('contact_name', $landlord->name)
+        ->assertSet('contact_phone', '09171234567')
+        ->assertSet('contact_email', $landlord->email);
+});
+
+test('the contact phone must be a mobile number', function () {
+    $landlord = User::factory()->create();
+    $unit = Unit::factory()->for(Property::factory()->for($landlord->currentTeam))->create();
+
+    $this->actingAs($landlord);
+
+    Livewire::test('pages::landlord.listings')
+        ->set('unit_id', $unit->id)
+        ->set('contact_phone', '0917')
+        ->call('save')
+        ->assertHasErrors('contact_phone');
+});
+
 test('required fields are validated', function () {
     $landlord = User::factory()->create();
 
@@ -111,7 +137,7 @@ test('photo uploads are validated', function (UploadedFile $file) {
         ->set('title', 'Title')
         ->set('description', 'Description')
         ->set('contact_name', 'Maria')
-        ->set('contact_phone', '0917')
+        ->set('contact_phone', '09171234567')
         ->set('contact_email', 'maria@example.com')
         ->set('newPhotos', [$file])
         ->call('save')
@@ -134,7 +160,7 @@ test('a listing cannot have more than eight photos', function () {
         ->set('title', 'Title')
         ->set('description', 'Description')
         ->set('contact_name', 'Maria')
-        ->set('contact_phone', '0917')
+        ->set('contact_phone', '09171234567')
         ->set('contact_email', 'maria@example.com')
         ->set('newPhotos', array_map(fn ($i) => UploadedFile::fake()->image("p{$i}.jpg"), range(1, 9)))
         ->call('save')
@@ -189,6 +215,51 @@ test('submitting for review needs at least one photo', function () {
 
     expect($listing->refresh()->status)->toBe(ListingStatus::Draft);
 });
+
+test('a listing without photos uses a copy of its unit\'s photo as the cover', function () {
+    $landlord = User::factory()->create();
+    $listing = listingFor($landlord);
+    Storage::disk('media')->put('units/unit-cover.webp', 'unit photo');
+    $listing->unit->forceFill(['photo_path' => 'units/unit-cover.webp'])->save();
+    PaymentChannel::factory()->for($landlord->currentTeam)->create();
+
+    $this->actingAs($landlord);
+
+    Livewire::test('pages::landlord.listings')->call('submitForReview', $listing->id);
+
+    $cover = $listing->refresh()->photos()->sole();
+
+    expect($listing->status)->toBe(ListingStatus::PendingReview)
+        ->and($cover->path)->not->toBe('units/unit-cover.webp');
+
+    Storage::disk('media')->assertExists([$cover->path, 'units/unit-cover.webp']);
+});
+
+test('saving a listing without photos uses its unit\'s photo, but not when photos are uploaded', function (bool $uploadsPhoto) {
+    $landlord = User::factory()->create();
+    $unit = Unit::factory()->for(Property::factory()->for($landlord->currentTeam))->create();
+    Storage::disk('media')->put('units/unit-cover.webp', 'unit photo');
+    $unit->forceFill(['photo_path' => 'units/unit-cover.webp'])->save();
+
+    $this->actingAs($landlord);
+
+    Livewire::test('pages::landlord.listings')
+        ->call('openCreate')
+        ->set('unit_id', $unit->id)
+        ->set('title', 'Sunny studio')
+        ->set('description', 'Near the university.')
+        ->set('contact_phone', '09171234567')
+        ->set('newPhotos', $uploadsPhoto ? [UploadedFile::fake()->image('front.jpg')] : [])
+        ->call('save')
+        ->assertHasNoErrors();
+
+    $cover = $unit->refresh()->listing->photos()->sole();
+
+    expect(Storage::disk('media')->get($cover->path) === 'unit photo')->toBe(! $uploadsPhoto);
+})->with([
+    'no upload, the unit photo is copied' => [false],
+    'an upload, only that photo' => [true],
+]);
 
 test('submitting for review needs the unit\'s floor area and rooms', function () {
     $landlord = User::factory()->create();
@@ -354,7 +425,7 @@ test('a landlord cannot create a listing for another team\'s unit', function () 
         ->set('title', 'Title')
         ->set('description', 'Description')
         ->set('contact_name', 'Maria')
-        ->set('contact_phone', '0917')
+        ->set('contact_phone', '09171234567')
         ->set('contact_email', 'maria@example.com')
         ->call('save')
         ->assertNotFound();
@@ -373,7 +444,7 @@ test('a unit can only have one listing', function () {
         ->set('title', 'Duplicate')
         ->set('description', 'Description')
         ->set('contact_name', 'Maria')
-        ->set('contact_phone', '0917')
+        ->set('contact_phone', '09171234567')
         ->set('contact_email', 'maria@example.com')
         ->call('save')
         ->assertNotFound();

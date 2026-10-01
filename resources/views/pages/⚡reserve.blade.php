@@ -298,7 +298,7 @@ new #[Layout('layouts::public'), Title('Reserve this unit')] class extends Compo
 
                     <div>
                         <label for="contact_number" class="mb-1 block text-sm text-zinc-700">{{ __('Mobile number') }}</label>
-                        <input id="contact_number" type="tel" maxlength="20" wire:model="contact_number" autocomplete="tel" inputmode="tel" placeholder="0917 123 4567" class="w-full rounded-lg border border-zinc-300 bg-brand-50 px-3 py-2 text-sm text-zinc-900">
+                        <input id="contact_number" type="tel" x-mask="99999999999" wire:model="contact_number" autocomplete="tel-national" inputmode="numeric" placeholder="09171234567" class="w-full rounded-lg border border-zinc-300 bg-brand-50 px-3 py-2 text-sm text-zinc-900">
                         <p class="mt-1 text-xs text-zinc-600">{{ __('The landlord uses this to reach you about the reservation.') }}</p>
                         @error('contact_number') <p class="mt-1 text-sm text-red-700">{{ $message }}</p> @enderror
                     </div>
