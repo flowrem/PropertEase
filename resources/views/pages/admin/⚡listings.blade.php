@@ -54,11 +54,15 @@ new #[Title('Listing review')] class extends Component
             : collect();
     }
 
-    public function select(int $listingId): void
+    /**
+     * Open a listing's review, or close it when it's already open. Only one
+     * is open at a time, since they share the rejection reason field.
+     */
+    public function toggle(int $listingId): void
     {
         $this->ensureSuperAdmin();
 
-        $this->selectedListingId = $listingId;
+        $this->selectedListingId = $this->selectedListingId === $listingId ? null : $listingId;
         $this->rejection_reason = '';
         $this->resetValidation();
         unset($this->selectedListing, $this->paymentChannels);
@@ -143,48 +147,40 @@ new #[Title('Listing review')] class extends Component
         <flux:subheading>{{ __('Listings waiting for approval, oldest first.') }}</flux:subheading>
     </div>
 
-    <div class="grid gap-6 lg:grid-cols-3">
-        <div class="flex flex-col gap-2 lg:col-span-1">
-            @forelse ($this->queue as $listing)
-                <button
-                    type="button"
-                    wire:key="queue-{{ $listing->id }}"
-                    wire:click="select({{ $listing->id }})"
-                    @class([
-                        'rounded-lg border p-3 text-start',
-                        'border-zinc-200 dark:border-zinc-700' => $selectedListingId !== $listing->id,
-                        'border-[var(--color-accent)]' => $selectedListingId === $listing->id,
-                    ])
-                >
-                    <flux:heading size="sm">{{ $listing->title }}</flux:heading>
-                    <flux:text class="text-zinc-500">
-                        {{ $listing->unit->property->name }} &middot; {{ __('Unit :number', ['number' => $listing->unit->unit_number]) }}
+    @forelse ($this->queue as $queuedListing)
+        @php($isOpen = $selectedListingId === $queuedListing->id)
+        <div wire:key="queue-{{ $queuedListing->id }}" class="rounded-xl border border-zinc-200 dark:border-zinc-700">
+            <div
+                wire:click="toggle({{ $queuedListing->id }})"
+                class="flex w-full cursor-pointer items-center justify-between gap-4 p-4 text-left"
+            >
+                <div>
+                    <flux:heading>{{ $queuedListing->title }}</flux:heading>
+                    <flux:text class="text-zinc-500 dark:text-zinc-400">
+                        {{ $queuedListing->unit->property->name }} &middot; {{ __('Unit :number', ['number' => $queuedListing->unit->unit_number]) }}
                     </flux:text>
-                    <flux:text class="text-xs text-zinc-500">
-                        {{ __('Submitted :time', ['time' => $listing->submitted_at?->diffForHumans()]) }}
-                    </flux:text>
-                </button>
-            @empty
-                <div class="rounded-xl border border-zinc-200 p-8 text-center dark:border-zinc-700">
-                    <flux:heading>{{ __('Nothing to review') }}</flux:heading>
-                    <flux:subheading>{{ __('Submitted listings appear here.') }}</flux:subheading>
                 </div>
-            @endforelse
-        </div>
 
-        <div class="lg:col-span-2">
-            @if ($this->selectedListing)
+                <div class="flex shrink-0 items-center gap-3">
+                    <flux:badge color="zinc">
+                        {{ __('Submitted :time', ['time' => $queuedListing->submitted_at?->diffForHumans()]) }}
+                    </flux:badge>
+                    @if ($isOpen)
+                        <flux:icon.chevron-up class="size-4 text-zinc-500" />
+                    @else
+                        <flux:icon.chevron-down class="size-4 text-zinc-500" />
+                    @endif
+                </div>
+            </div>
+
+            @if ($isOpen && $this->selectedListing)
                 @php($listing = $this->selectedListing)
                 @php($property = $listing->unit->property)
 
-                <div class="flex flex-col gap-5 rounded-lg border border-zinc-200 p-5 dark:border-zinc-700">
-                    <div>
-                        <flux:heading size="lg">{{ $listing->title }}</flux:heading>
-                        <flux:text class="text-zinc-500">
-                            {{ $property->team->name }} &middot; {{ $property->name }} ({{ $property->type->label() }})
-                            &middot; {{ __('Unit :number', ['number' => $listing->unit->unit_number]) }}
-                        </flux:text>
-                    </div>
+                <div class="flex flex-col gap-5 border-t border-zinc-200 p-4 dark:border-zinc-700">
+                    <flux:text class="text-zinc-500">
+                        {{ $property->team->name }} &middot; {{ $property->name }} ({{ $property->type->label() }})
+                    </flux:text>
 
                     @if ($listing->photos->isNotEmpty())
                         <div class="grid grid-cols-2 gap-3 sm:grid-cols-4">
@@ -249,9 +245,12 @@ new #[Title('Listing review')] class extends Component
                         </div>
                     </div>
                 </div>
-            @else
-                <flux:text class="text-zinc-500">{{ __('Select a listing to review it.') }}</flux:text>
             @endif
         </div>
-    </div>
+    @empty
+        <div class="rounded-xl border border-zinc-200 p-8 text-center dark:border-zinc-700">
+            <flux:heading>{{ __('Nothing to review') }}</flux:heading>
+            <flux:subheading>{{ __('Submitted listings appear here.') }}</flux:subheading>
+        </div>
+    @endforelse
 </div>
