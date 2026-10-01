@@ -33,11 +33,15 @@ function pendingListingFor(User $landlord): UnitListing
     return $listing;
 }
 
-test('guests and landlords cannot open the review queue', function () {
+test('guests and landlords cannot open the review queue or a review', function () {
     $landlord = User::factory()->create();
+    $listing = pendingListingFor($landlord);
 
-    $this->get(route('admin.listings'))->assertRedirect(route('login'));
-    $this->actingAs($landlord)->get(route('admin.listings'))->assertForbidden();
+    foreach ([route('admin.listings'), route('admin.listings.show', ['listing' => $listing->id])] as $url) {
+        $this->get($url)->assertRedirect(route('login'));
+        $this->actingAs($landlord)->get($url)->assertForbidden();
+        auth()->logout();
+    }
 });
 
 test('a super admin sees pending listings oldest first and nothing else', function () {
@@ -55,24 +59,9 @@ test('a super admin sees pending listings oldest first and nothing else', functi
         ->assertDontSee('Draft listing');
 });
 
-test('the detail view shows the team\'s active payment channels only', function () {
+test('each card shows the listing\'s details and links to its review page', function () {
     $landlord = User::factory()->create();
-    $listing = pendingListingFor($landlord);
-    PaymentChannel::factory()->for($landlord->currentTeam)->create(['account_name' => 'Active Account']);
-    PaymentChannel::factory()->for($landlord->currentTeam)->inactive()->create(['account_name' => 'Inactive Account']);
-    PaymentChannel::factory()->create(['account_name' => 'Other Team Account']);
-
-    $this->actingAs(superAdmin());
-
-    Livewire::test('pages::admin.listings')
-        ->call('toggle', $listing->id)
-        ->assertSee('Active Account')
-        ->assertDontSee('Inactive Account')
-        ->assertDontSee('Other Team Account');
-});
-
-test('each card shows the listing\'s details before it is opened', function () {
-    $landlord = User::factory()->create();
+    $landlord->currentTeam->update(['name' => 'INF-241']);
     $listing = pendingListingFor($landlord);
     $property = $listing->unit->property;
 
@@ -84,25 +73,43 @@ test('each card shows the listing\'s details before it is opened', function () {
         ->assertSee('Unit '.$listing->unit->unit_number)
         ->assertSee($property->type->label())
         ->assertSee($property->city)
-        ->assertSee('Landlord: '.$landlord->currentTeam->name);
+        ->assertSee('Landlord: '.$landlord->name)
+        ->assertDontSee('INF-241')
+        ->assertSee(route('admin.listings.show', ['listing' => $listing->id]));
 });
 
-test('clicking a listing expands its review, and clicking it again collapses it', function () {
+test('the review page shows the listing, its unit and the landlord', function () {
     $landlord = User::factory()->create();
+    $landlord->currentTeam->update(['name' => 'INF-241']);
     $listing = pendingListingFor($landlord);
     $listing->forceFill(['description' => 'Walking distance to campus.'])->save();
+    $listing->unit->forceFill(['floor_area_sqm' => 24, 'bedrooms' => 1, 'bathrooms' => 1])->save();
+
+    $this->actingAs(superAdmin())
+        ->get(route('admin.listings.show', ['listing' => $listing->id]))
+        ->assertOk()
+        ->assertSee('Walking distance to campus.')
+        ->assertSee('24 m²')
+        ->assertSee($landlord->name)
+        ->assertSee($landlord->email);
+});
+
+test('the review page shows the team\'s active payment channels only', function () {
+    $landlord = User::factory()->create();
+    $listing = pendingListingFor($landlord);
+    PaymentChannel::factory()->for($landlord->currentTeam)->create(['account_name' => 'Active Account']);
+    PaymentChannel::factory()->for($landlord->currentTeam)->inactive()->create(['account_name' => 'Inactive Account']);
+    PaymentChannel::factory()->create(['account_name' => 'Other Team Account']);
 
     $this->actingAs(superAdmin());
 
-    Livewire::test('pages::admin.listings')
-        ->assertDontSee('Walking distance to campus.')
-        ->call('toggle', $listing->id)
-        ->assertSee('Walking distance to campus.')
-        ->call('toggle', $listing->id)
-        ->assertDontSee('Walking distance to campus.');
+    Livewire::test('pages::admin.listing-review', ['listing' => $listing->id])
+        ->assertSee('Active Account')
+        ->assertDontSee('Inactive Account')
+        ->assertDontSee('Other Team Account');
 });
 
-test('approving records the reviewer and notifies the landlord and managers', function () {
+test('approving records the reviewer, notifies the landlord and managers, and goes back to the queue', function () {
     Notification::fake();
 
     $landlord = User::factory()->create();
@@ -115,7 +122,9 @@ test('approving records the reviewer and notifies the landlord and managers', fu
 
     $this->actingAs($admin);
 
-    Livewire::test('pages::admin.listings')->call('approve', $listing->id);
+    Livewire::test('pages::admin.listing-review', ['listing' => $listing->id])
+        ->call('approve')
+        ->assertRedirect(route('admin.listings'));
 
     $listing->refresh();
 
@@ -133,18 +142,13 @@ test('rejecting requires a reason and stores it', function () {
 
     $this->actingAs(superAdmin());
 
-    Livewire::test('pages::admin.listings')
-        ->call('toggle', $listing->id)
-        ->call('reject', $listing->id)
-        ->assertHasErrors('rejection_reason');
-
-    expect($listing->refresh()->status)->toBe(ListingStatus::PendingReview);
-
-    Livewire::test('pages::admin.listings')
-        ->call('toggle', $listing->id)
+    Livewire::test('pages::admin.listing-review', ['listing' => $listing->id])
+        ->call('reject')
+        ->assertHasErrors('rejection_reason')
         ->set('rejection_reason', 'The photos do not show the unit.')
-        ->call('reject', $listing->id)
-        ->assertHasNoErrors();
+        ->call('reject')
+        ->assertHasNoErrors()
+        ->assertRedirect(route('admin.listings'));
 
     expect($listing->refresh()->status)->toBe(ListingStatus::Rejected)
         ->and($listing->rejection_reason)->toBe('The photos do not show the unit.');
@@ -156,10 +160,10 @@ test('only a super admin can approve or reject', function () {
 
     $this->actingAs($landlord);
 
-    Livewire::test('pages::admin.listings')->call('approve', $listing->id)->assertForbidden();
-    Livewire::test('pages::admin.listings')
+    Livewire::test('pages::admin.listing-review', ['listing' => $listing->id])->call('approve')->assertForbidden();
+    Livewire::test('pages::admin.listing-review', ['listing' => $listing->id])
         ->set('rejection_reason', 'Nope')
-        ->call('reject', $listing->id)
+        ->call('reject')
         ->assertForbidden();
 
     expect($listing->refresh()->status)->toBe(ListingStatus::PendingReview);
@@ -174,9 +178,10 @@ test('a listing that is no longer pending cannot be reviewed again', function ()
 
     $this->actingAs(superAdmin());
 
-    Livewire::test('pages::admin.listings')
+    Livewire::test('pages::admin.listing-review', ['listing' => $listing->id])
+        ->assertSee('This listing is no longer waiting for review.')
         ->set('rejection_reason', 'Too late')
-        ->call('reject', $listing->id);
+        ->call('reject');
 
     expect($listing->refresh()->status)->toBe(ListingStatus::Approved);
     Notification::assertNothingSent();

@@ -12,4 +12,5 @@ Route::prefix('admin')
         Route::livewire('landlords', 'pages::admin.landlords')->name('landlords');
         Route::get('landlords/{team}/id', LandlordIdController::class)->whereNumber('team')->name('landlords.id');
         Route::livewire('listings', 'pages::admin.listings')->name('listings');
+        Route::livewire('listings/{listing}', 'pages::admin.listing-review')->whereNumber('listing')->name('listings.show');
     });
